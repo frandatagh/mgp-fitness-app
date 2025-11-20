@@ -1,8 +1,64 @@
 import { View, Text, TextInput, Pressable } from 'react-native';
-import { COLORS } from '../constants/colors';
 import { router } from 'expo-router';
+import { useForm, Controller } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { COLORS } from '../constants/colors';
+import { useState } from 'react';
+import { loginRequest } from '../lib/auth';
+
+// 1. Esquema de validación con Zod
+const loginSchema = z.object({
+    email: z
+        .string()
+        .min(1, 'El correo es obligatorio')
+        .email('Ingrese un correo válido'),
+    password: z
+        .string()
+        .min(6, 'La contraseña debe tener al menos 6 caracteres'),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
+    const [serverError, setServerError] = useState<string | null>(null);
+
+    // 2. useForm de React Hook Form
+    const {
+        control,
+        handleSubmit,
+        formState: { errors, isSubmitting },
+    } = useForm<LoginFormValues>({
+        resolver: zodResolver(loginSchema),
+        defaultValues: {
+            email: '',
+            password: '',
+        },
+    });
+
+    // 3. Qué pasa cuando el form es válido y se envía
+    const onSubmit = async (data: LoginFormValues) => {
+        setServerError(null);
+
+        try {
+            const response = await loginRequest(data.email, data.password);
+
+            // TODO: más adelante vamos a guardar el token (response.token)
+            // y el usuario (response.user) en un estado global / SecureStore.
+
+            console.log('Login OK:', response);
+            router.replace('/home');
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : 'Error inesperado al iniciar sesión';
+
+            setServerError(message);
+        }
+    };
+
+
     return (
         <View
             className="flex-1 items-center justify-center px-6"
@@ -39,37 +95,68 @@ export default function LoginScreen() {
                     Iniciar sesión
                 </Text>
 
-                {/* Email */}
+
+
+                {/* Correo electrónico */}
                 <Text
                     className="text-sm font-semibold mb-1"
                     style={{ color: COLORS.textLight }}
                 >
                     Correo electrónico
                 </Text>
-                <View className="mb-4 rounded-full px-4 py-2 bg-white flex-row items-center">
-                    <TextInput
-                        placeholder="Ingrese su correo electrónico"
-                        placeholderTextColor="#7BCED1"
-                        keyboardType="email-address"
-                        className="flex-1 text-base"
+                <View className="mb-1 rounded-full px-4 py-2 bg-white flex-row items-center">
+                    <Controller
+                        control={control}
+                        name="email"
+                        render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                value={value}
+                                onChangeText={onChange}
+                                onBlur={onBlur}
+                                placeholder="Ingrese su correo electrónico"
+                                placeholderTextColor="#7BCED1"
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                className="flex-1 text-base"
+                            />
+                        )}
                     />
                 </View>
+                {errors.email && (
+                    <Text className="text-xs mb-3" style={{ color: '#FFBABA' }}>
+                        {errors.email.message}
+                    </Text>
+                )}
 
-                {/* Password */}
+                {/* Contraseña */}
                 <Text
                     className="text-sm font-semibold mb-1"
                     style={{ color: COLORS.textLight }}
                 >
                     Contraseña
                 </Text>
-                <View className="mb-2 rounded-full px-4 py-2 bg-white flex-row items-center">
-                    <TextInput
-                        placeholder="Ingrese su contraseña"
-                        placeholderTextColor="#7BCED1"
-                        secureTextEntry
-                        className="flex-1 text-base"
+                <View className="mb-1 rounded-full px-4 py-2 bg-white flex-row items-center">
+                    <Controller
+                        control={control}
+                        name="password"
+                        render={({ field: { onChange, onBlur, value } }) => (
+                            <TextInput
+                                value={value}
+                                onChangeText={onChange}
+                                onBlur={onBlur}
+                                placeholder="Ingrese su contraseña"
+                                placeholderTextColor="#7BCED1"
+                                secureTextEntry
+                                className="flex-1 text-base"
+                            />
+                        )}
                     />
                 </View>
+                {errors.password && (
+                    <Text className="text-xs mb-3" style={{ color: '#FFBABA' }}>
+                        {errors.password.message}
+                    </Text>
+                )}
 
                 {/* Recordarme / Olvidé */}
                 <View className="flex-row justify-between items-center mb-5">
@@ -85,20 +172,29 @@ export default function LoginScreen() {
                 <Pressable
                     className="rounded-full py-3 items-center mb-4"
                     style={{ backgroundColor: COLORS.primary }}
-                    onPress={() => {
-                        // Más adelante acá haremos el login real.
-                        router.push('/home');
-                    }}
+                    onPress={handleSubmit(onSubmit)}
+                    disabled={isSubmitting}
                 >
                     <Text className="text-base font-bold" style={{ color: '#224000' }}>
-                        Ingresar cuenta
+                        {isSubmitting ? 'Ingresando...' : 'Ingresar cuenta'}
                     </Text>
                 </Pressable>
+
+                {serverError && (
+                    <Text
+                        className="text-xs mt-1 text-center"
+                        style={{ color: '#FFBABA' }}
+                    >
+                        {serverError}
+                    </Text>
+                )}
+
 
                 {/* Link registro */}
                 <Pressable onPress={() => router.push('/register')}>
                     <Text className="text-center text-sm" style={{ color: COLORS.textLight }}>
-                        ¿Eres nuevo? <Text style={{ textDecorationLine: 'underline' }}>Registrarse</Text>
+                        ¿Eres nuevo?{' '}
+                        <Text style={{ textDecorationLine: 'underline' }}>Registrarse</Text>
                     </Text>
                 </Pressable>
             </View>

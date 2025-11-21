@@ -1,5 +1,7 @@
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api';
 
+console.log('API_URL EN ESTE BUNDLE =>', API_URL); // 👈 agrega esta línea
+
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 async function request<T>(

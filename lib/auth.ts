@@ -4,7 +4,7 @@ import { api } from './api';
 export interface AuthUser {
     id: string;
     email: string;
-    username?: string;
+    name: string | null;
 }
 
 export interface AuthResponse {
@@ -18,7 +18,7 @@ export async function loginRequest(email: string, password: string) {
 }
 
 export async function registerRequest(input: {
-    username: string;
+    name: string;
     email: string;
     password: string;
 }) {

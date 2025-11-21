@@ -1,8 +1,10 @@
+import React, { useState } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
 import { RoutineCard } from '../components/RoutineCard';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
+import { useAuth } from '../context/AuthContext';
 
 const MOCK_ROUTINES = [
     {
@@ -23,6 +25,21 @@ const MOCK_ROUTINES = [
 ];
 
 export default function HomeScreen() {
+    const { user, isAuthenticated, logout } = useAuth();
+    const [settingsOpen, setSettingsOpen] = useState(false);
+
+    if (!isAuthenticated) {
+        return <Redirect href="/" />;
+    }
+
+    const displayName = user?.name ?? user?.email ?? 'usuario';
+
+    const handleLogout = async () => {
+        setSettingsOpen(false);
+        await logout();
+        router.replace('/');
+    };
+
     return (
         <SafeAreaView
             className="flex-1"
@@ -30,21 +47,23 @@ export default function HomeScreen() {
         >
             <View className="flex-1 px-4 pt-6 pb-4">
                 {/* LOGO SUPERIOR */}
-                <View className="items-center mb-4">
+                <View className="items-center mb-1">
                     <Text
-                        className="text-3xl font-extrabold tracking-tight"
+                        className="text-3xl font-extrabold tracking-tight text-center"
                         style={{ color: COLORS.accent }}
                     >
-                        MGP{' '}
-                        <Text style={{ color: COLORS.primary }}>
-                            RUTINA
-                        </Text>{' '}
-                        FITNESS
+                        MGP <Text style={{ color: COLORS.primary }}>RUTINA FITNESS</Text>
+                    </Text>
+                    <Text
+                        className="text-xs mt-1"
+                        style={{ color: COLORS.textLight }}
+                    >
+                        Hola, {displayName}
                     </Text>
                 </View>
 
                 {/* TABS SUPERIORES */}
-                <View className="flex-row justify-around mb-2">
+                <View className="flex-row justify-around mb-2 mt-2">
                     <View className="items-center">
                         <Text style={{ color: COLORS.accent }}>Mis rutinas</Text>
                         <View
@@ -52,22 +71,30 @@ export default function HomeScreen() {
                             style={{ backgroundColor: COLORS.primary }}
                         />
                     </View>
+
                     <View className="items-center">
-                        <Text style={{ color: COLORS.textMuted }}>Recomendadas</Text>
+                        <Text style={{ color: COLORS.textMuted }}>Sugerencias</Text>
                     </View>
+
                     <View className="items-center">
                         <Text style={{ color: COLORS.textMuted }}>Personalizar IA</Text>
                     </View>
-                    <View className="items-center">
+
+                    {/* AJUSTES como botón */}
+                    <Pressable
+                        className="items-center"
+                        onPress={() => setSettingsOpen((prev) => !prev)}
+                    >
                         <Text style={{ color: COLORS.textMuted }}>Ajustes</Text>
-                    </View>
+                    </Pressable>
                 </View>
 
-                {/* MARCO PRINCIPAL (similar al recuadro verde de tu diseño) */}
+                {/* MARCO PRINCIPAL */}
                 <View
-                    className="flex-1 mt-2 rounded-3xl px-3 py-4"
+                    className="flex-1 mt-2 rounded-3xl px-3 py-4 relative"
                     style={{ borderWidth: 2, borderColor: COLORS.primary }}
                 >
+                    {/* LISTA DE RUTINAS */}
                     <ScrollView showsVerticalScrollIndicator={false}>
                         {MOCK_ROUTINES.map((routine) => (
                             <RoutineCard
@@ -79,6 +106,79 @@ export default function HomeScreen() {
                             />
                         ))}
                     </ScrollView>
+
+                    {/* MENÚ DESPLEGABLE DE AJUSTES */}
+                    {settingsOpen && (
+                        <View
+                            className="absolute rounded-2xl p-3"
+                            style={{
+                                top: 10,
+                                right: 10,
+                                backgroundColor: '#111111',
+                                borderWidth: 1,
+                                borderColor: COLORS.primary,
+                            }}
+                        >
+                            <Pressable
+                                className="py-1"
+                                onPress={() => {
+                                    // Más adelante podemos navegar a una pantalla de información
+                                    setSettingsOpen(false);
+                                }}
+                            >
+                                <Text
+                                    className="text-sm"
+                                    style={{ color: COLORS.textLight }}
+                                >
+                                    Información
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                className="py-1"
+                                onPress={() => {
+                                    // Más adelante: pantalla "Acerca de nosotros"
+                                    setSettingsOpen(false);
+                                }}
+                            >
+                                <Text
+                                    className="text-sm"
+                                    style={{ color: COLORS.textLight }}
+                                >
+                                    Acerca de nosotros
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                className="py-1"
+                                onPress={() => {
+                                    // Más adelante: pantalla "Términos y condiciones"
+                                    setSettingsOpen(false);
+                                }}
+                            >
+                                <Text
+                                    className="text-sm"
+                                    style={{ color: COLORS.textLight }}
+                                >
+                                    Términos y condiciones
+                                </Text>
+                            </Pressable>
+
+                            <View
+                                className="h-px my-2"
+                                style={{ backgroundColor: COLORS.textMuted }}
+                            />
+
+                            <Pressable className="py-1" onPress={handleLogout}>
+                                <Text
+                                    className="text-sm font-semibold"
+                                    style={{ color: '#FFBABA' }}
+                                >
+                                    Cerrar sesión
+                                </Text>
+                            </Pressable>
+                        </View>
+                    )}
                 </View>
 
                 {/* BOTONES INFERIORES */}
@@ -108,14 +208,8 @@ export default function HomeScreen() {
 
                 {/* FOOTER */}
                 <View className="items-center mt-4">
-                    <Text
-                        className="font-bold"
-                        style={{ color: COLORS.accent }}
-                    >
-                        MGP{' '}
-                        <Text style={{ color: COLORS.primary }}>
-                            RUTINA FITNESS
-                        </Text>
+                    <Text className="font-bold" style={{ color: COLORS.accent }}>
+                        MGP <Text style={{ color: COLORS.primary }}>RUTINA FITNESS</Text>
                     </Text>
                     <Text style={{ color: COLORS.textLight }}>
                         ¡Tu entrenamiento al instante!

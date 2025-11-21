@@ -6,6 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { COLORS } from '../constants/colors';
 import { useState } from 'react';
 import { loginRequest } from '../lib/auth';
+import { useAuth } from '../context/AuthContext';
+import { Redirect } from 'expo-router';
 
 // 1. Esquema de validación con Zod
 const loginSchema = z.object({
@@ -21,7 +23,15 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
+    const { login, isAuthenticated } = useAuth();
+
+    if (isAuthenticated) {
+        return <Redirect href="/home" />;
+    }
+
     const [serverError, setServerError] = useState<string | null>(null);
+
+
 
     // 2. useForm de React Hook Form
     const {
@@ -44,6 +54,7 @@ export default function LoginScreen() {
             const response = await loginRequest(data.email, data.password);
 
             // TODO: más adelante vamos a guardar el token (response.token)
+            login(response.user, response.token);
             // y el usuario (response.user) en un estado global / SecureStore.
 
             console.log('Login OK:', response);

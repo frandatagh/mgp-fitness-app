@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { COLORS } from '../constants/colors';
 import { useState } from 'react';
 import { registerRequest } from '../lib/auth';
+import { useAuth } from '../context/AuthContext';
 
 
 // 1. Esquema de validación de registro
@@ -33,7 +34,7 @@ const registerSchema = z
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function RegisterScreen() {
-
+    const { login } = useAuth();
     const [serverError, setServerError] = useState<string | null>(null);
 
     const {
@@ -55,10 +56,12 @@ export default function RegisterScreen() {
 
         try {
             const response = await registerRequest({
-                username: data.username,
+                name: data.username,
                 email: data.email,
                 password: data.password,
             });
+
+            login(response.user, response.token);
 
             console.log('Register OK:', response);
             // Podés llevar al usuario a Home directamente o al login:

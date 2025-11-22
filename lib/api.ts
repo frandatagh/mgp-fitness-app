@@ -1,61 +1,37 @@
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api';
+// lib/api.ts
+import Constants from 'expo-constants';
 
-console.log('API_URL EN ESTE BUNDLE =>', API_URL); // 👈 agrega esta línea
+const API_URL =
+    Constants.expoConfig?.extra?.apiUrl ??
+    process.env.EXPO_PUBLIC_API_URL ??
+    'http://192.168.0.81:3000/api';
 
-type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+let currentToken: string | null = null;
 
-async function request<T>(
-    path: string,
-    options: RequestInit = {},
-): Promise<T> {
-    const url = `${API_URL}${path}`;
-
-    const response = await fetch(url, {
-        headers: {
-            'Content-Type': 'application/json',
-            ...(options.headers ?? {}),
-        },
-        ...options,
-    });
-
-    let data: any = null;
-    try {
-        data = await response.json();
-    } catch {
-        // puede que no haya body (204, etc.)
-    }
-
-    if (!response.ok) {
-        const message =
-            data?.message ||
-            data?.error ||
-            `Error ${response.status} al llamar a ${path}`;
-
-        throw new Error(message);
-    }
-
-    return data as T;
+// lo llama AuthContext cuando haces login/logout
+export function setAuthToken(token: string | null) {
+    currentToken = token;
 }
 
-export const api = {
-    get: <T>(path: string) => request<T>(path),
-    post: <T>(path: string, body?: unknown) =>
-        request<T>(path, {
-            method: 'POST',
-            body: body ? JSON.stringify(body) : undefined,
-        }),
-    put: <T>(path: string, body?: unknown) =>
-        request<T>(path, {
-            method: 'PUT',
-            body: body ? JSON.stringify(body) : undefined,
-        }),
-    patch: <T>(path: string, body?: unknown) =>
-        request<T>(path, {
-            method: 'PATCH',
-            body: body ? JSON.stringify(body) : undefined,
-        }),
-    delete: <T>(path: string) =>
-        request<T>(path, {
-            method: 'DELETE',
-        }),
-};
+// 👉 TIPAR BIEN apiFetch
+export async function apiFetch(
+    path: string,
+    options: RequestInit = {}
+): Promise<Response> {
+    const url = `${API_URL}${path}`;
+
+    const headers: HeadersInit = {
+        ...(options.headers || {}),
+    };
+
+    if (currentToken) {
+        headers['Authorization'] = `Bearer ${currentToken}`;
+    }
+
+    const res = await fetch(url, {
+        ...options,
+        headers,
+    });
+
+    return res; // <- Response
+}

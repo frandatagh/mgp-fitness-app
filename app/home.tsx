@@ -1,61 +1,119 @@
-import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+// app/home.tsx
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, Pressable, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
 import { RoutineCard } from '../components/RoutineCard';
-import { Redirect, router } from 'expo-router';
+import { router } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
-
-const MOCK_ROUTINES = [
-    {
-        id: '1',
-        title: 'Rutina de prueba',
-        description:
-            'Rutina de prueba. Ejercicios de calentamiento 15 minutos. Tres veces a la semana. Volver a evaluar en tres meses.',
-        highlighted: true,
-        tag: 'Visto recientemente',
-    },
-    {
-        id: '2',
-        title: 'Calentamiento para correr',
-        description:
-            'Rutina de ejercicios para correr. Rodillas arriba 2x2. Trote lateral 3x2. Fondos por loma x4. Descansos intermedios. Estiramientos varios.',
-        highlighted: false,
-    },
-];
+import { getRoutines, Routine } from '../lib/routines';
 
 export default function HomeScreen() {
     const { user, isAuthenticated, logout } = useAuth();
-    const [settingsOpen, setSettingsOpen] = useState(false);
 
-    if (!isAuthenticated) {
-        return <Redirect href="/" />;
-    }
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [routines, setRoutines] = useState<Routine[]>([]);
+    const [loadingRoutines, setLoadingRoutines] = useState(true);
+    const [routinesError, setRoutinesError] = useState<string | null>(null);
 
     const displayName = user?.name ?? user?.email ?? 'usuario';
+
+    // 👉 Redirigir a login si NO está autenticado (pero desde un efecto)
+    useEffect(() => {
+        if (!isAuthenticated) {
+            console.log('No autenticado, redirigiendo a /');
+            router.replace('/');
+        }
+    }, [isAuthenticated]);
+
+    // Cargar rutinas SOLO cuando el usuario está autenticado
+    useEffect(() => {
+        const load = async () => {
+            try {
+                if (!isAuthenticated) {
+                    // si no está logueado, limpiamos estado y salimos
+                    setRoutines([]);
+                    setLoadingRoutines(false);
+                    setRoutinesError(null);
+                    return;
+                }
+
+                setRoutinesError(null);
+                setLoadingRoutines(true);
+
+                const data = await getRoutines();
+                console.log('RUTINAS DESDE API:', data);
+                setRoutines(data);
+            } catch (error) {
+                const message =
+                    error instanceof Error
+                        ? error.message
+                        : 'Error al cargar tus rutinas';
+                setRoutinesError(message);
+            } finally {
+                setLoadingRoutines(false);
+            }
+        };
+
+        load();
+    }, [isAuthenticated]);
 
     const handleLogout = async () => {
         setSettingsOpen(false);
         await logout();
-        router.replace('/');
+        // el efecto de arriba se encargará de mandarte a "/"
     };
+
+    const latestRoutineId = useMemo(() => {
+        if (!routines.length) return null;
+
+        const latest = routines.reduce((currentLatest, routine) => {
+            // usamos updatedAt si existe, sino createdAt
+            const currentDateStr = currentLatest.updatedAt ?? currentLatest.createdAt ?? '';
+            const routineDateStr = routine.updatedAt ?? routine.createdAt ?? '';
+
+            const currentDate = currentDateStr ? new Date(currentDateStr).getTime() : 0;
+            const routineDate = routineDateStr ? new Date(routineDateStr).getTime() : 0;
+
+            return routineDate > currentDate ? routine : currentLatest;
+        }, routines[0]);
+
+        return latest.id;
+    }, [routines]);
+
+
+    // 👉 Si por algún motivo aún no está autenticado, mostramos un fallback
+    if (!isAuthenticated) {
+        return (
+            <SafeAreaView
+                className="flex-1 items-center justify-center"
+                style={{ backgroundColor: COLORS.background }}
+            >
+                <Text style={{ color: COLORS.textLight }}>
+                    Redirigiendo al inicio de sesión...
+                </Text>
+            </SafeAreaView>
+        );
+    }
 
     return (
         <SafeAreaView
             className="flex-1"
             style={{ backgroundColor: COLORS.background }}
         >
-            <View className="flex-1 px-4 pt-6 pb-4">
+            <View className="flex-1 px-4">
                 {/* LOGO SUPERIOR */}
-                <View className="items-center mb-1">
+                <View className="items-center">
+                    <Image
+                        source={require('../assets/img/iconhome.png')}
+                        style={{ width: 110, height: 110, resizeMode: 'contain' }}
+                    />
+                </View>
+
+                {/* SALUDO IZQUIERDO */}
+                <View className="mb-2 self-start px-1">
                     <Text
-                        className="text-3xl font-extrabold tracking-tight text-center"
-                        style={{ color: COLORS.accent }}
-                    >
-                        MGP <Text style={{ color: COLORS.primary }}>RUTINA FITNESS</Text>
-                    </Text>
-                    <Text
-                        className="text-xs mt-1"
+                        className="text-md"
                         style={{ color: COLORS.textLight }}
                     >
                         Hola, {displayName}
@@ -80,10 +138,9 @@ export default function HomeScreen() {
                         <Text style={{ color: COLORS.textMuted }}>Personalizar IA</Text>
                     </View>
 
-                    {/* AJUSTES como botón */}
                     <Pressable
                         className="items-center"
-                        onPress={() => setSettingsOpen((prev) => !prev)}
+                        onPress={() => setSettingsOpen(prev => !prev)}
                     >
                         <Text style={{ color: COLORS.textMuted }}>Ajustes</Text>
                     </Pressable>
@@ -94,20 +151,57 @@ export default function HomeScreen() {
                     className="flex-1 mt-2 rounded-3xl px-3 py-4 relative"
                     style={{ borderWidth: 2, borderColor: COLORS.primary }}
                 >
-                    {/* LISTA DE RUTINAS */}
                     <ScrollView showsVerticalScrollIndicator={false}>
-                        {MOCK_ROUTINES.map((routine) => (
+                        {loadingRoutines && (
+                            <Text
+                                className="text-sm mb-2"
+                                style={{ color: COLORS.textMuted }}
+                            >
+                                Cargando tus rutinas...
+                            </Text>
+                        )}
+
+                        {routinesError && (
+                            <Text className="text-sm mb-2" style={{ color: '#FFBABA' }}>
+                                {routinesError}
+                            </Text>
+                        )}
+
+                        {!loadingRoutines && routines.length === 0 && !routinesError && (
+                            <Text
+                                className="text-sm mb-2"
+                                style={{ color: COLORS.textMuted }}
+                            >
+                                Aún no tienes rutinas guardadas. Crea tu primera rutina con el
+                                botón de abajo.
+                            </Text>
+                        )}
+
+                        {routines.map((routine) => (
                             <RoutineCard
                                 key={routine.id}
                                 title={routine.title}
-                                description={routine.description}
-                                highlighted={routine.highlighted}
-                                tag={routine.tag}
+                                description={routine.notes}
+                                highlighted={routine.id === latestRoutineId}
+                                exercisesPreview={routine.exercises ?? []}
+                                onOpen={() => {
+                                    router.push({ pathname: '/routine/[id]', params: { id: routine.id } });
+                                }}
+                                onEdit={() => {
+                                    router.push({ pathname: '/routine/edit/[id]', params: { id: routine.id } });
+                                }}
+                                onDelete={() => {
+                                    // luego podemos agregar un Alert y deleteRoutine(...)
+                                    console.log('Borrar rutina', routine.id);
+                                }}
+                                onShare={() => {
+                                    console.log('Compartir / exportar rutina', routine.id);
+                                }}
                             />
                         ))}
                     </ScrollView>
 
-                    {/* MENÚ DESPLEGABLE DE AJUSTES */}
+                    {/* MENÚ AJUSTES */}
                     {settingsOpen && (
                         <View
                             className="absolute rounded-2xl p-3"
@@ -121,45 +215,27 @@ export default function HomeScreen() {
                         >
                             <Pressable
                                 className="py-1"
-                                onPress={() => {
-                                    // Más adelante podemos navegar a una pantalla de información
-                                    setSettingsOpen(false);
-                                }}
+                                onPress={() => setSettingsOpen(false)}
                             >
-                                <Text
-                                    className="text-sm"
-                                    style={{ color: COLORS.textLight }}
-                                >
+                                <Text className="text-sm" style={{ color: COLORS.textLight }}>
                                     Información
                                 </Text>
                             </Pressable>
 
                             <Pressable
                                 className="py-1"
-                                onPress={() => {
-                                    // Más adelante: pantalla "Acerca de nosotros"
-                                    setSettingsOpen(false);
-                                }}
+                                onPress={() => setSettingsOpen(false)}
                             >
-                                <Text
-                                    className="text-sm"
-                                    style={{ color: COLORS.textLight }}
-                                >
+                                <Text className="text-sm" style={{ color: COLORS.textLight }}>
                                     Acerca de nosotros
                                 </Text>
                             </Pressable>
 
                             <Pressable
                                 className="py-1"
-                                onPress={() => {
-                                    // Más adelante: pantalla "Términos y condiciones"
-                                    setSettingsOpen(false);
-                                }}
+                                onPress={() => setSettingsOpen(false)}
                             >
-                                <Text
-                                    className="text-sm"
-                                    style={{ color: COLORS.textLight }}
-                                >
+                                <Text className="text-sm" style={{ color: COLORS.textLight }}>
                                     Términos y condiciones
                                 </Text>
                             </Pressable>
@@ -219,3 +295,4 @@ export default function HomeScreen() {
         </SafeAreaView>
     );
 }
+

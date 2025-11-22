@@ -1,26 +1,60 @@
-import { api } from './api';
+// lib/auth.ts
+import { apiFetch } from './api';
 
-// Ajusta esto a lo que devuelva tu backend realmente
-export interface AuthUser {
+export type AuthUser = {
     id: string;
     email: string;
     name: string | null;
-}
+};
 
-export interface AuthResponse {
+export type AuthResponse = {
+    token: string;
     user: AuthUser;
-    token: string; // o accessToken, como lo tengas en el backend
+};
+
+/**
+ * Login: envía email y password, devuelve token + user
+ */
+export async function loginRequest(
+    email: string,
+    password: string
+): Promise<AuthResponse> {
+    const res = await apiFetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.log('Error en login, respuesta:', text);
+        throw new Error('Credenciales inválidas o error al iniciar sesión');
+    }
+
+    const data = (await res.json()) as AuthResponse;
+    return data;
 }
 
-export async function loginRequest(email: string, password: string) {
-    // Ajusta la ruta si en tu backend es diferente
-    return api.post<AuthResponse>('/auth/login', { email, password });
-}
+/**
+ * Registro: crea usuario nuevo, devuelve token + user
+ */
+export async function registerRequest(
+    name: string,
+    email: string,
+    password: string
+): Promise<AuthResponse> {
+    const res = await apiFetch('/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+    });
 
-export async function registerRequest(input: {
-    name: string;
-    email: string;
-    password: string;
-}) {
-    return api.post<AuthResponse>('/auth/register', input);
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.log('Error en registro, respuesta:', text);
+        throw new Error('No se pudo crear la cuenta (revisa email / contraseña)');
+    }
+
+    const data = (await res.json()) as AuthResponse;
+    return data;
 }

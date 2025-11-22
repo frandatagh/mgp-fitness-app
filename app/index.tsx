@@ -53,9 +53,8 @@ export default function LoginScreen() {
         try {
             const response = await loginRequest(data.email, data.password);
 
-            // TODO: más adelante vamos a guardar el token (response.token)
-            login(response.user, response.token);
-            // y el usuario (response.user) en un estado global / SecureStore.
+            // Esperar a que el contexto termine de guardar token + user
+            await login(response.user, response.token);
 
             console.log('Login OK:', response);
             router.replace('/home');
@@ -68,6 +67,7 @@ export default function LoginScreen() {
             setServerError(message);
         }
     };
+
 
 
     return (

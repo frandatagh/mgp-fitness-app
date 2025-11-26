@@ -1,4 +1,4 @@
-import { View, Text, TextInput, Pressable } from 'react-native';
+import { View, Text, TextInput, Pressable, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -76,20 +76,15 @@ export default function LoginScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
             {/* LOGO / TITULO */}
-            <View className="items-center mb-10">
-                <Text
-                    className="text-4xl font-extrabold tracking-tight"
-                    style={{ color: COLORS.accent }}
-                >
-                    MGP <Text style={{ color: COLORS.primary }}>RUTINA</Text>
-                </Text>
-                <Text
-                    className="text-4xl font-extrabold -mt-1"
-                    style={{ color: COLORS.primary }}
-                >
-                    FITNESS
-                </Text>
-                <Text className="mt-4 text-base" style={{ color: COLORS.textLight }}>
+            <View className="items-center mb-5">
+                {/* LOGO SUPERIOR */}
+                <View className="items-center">
+                    <Image
+                        source={require('../assets/img/iconhome.png')}
+                        style={{ width: 220, height: 220, resizeMode: 'contain' }}
+                    />
+                </View>
+                <Text className=" text-base" style={{ color: COLORS.textLight }}>
                     ¡Tu entrenamiento al instante!
                 </Text>
             </View>
@@ -97,7 +92,7 @@ export default function LoginScreen() {
             {/* CARD LOGIN */}
             <View
                 className="w-full rounded-3xl px-6 py-7"
-                style={{ backgroundColor: COLORS.card }}
+                style={{ backgroundColor: COLORS.card, maxWidth: 600 }}
             >
                 <Text
                     className="text-2xl font-bold mb-6 text-center"

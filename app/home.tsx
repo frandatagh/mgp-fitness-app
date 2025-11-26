@@ -101,7 +101,9 @@ export default function HomeScreen() {
             className="flex-1"
             style={{ backgroundColor: COLORS.background }}
         >
-            <View className="flex-1 px-4">
+            <View className="flex-1 px-4"
+                style={{ maxWidth: 800, alignSelf: 'center' }}
+            >
                 {/* LOGO SUPERIOR */}
                 <View className="items-center">
                     <Image
@@ -111,10 +113,9 @@ export default function HomeScreen() {
                 </View>
 
                 {/* SALUDO IZQUIERDO */}
-                <View className="mb-2 self-start px-1">
+                <View className="self-start px-3">
                     <Text
-                        className="text-md"
-                        style={{ color: COLORS.textLight }}
+                        className="text-md text-gray-500"
                     >
                         Hola, {displayName}
                     </Text>

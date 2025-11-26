@@ -8,6 +8,7 @@ export interface RoutineExercise {
     reps?: string | null;
     notes?: string | null;
     order?: number | null;
+    day?: string | null;
 }
 
 export interface Routine {
@@ -32,13 +33,24 @@ export type CreateRoutinePayload = {
         reps?: string | null;
         notes?: string | null;
         order?: number;
+        day?: string | null;
     }[];
 };
 
 export type UpdateRoutinePayload = {
     title?: string;
     notes?: string | null;
+    exercises?: {
+        id?: string;
+        name: string;
+        sets?: string | null;
+        reps?: string | null;
+        notes?: string | null;
+        day?: string | null;
+        order?: number;
+    }[];
 };
+
 
 export async function getRoutines(): Promise<Routine[]> {
     const res = await apiFetch('/routines', {

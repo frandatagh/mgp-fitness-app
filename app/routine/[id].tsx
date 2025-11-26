@@ -7,6 +7,7 @@ import {
     View,
     Pressable,
     Modal,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -30,6 +31,9 @@ export default function RoutineDetailScreen() {
     const [error, setError] = useState<string | null>(null);
 
     const [menuVisible, setMenuVisible] = useState(false);
+
+    const [doneModalVisible, setDoneModalVisible] = useState(false);
+    const [doneMarked, setDoneMarked] = useState(false);
 
     if (!isAuthenticated) {
         return <Redirect href="/" />;
@@ -67,9 +71,23 @@ export default function RoutineDetailScreen() {
         router.replace('/home');
     };
 
-    const handleDone = () => {
+    // NUEVO: al apretar el botón “Realizada” abrimos modal
+    const handleDonePress = () => {
+        setDoneModalVisible(true);
+    };
+
+    // NUEVO: confirmar rutina realizada
+    const handleConfirmDone = () => {
+        setDoneMarked(true);
+        setDoneModalVisible(false);
+
+        // Más adelante: acá podemos mandar al backend, registrar estadísticas, etc.
         console.log('Rutina marcada como realizada:', routine?.id);
-        router.replace('/home');
+    };
+
+    // NUEVO: cerrar modal sin marcar como realizada
+    const handleContinue = () => {
+        setDoneModalVisible(false);
     };
 
     if (loading) {
@@ -103,28 +121,52 @@ export default function RoutineDetailScreen() {
         );
     }
 
-    const exercises: RoutineExercise[] = routine.exercises ?? [];
+    // 👉 Ordenamos por `order` y agrupamos por `day`
+    const exercises: RoutineExercise[] =
+        (routine.exercises ?? []).slice().sort((a, b) => {
+            const ao = a.order ?? 0;
+            const bo = b.order ?? 0;
+            return ao - bo;
+        });
+
+    const groupedByDay: Record<string, RoutineExercise[]> = {};
+    for (const ex of exercises) {
+        const key = ex.day || 'Sin día';
+        if (!groupedByDay[key]) groupedByDay[key] = [];
+        groupedByDay[key].push(ex);
+    }
+
+    const menuItems = [
+        { label: 'Editar rutina', action: 'edit' as const },
+        { label: 'Borrar rutina', action: 'delete' as const, destructive: true },
+        { label: 'Exportar', action: 'export' as const },
+        { label: 'Compartir', action: 'share' as const },
+        { label: 'Salir de rutina', action: 'close' as const },
+    ];
 
     return (
         <SafeAreaView
             className="flex-1"
             style={{ backgroundColor: COLORS.background }}
         >
-            <View className="flex-1 px-4 pt-6 pb-4">
+            <View className="flex-1 px-4 pt-1 pb-4"
+                style={{ maxWidth: 800, alignSelf: 'center' }}>
                 {/* Encabezado superior */}
-                <View className="items-center mb-4">
-                    <Text
-                        className="text-3xl font-extrabold tracking-tight text-center"
-                        style={{ color: COLORS.accent }}
-                    >
-                        MGP <Text style={{ color: COLORS.primary }}>RUTINA FITNESS</Text>
-                    </Text>
-                    <Text
-                        className="text-xs mt-1"
-                        style={{ color: COLORS.textLight }}
-                    >
-                        Detalle de rutina
-                    </Text>
+                {/* LOGO + TÍTULO SUPERIOR */}
+                <View className="mb-1">
+                    {/* Logo centrado */}
+                    <View className="items-center">
+                        <Image
+                            source={require('../../assets/img/iconrun.png')}
+                            style={{
+                                width: 180,        // ajustá a gusto
+                                height: 90,
+                                resizeMode: 'contain',
+                            }}
+                        />
+                    </View>
+
+
                 </View>
 
                 {/* Contenedor principal de la tarjeta */}
@@ -135,172 +177,302 @@ export default function RoutineDetailScreen() {
                     <ScrollView showsVerticalScrollIndicator={false}>
                         {/* Título + botón menú */}
                         <View className="flex-row items-center justify-between mb-4 px-4">
-                            <View>
-                                <Text className="text-[14px] text-gray-300">Detalle de rutina</Text>
-                                <Text className="text-[16px] font-semibold text-white mt-1">
+                            <View >
+                                <Text className=" text-[16px] underline font-semibold text-white">
                                     {routine.title}
                                 </Text>
                             </View>
 
-                            {/* Botón tres puntos */}
+                            {/* Botón tres puntos, minimal */}
                             <Pressable
                                 onPress={() => setMenuVisible(true)}
-                                className="w-10 h-10 rounded-full bg-neutral-800 items-center justify-center border border-lime-400"
                                 hitSlop={8}
+                                style={({ pressed }) => ({
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 9999,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: pressed ? '#3f3f3f' : 'transparent', // gris al presionar (podés usar COLORS.primary si lo querés verde)
+                                })}
                             >
-                                <Text className="text-[20px] text-lime-300">⋯</Text>
+                                <Text style={{ fontSize: 20, color: '#ffffff' }}>⋯</Text>
                             </Pressable>
                         </View>
+
 
                         {/* Descripción */}
                         {routine.notes && (
                             <Text
-                                className="text-[16px] leading-5 text-gray-200 mb-4 px-4"
+                                className="text-[16px] leading-5 text-gray-200 mb-2 px-4"
                                 style={{ color: COLORS.textMuted }}
                             >
                                 {routine.notes}
                             </Text>
                         )}
 
-                        {/* Cabecera de “tabla” */}
+                        {/* TABLA AGRUPADA POR DÍA */}
                         <View className="mt-3 px-4">
-                            <View className="flex-row border-b border-lime-400 pb-1 mb-1">
-                                <Text
-                                    style={colName}
-                                    className="text-[16px] font-semibold text-gray-100"
-                                >
-                                    Ejercicios
-                                </Text>
-                                <Text
-                                    style={colSets}
-                                    className="text-[16px] font-semibold text-gray-100 text-center"
-                                >
-                                    Series
-                                </Text>
-                                <Text
-                                    style={colReps}
-                                    className="text-[16px] font-semibold text-gray-100 text-center"
-                                >
-                                    Reps.
-                                </Text>
-                                <Text
-                                    style={colNotes}
-                                    className="text-[16px] font-semibold text-gray-100 text-right"
-                                >
-                                    Notas
-                                </Text>
-                            </View>
+                            {Object.entries(groupedByDay).map(([day, exs]) => (
+                                <View key={day} className="mb-3">
+                                    {/* “Chip” con el día */}
+                                    <View className="mb-1">
+                                        <Text
+                                            className="text-left text-[13px] font-bold text-gray-400"
 
-                            {/* Filas de ejercicios */}
-                            {exercises.map((ex, index) => (
-                                <View
-                                    key={ex.id ?? index}
-                                    className="flex-row py-1 border-b border-neutral-800"
-                                >
-                                    <Text
-                                        style={colName}
-                                        className="text-[16px] text-gray-200"
-                                        numberOfLines={1}
-                                    >
-                                        {ex.name}
-                                    </Text>
+                                        >
+                                            {day}
+                                        </Text>
+                                    </View>
 
-                                    <Text
-                                        style={colSets}
-                                        className="text-[16px] text-gray-300 text-center"
-                                    >
-                                        {ex.sets ?? '-'}
-                                    </Text>
+                                    {/* Cabecera de columnas */}
+                                    <View className="flex-row border-b border-lime-400 pb-1 mb-1">
+                                        <Text
+                                            style={colName}
+                                            className="text-[14px] font-semibold text-gray-100"
+                                        >
+                                            Ejercicios
+                                        </Text>
+                                        <Text
+                                            style={colSets}
+                                            className="text-[14px] font-semibold text-gray-100 text-center"
+                                        >
+                                            Series
+                                        </Text>
+                                        <Text
+                                            style={colReps}
+                                            className="text-[14px] font-semibold text-gray-100 text-center"
+                                        >
+                                            Reps.
+                                        </Text>
+                                        <Text
+                                            style={colNotes}
+                                            className="text-[14px] font-semibold text-gray-100 text-right"
+                                        >
+                                            Notas
+                                        </Text>
+                                    </View>
 
-                                    <Text
-                                        style={colReps}
-                                        className="text-[16px] text-gray-300 text-center"
-                                    >
-                                        {ex.reps ?? '-'}
-                                    </Text>
+                                    {/* Filas de ese día */}
+                                    {exs.map((ex, index) => (
+                                        <View
+                                            key={ex.id ?? `${day}-${index}`}
+                                            className="flex-row py-1 border-b border-neutral-800"
+                                        >
+                                            <Text
+                                                style={colName}
+                                                className="text-[14px] text-gray-200"
+                                                numberOfLines={1}
+                                            >
+                                                {ex.name}
+                                            </Text>
 
-                                    <Text
-                                        style={colNotes}
-                                        className="text-[16px] text-gray-300 text-right"
-                                        numberOfLines={1}
-                                    >
-                                        {ex.notes ?? '-'}
-                                    </Text>
+                                            <Text
+                                                style={colSets}
+                                                className="text-[14px] text-gray-300 text-center"
+                                            >
+                                                {ex.sets ?? '-'}
+                                            </Text>
+
+                                            <Text
+                                                style={colReps}
+                                                className="text-[14px] text-gray-300 text-center"
+                                            >
+                                                {ex.reps ?? '-'}
+                                            </Text>
+
+                                            <Text
+                                                style={colNotes}
+                                                className="text-[14px] text-gray-300 text-right"
+                                                numberOfLines={1}
+                                            >
+                                                {ex.notes ?? '-'}
+                                            </Text>
+                                        </View>
+                                    ))}
                                 </View>
                             ))}
                         </View>
 
-                        {/* Menú de opciones (modal) */}
                         <Modal
                             visible={menuVisible}
                             transparent
                             animationType="fade"
                             onRequestClose={() => setMenuVisible(false)}
                         >
-                            {/* Fondo oscurecido */}
-                            <Pressable
-                                className="flex-1 bg-black/50"
-                                onPress={() => setMenuVisible(false)}
+                            <View
+                                className="flex-1 justify-center items-center"
+                                style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
                             >
-                                {/* Contenedor del menú */}
-                                <View className="absolute right-4 top-16 w-52 bg-neutral-900 rounded-xl border border-neutral-700 shadow-lg">
-                                    {[
-                                        { label: 'Editar rutina', action: 'edit' },
-                                        { label: 'Borrar rutina', action: 'delete' },
-                                        { label: 'Exportar', action: 'export' },
-                                        { label: 'Compartir', action: 'share' },
-                                        { label: 'Salir de rutina', action: 'close' },
-                                    ].map((item, index) => (
+                                <View
+                                    className="w-72 rounded-3xl px-4 py-4"
+                                    style={{
+                                        backgroundColor: '#111111',
+                                        borderWidth: 1,
+                                        borderColor: COLORS.primary,
+                                    }}
+                                >
+                                    <Text
+                                        className="text-base font-semibold mb-3 text-center"
+                                        style={{ color: COLORS.textLight }}
+                                    >
+                                        Opciones de tu rutina
+                                    </Text>
+
+                                    {menuItems.map((item, index) => (
                                         <Pressable
                                             key={item.action}
                                             onPress={() => {
                                                 setMenuVisible(false);
+
                                                 if (item.action === 'edit' && routine?.id) {
-                                                    console.log('Editar rutina', routine.id);
+                                                    // Ir a pantalla de edición
                                                     router.push({
-                                                        pathname: "/routine/edit/[id]",
+                                                        pathname: '/routine/edit/[id]',
                                                         params: { id: routine.id },
                                                     });
-                                                }
-                                                if (item.action === 'close') {
+                                                } else if (item.action === 'delete' && routine?.id) {
+                                                    // TODO: más adelante: confirm + borrar rutina real
+                                                    console.log('Borrar rutina', routine.id);
+                                                } else if (item.action === 'export') {
+                                                    console.log('Exportar rutina', routine?.id);
+                                                } else if (item.action === 'share') {
+                                                    console.log('Compartir rutina', routine?.id);
+                                                } else if (item.action === 'close') {
                                                     handleBack();
                                                 }
                                             }}
-                                            className={`px-4 py-2 ${index !== 0 ? 'border-t border-neutral-800' : ''
-                                                }`}
+                                            className={`py-2 ${index !== 0 ? 'border-t border-neutral-800' : ''}`}
                                         >
-                                            <Text className="text-[14px] text-gray-100">
+                                            <Text
+                                                className="text-[14px]"
+                                                style={{
+                                                    color: item.destructive ? '#FFBABA' : COLORS.textLight,
+                                                }}
+                                            >
                                                 {item.label}
                                             </Text>
                                         </Pressable>
                                     ))}
+
+                                    <Pressable
+                                        onPress={() => setMenuVisible(false)}
+                                        className="mt-4 py-2 rounded-full items-center"
+                                        style={{ backgroundColor: COLORS.primary }}
+                                    >
+                                        <Text
+                                            className="text-[14px] font-semibold"
+                                            style={{ color: '#111111' }}
+                                        >
+                                            Cerrar
+                                        </Text>
+                                    </Pressable>
                                 </View>
-                            </Pressable>
+                            </View>
                         </Modal>
+
                     </ScrollView>
                 </View>
 
                 {/* Botones inferiores */}
                 <View className="mt-4 flex-row justify-between px-4 pb-4">
+                    {/* Botón "Realizada" gris, con tilde. Verde si ya fue marcada */}
                     <Pressable
-                        onPress={handleDone}
-                        className="flex-1 mr-2 bg-lime-400 rounded-full py-2 items-center justify-center"
+                        onPress={handleDonePress}
+                        className="flex-1 mr-2 rounded-full py-2 items-center justify-center"
+                        style={{
+                            backgroundColor: doneMarked ? COLORS.primary : '#444444',
+                        }}
                     >
-                        <Text className="text-[14px] font-semibold text-black">
-                            Realizada
+                        <Text
+                            className="text-[14px] font-semibold"
+                            style={{ color: doneMarked ? '#111111' : COLORS.textLight }}
+                        >
+                            ✔ Realizada
                         </Text>
                     </Pressable>
 
+                    {/* Botón "Volver atrás" gris */}
                     <Pressable
                         onPress={handleBack}
-                        className="flex-1 ml-2 bg-neutral-700 rounded-full py-2 items-center justify-center"
+                        className="flex-1 ml-2 rounded-full py-2 items-center justify-center"
+                        style={{ backgroundColor: '#444444' }}
                     >
-                        <Text className="text-[14px] font-semibold text-gray-100">
+                        <Text className="text-[14px] font-semibold" style={{ color: COLORS.textLight }}>
                             Volver atrás
                         </Text>
                     </Pressable>
                 </View>
+                {/* Modal: confirmar rutina realizada */}
+                <Modal
+                    visible={doneModalVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={handleContinue}
+                >
+                    <View
+                        className="flex-1 justify-center items-center"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                    >
+                        <View
+                            className="w-72 rounded-3xl px-4 py-4"
+                            style={{
+                                backgroundColor: '#111111',
+                                borderWidth: 1,
+                                borderColor: COLORS.primary,
+                            }}
+                        >
+                            <Text
+                                className="text-base font-semibold mb-4 text-center"
+                                style={{ color: COLORS.textLight }}
+                            >
+                                ¿Has terminado con el entrenamiento de hoy?
+                            </Text>
+
+                            <Text
+                                className="text-xs mb-4 text-center"
+                                style={{
+                                    color: COLORS.textMuted,
+                                    textDecorationLine: 'underline',
+                                }}
+                            >
+                                ver estadísticas (próximamente)
+                            </Text>
+
+                            <View className="flex-row justify-between mt-4">
+                                {/* Botón verde: Rutina realizada */}
+                                <Pressable
+                                    onPress={handleConfirmDone}
+                                    className="flex-1 mr-2 rounded-full py-2 items-center justify-center"
+                                    style={{ backgroundColor: COLORS.primary }}
+                                >
+                                    <Text
+                                        className="text-[13px] font-semibold"
+                                        style={{ color: '#111111' }}
+                                    >
+                                        Rutina realizada
+                                    </Text>
+                                </Pressable>
+
+                                {/* Botón gris: Continuar */}
+                                <Pressable
+                                    onPress={handleContinue}
+                                    className="flex-1 ml-2 rounded-full py-2 items-center justify-center"
+                                    style={{ backgroundColor: '#444444' }}
+                                >
+                                    <Text
+                                        className="text-[13px] font-semibold"
+                                        style={{ color: COLORS.textLight }}
+                                    >
+                                        Continuar
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+
             </View>
-        </SafeAreaView>
+        </SafeAreaView >
     );
 }

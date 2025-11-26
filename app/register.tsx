@@ -1,4 +1,4 @@
-import { View, Text, TextInput, Pressable } from 'react-native';
+import { View, Text, TextInput, Pressable, Image } from 'react-native';
 import { router } from 'expo-router';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -55,11 +55,11 @@ export default function RegisterScreen() {
         setServerError(null);
 
         try {
-            const response = await registerRequest({
-                name: data.username,
-                email: data.email,
-                password: data.password,
-            });
+            const response = await registerRequest(
+                data.username,
+                data.email,
+                data.password,
+            );
 
             login(response.user, response.token);
 
@@ -83,19 +83,11 @@ export default function RegisterScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
             {/* LOGO GRANDE */}
-            <View className="items-center mb-6">
-                <Text
-                    className="text-5xl font-extrabold tracking-tight"
-                    style={{ color: COLORS.accent }}
-                >
-                    MGP
-                </Text>
-                <Text
-                    className="text-4xl font-extrabold -mt-2 text-center"
-                    style={{ color: COLORS.primary }}
-                >
-                    RUTINA{'\n'}FITNESS
-                </Text>
+            <View className="items-center">
+                <Image
+                    source={require('../assets/img/icontwist.png')}
+                    style={{ width: 220, height: 220, resizeMode: 'contain' }}
+                />
             </View>
 
             {/* CARD REGISTRO */}

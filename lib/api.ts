@@ -2,18 +2,16 @@
 import Constants from 'expo-constants';
 
 const API_URL =
-    Constants.expoConfig?.extra?.apiUrl ??
+    (Constants.expoConfig?.extra?.apiUrl as string | undefined) ??
     process.env.EXPO_PUBLIC_API_URL ??
-    'http://192.168.0.81:3000/api';
+    'http://localhost:3000/api';   // 👈 CAMBIADO AQUÍ
 
 let currentToken: string | null = null;
 
-// lo llama AuthContext cuando haces login/logout
 export function setAuthToken(token: string | null) {
     currentToken = token;
 }
 
-// 👉 TIPAR BIEN apiFetch
 export async function apiFetch(
     path: string,
     options: RequestInit = {}
@@ -33,5 +31,5 @@ export async function apiFetch(
         headers,
     });
 
-    return res; // <- Response
+    return res;
 }

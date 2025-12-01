@@ -7,6 +7,8 @@ import { RoutineCard } from '../components/RoutineCard';
 import { router } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { getRoutines, Routine } from '../lib/routines';
+import { Ionicons } from '@expo/vector-icons';
+
 
 export default function HomeScreen() {
     const { user, isAuthenticated, logout } = useAuth();
@@ -259,39 +261,71 @@ export default function HomeScreen() {
                 </View>
 
                 {/* BOTONES INFERIORES */}
-                <View className="flex-row justify-between mt-4">
+                <View className="flex-row justify-between mt-2 mb-2">
+                    {/* Crear rutina */}
                     <Pressable
                         className="flex-1 mr-2 px-4 py-3 rounded-xl items-center"
                         style={{ backgroundColor: '#444444' }}
                         onPress={() => router.push('/routine/new')}
                     >
-                        <Text style={{ color: COLORS.textLight }}>+ Crear rutina</Text>
+                        <View className="flex-row items-center justify-center">
+                            <Ionicons
+                                name="add"
+                                size={18}
+                                color={COLORS.textLight}
+                            />
+                            <Text
+                                className="ml-2"
+                                style={{ color: COLORS.textLight }}
+                            >
+                                Crear rutina
+                            </Text>
+                        </View>
                     </Pressable>
 
+                    {/* Subir archivo (sin icono por ahora) */}
                     <Pressable
                         className="flex-1 mx-1 px-4 py-3 rounded-xl items-center"
                         style={{ backgroundColor: '#444444' }}
                     >
-                        <Text style={{ color: COLORS.textLight }}>Subir archivo</Text>
+                        <View className="flex-row items-center justify-center">
+                            <Ionicons
+                                name="cloud-upload-outline"
+                                size={18}
+                                color={COLORS.textLight}
+                            />
+                            <Text
+                                className="ml-2"
+                                style={{ color: COLORS.textLight }}
+                            >
+                                Subir archivo
+                            </Text>
+                        </View>
                     </Pressable>
 
+                    {/* Puntos cercanos */}
                     <Pressable
                         className="flex-1 ml-2 px-4 py-3 rounded-xl items-center"
                         style={{ backgroundColor: '#444444' }}
                     >
-                        <Text style={{ color: COLORS.textLight }}>Puntos cercanos</Text>
+                        <View className="flex-row items-center justify-center">
+                            <Ionicons
+                                name="location-outline"
+                                size={18}
+                                color={COLORS.textLight}
+                            />
+                            <Text
+                                className="ml-2"
+                                style={{ color: COLORS.textLight }}
+                            >
+                                Puntos cercanos
+                            </Text>
+                        </View>
                     </Pressable>
                 </View>
 
-                {/* FOOTER */}
-                <View className="items-center mt-4">
-                    <Text className="font-bold" style={{ color: COLORS.accent }}>
-                        MGP <Text style={{ color: COLORS.primary }}>RUTINA FITNESS</Text>
-                    </Text>
-                    <Text style={{ color: COLORS.textLight }}>
-                        ¡Tu entrenamiento al instante!
-                    </Text>
-                </View>
+
+
             </View>
         </SafeAreaView>
     );

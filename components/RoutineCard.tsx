@@ -1,6 +1,7 @@
 // components/RoutineCard.tsx
 import React, { useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Modal } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 import type { RoutineExercise } from '../lib/routines';
 
@@ -8,205 +9,281 @@ type RoutineCardProps = {
     title: string;
     description?: string | null;
     highlighted?: boolean;
-    exercisesPreview?: RoutineExercise[];
-
-    // acciones desde el Home
-    onOpen?: () => void;
-    onEdit?: () => void;
-    onDelete?: () => void;
-    onShare?: () => void;
+    exercisesPreview?: RoutineExercise[] | null;
+    onOpen: () => void;
+    onEdit: () => void;
+    onDelete: () => Promise<void> | void; // se llama al backend
+    onShare: () => void;
 };
 
 export const RoutineCard: React.FC<RoutineCardProps> = ({
     title,
     description,
-    highlighted = false,
-    exercisesPreview = [],
+    highlighted,
+    exercisesPreview,
     onOpen,
     onEdit,
     onDelete,
     onShare,
 }) => {
-    const [menuVisible, setMenuVisible] = useState(false);
+    const [optionsVisible, setOptionsVisible] = useState(false);
+    const [confirmVisible, setConfirmVisible] = useState(false);
+    const [deleting, setDeleting] = useState(false);
 
-    const handleOpen = () => {
-        setMenuVisible(false);
-        onOpen && onOpen();
+    const handleOpenOptions = () => {
+        setOptionsVisible(true);
     };
 
-    const handleEdit = () => {
-        setMenuVisible(false);
-        onEdit && onEdit();
+    const handleCloseOptions = () => {
+        setOptionsVisible(false);
     };
 
-    const handleDelete = () => {
-        setMenuVisible(false);
-        onDelete && onDelete();
+    const handleAskDelete = () => {
+        // cerrar el menú y abrir confirmación
+        setOptionsVisible(false);
+        setConfirmVisible(true);
     };
 
-    const handleShare = () => {
-        setMenuVisible(false);
-        onShare && onShare();
+    const handleCancelDelete = () => {
+        setConfirmVisible(false);
     };
+
+    const handleConfirmDelete = async () => {
+        try {
+            setDeleting(true);
+            await onDelete();          // 🔥 llama a handleDeleteRoutine del Home
+            setConfirmVisible(false);  // cerrar modal si todo fue bien
+        } catch (error) {
+            console.error('Error eliminando rutina', error);
+        } finally {
+            setDeleting(false);
+        }
+    };
+
+    const exerciseCount = exercisesPreview?.length ?? 0;
 
     return (
-        <Pressable
-            onPress={handleOpen}
-            className="mb-3 rounded-2xl"
-            style={{
-                borderWidth: 1,
-                borderColor: highlighted ? COLORS.primary : '#555555',
-                backgroundColor: '#111111',
-                paddingHorizontal: 12,
-                paddingVertical: 10,
-            }}
-        >
-            {/* FILA SUPERIOR: título + botón menú */}
-            <View className="flex-row justify-between items-center mb-1">
-                <Text
-                    className="text-[15px] font-semibold"
-                    style={{ color: COLORS.textLight }}
-                    numberOfLines={1}
-                >
-                    {title}
-                </Text>
-
-                {/* Botón tres puntos */}
-                <Pressable
-                    onPress={() => setMenuVisible(prev => !prev)}
-                    className="w-7 h-4 rounded-full items-center justify-center"
-                    style={{
-                        backgroundColor: highlighted ? COLORS.primary : '#222222',
-                        borderWidth: 1,
-                        borderColor: highlighted ? COLORS.primary : COLORS.textMuted,
-                    }}
-                >
-                    <Text
-                        className="text-[20px]"
-                        style={{ color: highlighted ? '#111111' : COLORS.textLight }}
-                    >
-                        ⋯
-                    </Text>
-                </Pressable>
-            </View>
-
-            {/* Descripción */}
-            {description && (
-                <Text
-                    className="text-[12px] mb-2"
-                    style={{ color: COLORS.textMuted }}
-                    numberOfLines={2}
-                >
-                    {description}
-                </Text>
-            )}
-
-            {/* Preview de hasta 3 ejercicios */}
-            {exercisesPreview.length > 0 && (
-                <View className="mt-1">
-                    {exercisesPreview.slice(0, 3).map((ex, idx) => (
+        <>
+            {/* TARJETA */}
+            <Pressable
+                className="mb-3 rounded-2xl p-3"
+                style={{
+                    backgroundColor: '#1A1A1A',
+                    borderWidth: highlighted ? 2 : 1,
+                    borderColor: highlighted ? COLORS.primary : '#333333',
+                }}
+                onPress={onOpen}
+            >
+                <View className="flex-row justify-between items-start">
+                    {/* Título y descripción */}
+                    <View className="flex-1 pr-2">
                         <Text
-                            key={ex.id ?? idx}
-                            className="text-[11px]"
+                            className="text-base font-semibold"
                             style={{ color: COLORS.textLight }}
                             numberOfLines={1}
                         >
-                            • {ex.name}
+                            {title}
                         </Text>
-                    ))}
 
-                    {exercisesPreview.length > 3 && (
-                        <Text className="text-[10px]" style={{ color: COLORS.textMuted }}>
-                            + {exercisesPreview.length - 3} ejercicios más
-                        </Text>
-                    )}
+                        {description ? (
+                            <Text
+                                className="text-xs mt-1"
+                                style={{ color: COLORS.textMuted }}
+                                numberOfLines={2}
+                            >
+                                {description}
+                            </Text>
+                        ) : null}
+
+                        {exerciseCount > 0 && (
+                            <Text
+                                className="text-[11px] mt-2"
+                                style={{ color: COLORS.textMuted }}
+                            >
+                                {exerciseCount} ejercicio
+                                {exerciseCount !== 1 && 's'}
+                            </Text>
+                        )}
+                    </View>
+
+                    {/* Botón de opciones */}
+                    <Pressable
+                        className="p-1 rounded-full"
+                        hitSlop={10}
+                        onPress={handleOpenOptions}
+                    >
+                        <Ionicons
+                            name="ellipsis-horizontal"
+                            size={18}
+                            color={COLORS.textLight}
+                        />
+                    </Pressable>
                 </View>
-            )}
+            </Pressable>
 
-            {/* ETIQUETA "VISTO RECIENTEMENTE" – abajo a la derecha */}
-            {highlighted && (
-                <View className="mt-3 flex-row justify-end">
+            {/* MODAL DE OPCIONES */}
+            <Modal
+                visible={optionsVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={handleCloseOptions}
+            >
+                <View
+                    className="flex-1 justify-center items-center"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                >
+                    {/* Cerrar al tocar fuera */}
+                    <Pressable
+                        className="absolute inset-0"
+                        onPress={handleCloseOptions}
+                    />
+
                     <View
-                        className="px-3 py-1 rounded-full"
-                        style={{ backgroundColor: COLORS.primary }}
+                        className="w-11/12 max-w-xs rounded-2xl p-4"
+                        style={{
+                            backgroundColor: '#111111',
+                            borderWidth: 1,
+                            borderColor: COLORS.primary,
+                        }}
                     >
                         <Text
-                            className="text-[10px] font-semibold"
-                            style={{ color: '#111111' }}
+                            className="text-center text-base font-semibold mb-3"
+                            style={{ color: COLORS.textLight }}
                         >
-                            Visto recientemente
+                            Opciones de rutina
                         </Text>
+
+                        <Pressable
+                            className="py-2"
+                            onPress={() => {
+                                handleCloseOptions();
+                                onOpen();
+                            }}
+                        >
+                            <Text style={{ color: COLORS.textLight }}>
+                                Ver rutina
+                            </Text>
+                        </Pressable>
+
+                        <Pressable
+                            className="py-2"
+                            onPress={() => {
+                                handleCloseOptions();
+                                onEdit();
+                            }}
+                        >
+                            <Text style={{ color: COLORS.textLight }}>
+                                Editar rutina
+                            </Text>
+                        </Pressable>
+
+                        <Pressable
+                            className="py-2"
+                            onPress={() => {
+                                handleCloseOptions();
+                                onShare();
+                            }}
+                        >
+                            <Text style={{ color: COLORS.textLight }}>
+                                Compartir / exportar
+                            </Text>
+                        </Pressable>
+
+                        <View
+                            className="h-px my-2"
+                            style={{ backgroundColor: COLORS.textMuted }}
+                        />
+
+                        <Pressable className="py-2" onPress={handleAskDelete}>
+                            <Text
+                                style={{
+                                    color: '#FFBABA',
+                                    fontWeight: '600',
+                                }}
+                            >
+                                Eliminar rutina
+                            </Text>
+                        </Pressable>
+
+                        <Pressable
+                            className="mt-3 py-2 items-center"
+                            onPress={handleCloseOptions}
+                        >
+                            <Text style={{ color: COLORS.textMuted }}>
+                                Cancelar
+                            </Text>
+                        </Pressable>
                     </View>
                 </View>
-            )}
+            </Modal>
 
-            {/* MENÚ DESPLEGABLE DEL BOTÓN '...' */}
-            {menuVisible && (
+            {/* MODAL DE CONFIRMACIÓN DE BORRADO */}
+            <Modal
+                visible={confirmVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={handleCancelDelete}
+            >
                 <View
-                    className="absolute rounded-xl"
-                    style={{
-                        top: 6,
-                        right: 6,
-                        backgroundColor: '#111111',
-                        borderWidth: 1,
-                        borderColor: COLORS.primary,
-                        paddingVertical: 4,
-                        width: 150,
-                        zIndex: 20,
-                        alignSelf: 'flex-start', // ayuda a que no se corte en tarjetas bajitas
-                    }}
+                    className="flex-1 justify-center items-center"
+                    style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
                 >
-                    <Pressable
-                        className="px-3 py-2"
-                        onPress={() => {
-                            setMenuVisible(false);
-                            handleOpen();
+                    <View
+                        className="w-11/12 max-w-xs rounded-2xl p-4"
+                        style={{
+                            backgroundColor: '#111111',
+                            borderWidth: 1,
+                            borderColor: COLORS.primary,
                         }}
                     >
-                        <Text className="text-[12px]" style={{ color: COLORS.textLight }}>
-                            Abrir
+                        <Text
+                            className="text-center text-base font-semibold mb-1"
+                            style={{ color: COLORS.textLight }}
+                        >
+                            ¿Eliminar rutina?
                         </Text>
-                    </Pressable>
+                        <Text
+                            className="text-center text-xs mb-4"
+                            style={{ color: COLORS.textMuted }}
+                        >
+                            Esta acción no se puede deshacer.
+                        </Text>
 
-                    <Pressable
-                        className="px-3 py-2 border-t border-neutral-800"
-                        onPress={() => {
-                            setMenuVisible(false);
-                            handleEdit();
-                        }}
-                    >
-                        <Text className="text-[12px]" style={{ color: COLORS.textLight }}>
-                            Editar rutina
-                        </Text>
-                    </Pressable>
+                        <View className="flex-row justify-center mt-1">
+                            <Pressable
+                                className="px-4 py-2 rounded-full mr-2 border"
+                                style={{
+                                    borderColor: COLORS.textLight,
+                                    backgroundColor: '#222222',
+                                }}
+                                onPress={handleCancelDelete}
+                                disabled={deleting}
+                            >
+                                <Text style={{ color: COLORS.textLight }}>
+                                    Cancelar
+                                </Text>
+                            </Pressable>
 
-                    <Pressable
-                        className="px-3 py-2 border-t border-neutral-800"
-                        onPress={() => {
-                            setMenuVisible(false);
-                            handleDelete();
-                        }}
-                    >
-                        <Text className="text-[12px]" style={{ color: '#FFBABA' }}>
-                            Borrar rutina
-                        </Text>
-                    </Pressable>
-
-                    <Pressable
-                        className="px-3 py-2 border-t border-neutral-800"
-                        onPress={() => {
-                            setMenuVisible(false);
-                            handleShare();
-                        }}
-                    >
-                        <Text className="text-[12px]" style={{ color: COLORS.textLight }}>
-                            Exportar / Compartir
-                        </Text>
-                    </Pressable>
+                            <Pressable
+                                className="px-4 py-2 rounded-full"
+                                style={{ backgroundColor: '#FF4B4B' }}
+                                onPress={handleConfirmDelete}
+                                disabled={deleting}
+                            >
+                                <Text
+                                    style={{
+                                        color: 'white',
+                                        fontWeight: '600',
+                                    }}
+                                >
+                                    {deleting ? 'Eliminando...' : 'Eliminar'}
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
                 </View>
-            )}
-        </Pressable>
+            </Modal>
+        </>
     );
-
-
 };
+

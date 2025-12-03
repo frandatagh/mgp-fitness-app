@@ -225,30 +225,30 @@ export default function NewRoutineScreen() {
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 keyboardVerticalOffset={Platform.select({
-                    ios: 80,      // levanta un poco más en iOS
+                    ios: 80,
                     android: 0,
                     default: 0,
                 })}
             >
-
-                <View className="flex-1 px-4 pb-4"
-                    style={{ maxWidth: 800, alignSelf: 'center' }}>
-
-                    {/* LOGO + TÍTULO SUPERIOR */}
+                {/* CONTENEDOR CENTRAL */}
+                <View
+                    className="flex-1 px-4 pb-4"
+                    style={{
+                        maxWidth: 800,
+                        alignSelf: 'center',
+                        width: '100%',
+                    }}
+                >
+                    {/* HEADER FIJO: LOGO + TÍTULO */}
                     <View className="mb-2">
-                        {/* Logo centrado */}
                         <View className="items-center">
                             <Image
                                 source={require('../../assets/img/icontwist.png')}
-                                style={{
-                                    width: 180,        // ajustá a gusto
-                                    height: 100,
-                                    resizeMode: 'contain',
-                                }}
+                                style={{ width: 180, height: 100 }}
+                                resizeMode="contain"
                             />
                         </View>
 
-                        {/* Subtítulo alineado a la izquierda */}
                         <View style={{ alignItems: 'flex-start' }}>
                             <Text
                                 className="text-base font-light px-4"
@@ -259,16 +259,15 @@ export default function NewRoutineScreen() {
                         </View>
                     </View>
 
-                    <View
-                        className="flex-1 rounded-3xl px-3 py-4"
-                        style={{ borderWidth: 2, borderColor: COLORS.primary, overflow: 'visible' }}
-                    >
-                        <ScrollView
-                            showsVerticalScrollIndicator={false}
-                            keyboardShouldPersistTaps="handled"
-                            nestedScrollEnabled={true}
-                            scrollEnabled={Platform.OS === 'web' ? openDayMenuIndex === null : true}
-                            contentContainerStyle={{ paddingBottom: 40 }}
+                    {/* ZONA CENTRAL: PANEL CON SCROLL INTERNO */}
+                    <View className="flex-1 mt-2">
+                        <View
+                            className="flex-1 rounded-3xl px-3 py-4"
+                            style={{
+                                borderWidth: 2,
+                                borderColor: COLORS.primary,
+                                overflow: 'visible',
+                            }}
                         >
                             {/* TÍTULO DE RUTINA */}
                             <View className="mb-3">
@@ -292,6 +291,7 @@ export default function NewRoutineScreen() {
                                     }}
                                 />
                             </View>
+
                             {/* DESCRIPCIÓN */}
                             <View className="mb-2">
                                 <Text
@@ -352,286 +352,339 @@ export default function NewRoutineScreen() {
                                 </View>
 
                                 <View className="flex-[2] items-center">
-                                    <Text className="font-semibold" style={{ color: COLORS.textLight }}>
+                                    <Text
+                                        className="font-semibold"
+                                        style={{ color: COLORS.textLight }}
+                                    >
                                         Día
                                     </Text>
                                 </View>
                             </View>
 
-                            {/* FILAS DE EJERCICIOS */}
-                            {/* FILAS DE EJERCICIOS */}
-                            {exercises.map((exercise, index) => {
-                                const isSelected = selectedExerciseIndex === index;
+                            {/* 👇 SCROLL INTERNO SOLO PARA LA LISTA DE EJERCICIOS */}
+                            <View style={{ flex: 1 }}>
+                                <ScrollView
+                                    className="no-scrollbar"
+                                    showsVerticalScrollIndicator={false}
+                                    nestedScrollEnabled
+                                    keyboardShouldPersistTaps="handled"
+                                    contentContainerStyle={{ paddingBottom: 8 }}
+                                >
+                                    {exercises.map((exercise, index) => {
+                                        const isSelected =
+                                            selectedExerciseIndex === index;
 
-                                return (
-                                    <View
-                                        key={index}
-                                        className="mb-3 rounded-xl px-2 py-2"
-                                        style={{
-                                            borderWidth: 1,
-                                            borderColor: isSelected ? '#ff5555' : '#333333',
-                                            backgroundColor: isSelected ? '#1a0000' : '#111111',
-                                        }}
-                                    >
-                                        {/* PRIMERA LÍNEA: nombre, series, reps, día */}
-                                        <View className="flex-row items-center mb-1">
-                                            {/* Nombre */}
-                                            <View className="flex-[4] mr-1">
-                                                <TextInput
-                                                    value={exercise.name}
-                                                    onChangeText={(text) =>
-                                                        handleChangeExercise(index, 'name', text)
-                                                    }
-                                                    onFocus={() => setSelectedExerciseIndex(index)}
-                                                    placeholder="Press banca"
-                                                    placeholderTextColor={COLORS.textMuted}
-                                                    className="px-2 py-1 rounded-lg text-sm"
-                                                    style={{
-                                                        backgroundColor: '#111111',
-                                                        color: COLORS.textLight,
-                                                        borderWidth: 1,
-                                                        borderColor: '#333333',
-                                                    }}
-                                                />
-                                            </View>
+                                        return (
+                                            <View
+                                                key={index}
+                                                className="mb-3 rounded-xl px-2 py-2"
+                                                style={{
+                                                    borderWidth: 1,
+                                                    borderColor: isSelected
+                                                        ? '#ff5555'
+                                                        : '#333333',
+                                                    backgroundColor: isSelected
+                                                        ? '#1a0000'
+                                                        : '#111111',
+                                                }}
+                                            >
+                                                {/* PRIMERA LÍNEA: nombre, series, reps, día */}
+                                                <View className="flex-row items-center mb-1">
+                                                    {/* Nombre */}
+                                                    <View className="flex-[4] mr-1">
+                                                        <TextInput
+                                                            value={exercise.name}
+                                                            onChangeText={(text) =>
+                                                                handleChangeExercise(
+                                                                    index,
+                                                                    'name',
+                                                                    text,
+                                                                )
+                                                            }
+                                                            onFocus={() =>
+                                                                setSelectedExerciseIndex(
+                                                                    index,
+                                                                )
+                                                            }
+                                                            placeholder="Press banca"
+                                                            placeholderTextColor={
+                                                                COLORS.textMuted
+                                                            }
+                                                            className="px-2 py-1 rounded-lg text-sm"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    '#111111',
+                                                                color: COLORS.textLight,
+                                                                borderWidth: 1,
+                                                                borderColor:
+                                                                    '#333333',
+                                                            }}
+                                                        />
+                                                    </View>
 
-                                            {/* Series */}
-                                            <View className="flex-[2] mx-1">
-                                                <TextInput
-                                                    value={exercise.sets}
-                                                    onChangeText={(text) =>
-                                                        handleChangeExercise(index, 'sets', text)
-                                                    }
-                                                    onFocus={() => setSelectedExerciseIndex(index)}
-                                                    keyboardType="numeric"
-                                                    placeholder="3"
-                                                    placeholderTextColor={COLORS.textMuted}
-                                                    className="px-2 py-1 rounded-lg text-sm text-center"
-                                                    style={{
-                                                        backgroundColor: '#111111',
-                                                        color: COLORS.textLight,
-                                                        borderWidth: 1,
-                                                        borderColor: '#333333',
-                                                    }}
-                                                />
-                                            </View>
+                                                    {/* Series */}
+                                                    <View className="flex-[2] mx-1">
+                                                        <TextInput
+                                                            value={exercise.sets}
+                                                            onChangeText={(text) =>
+                                                                handleChangeExercise(
+                                                                    index,
+                                                                    'sets',
+                                                                    text,
+                                                                )
+                                                            }
+                                                            onFocus={() =>
+                                                                setSelectedExerciseIndex(
+                                                                    index,
+                                                                )
+                                                            }
+                                                            keyboardType="numeric"
+                                                            placeholder="3"
+                                                            placeholderTextColor={
+                                                                COLORS.textMuted
+                                                            }
+                                                            className="px-2 py-1 rounded-lg text-sm text-center"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    '#111111',
+                                                                color: COLORS.textLight,
+                                                                borderWidth: 1,
+                                                                borderColor:
+                                                                    '#333333',
+                                                            }}
+                                                        />
+                                                    </View>
 
-                                            {/* Reps */}
-                                            <View className="flex-[2] mx-1">
-                                                <TextInput
-                                                    value={exercise.reps}
-                                                    onChangeText={(text) =>
-                                                        handleChangeExercise(index, 'reps', text)
-                                                    }
-                                                    onFocus={() => setSelectedExerciseIndex(index)}
-                                                    keyboardType="numeric"
-                                                    placeholder="10"
-                                                    placeholderTextColor={COLORS.textMuted}
-                                                    className="px-2 py-1 rounded-lg text-sm text-center"
-                                                    style={{
-                                                        backgroundColor: '#111111',
-                                                        color: COLORS.textLight,
-                                                        borderWidth: 1,
-                                                        borderColor: '#333333',
-                                                    }}
-                                                />
-                                            </View>
+                                                    {/* Reps */}
+                                                    <View className="flex-[2] mx-1">
+                                                        <TextInput
+                                                            value={exercise.reps}
+                                                            onChangeText={(text) =>
+                                                                handleChangeExercise(
+                                                                    index,
+                                                                    'reps',
+                                                                    text,
+                                                                )
+                                                            }
+                                                            onFocus={() =>
+                                                                setSelectedExerciseIndex(
+                                                                    index,
+                                                                )
+                                                            }
+                                                            keyboardType="numeric"
+                                                            placeholder="10"
+                                                            placeholderTextColor={
+                                                                COLORS.textMuted
+                                                            }
+                                                            className="px-2 py-1 rounded-lg text-sm text-center"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    '#111111',
+                                                                color: COLORS.textLight,
+                                                                borderWidth: 1,
+                                                                borderColor:
+                                                                    '#333333',
+                                                            }}
+                                                        />
+                                                    </View>
 
-                                            {/* Día (botón que abre el menú) */}
-                                            <View className="flex-[2] ml-1">
-                                                <Pressable
-                                                    onPress={() => {
-                                                        setSelectedExerciseIndex(index);
-                                                        setOpenDayMenuIndex(
-                                                            openDayMenuIndex === index ? null : index
-                                                        );
-                                                    }}
-                                                    style={{
-                                                        backgroundColor: '#111111',
-                                                        borderWidth: 1,
-                                                        borderColor: '#555555',
-                                                        borderRadius: 8,
-                                                        paddingVertical: 4,
-                                                        paddingHorizontal: 6,
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                    }}
-                                                >
-                                                    <Text
-                                                        style={{
-                                                            color: exercise.day
-                                                                ? COLORS.textLight
-                                                                : COLORS.textMuted,
-                                                            fontSize: 12,
-                                                        }}
-                                                    >
-                                                        {exercise.day || 'Día'}
-                                                    </Text>
-                                                </Pressable>
-                                            </View>
-
-                                            {/* MENÚ DÍAS (igual al que ya tenías) */}
-                                            {openDayMenuIndex === index && (
-                                                <View
-                                                    className="absolute"
-                                                    style={{
-                                                        top: 32,
-                                                        right: 0,
-                                                        backgroundColor: '#111111',
-                                                        borderWidth: 1,
-                                                        borderColor: '#555555',
-                                                        borderRadius: 8,
-                                                        width: 100,
-                                                        zIndex: 999,
-                                                        elevation: 10,
-                                                    }}
-                                                >
-                                                    <ScrollView
-                                                        style={{ maxHeight: 130 }}
-                                                        contentContainerStyle={{ paddingVertical: 4 }}
-                                                        nestedScrollEnabled
-                                                        keyboardShouldPersistTaps="handled"
-                                                        showsVerticalScrollIndicator={false}
-                                                    >
-                                                        {DAY_OPTIONS.map((opt) => (
-                                                            <Pressable
-                                                                key={opt}
-                                                                onPress={() => {
-                                                                    handleChangeExercise(index, 'day', opt);
-                                                                    setOpenDayMenuIndex(null);
-                                                                }}
+                                                    {/* Día (botón que abre el menú) */}
+                                                    <View className="flex-[2] ml-1">
+                                                        <Pressable
+                                                            onPress={() => {
+                                                                setSelectedExerciseIndex(
+                                                                    index,
+                                                                );
+                                                                setOpenDayMenuIndex(
+                                                                    openDayMenuIndex ===
+                                                                        index
+                                                                        ? null
+                                                                        : index,
+                                                                );
+                                                            }}
+                                                            style={{
+                                                                backgroundColor:
+                                                                    '#111111',
+                                                                borderWidth: 1,
+                                                                borderColor:
+                                                                    '#555555',
+                                                                borderRadius: 8,
+                                                                paddingVertical: 4,
+                                                                paddingHorizontal: 6,
+                                                                alignItems: 'center',
+                                                                justifyContent:
+                                                                    'center',
+                                                            }}
+                                                        >
+                                                            <Text
                                                                 style={{
-                                                                    paddingVertical: 4,
-                                                                    paddingHorizontal: 8,
+                                                                    color: exercise.day
+                                                                        ? COLORS
+                                                                            .textLight
+                                                                        : COLORS
+                                                                            .textMuted,
+                                                                    fontSize: 12,
                                                                 }}
                                                             >
-                                                                <Text
-                                                                    style={{
-                                                                        color:
-                                                                            exercise.day === opt
-                                                                                ? COLORS.primary
-                                                                                : COLORS.textLight,
-                                                                        fontSize: 11,
-                                                                    }}
-                                                                >
-                                                                    {opt}
-                                                                </Text>
-                                                            </Pressable>
-                                                        ))}
-                                                    </ScrollView>
+                                                                {exercise.day || 'Día'}
+                                                            </Text>
+                                                        </Pressable>
+                                                    </View>
+
+                                                    {/* MENÚ DÍAS */}
+                                                    {openDayMenuIndex === index && (
+                                                        <View
+                                                            className="absolute"
+                                                            style={{
+                                                                top: 32,
+                                                                right: 0,
+                                                                backgroundColor:
+                                                                    '#111111',
+                                                                borderWidth: 1,
+                                                                borderColor:
+                                                                    '#555555',
+                                                                borderRadius: 8,
+                                                                width: 100,
+                                                                zIndex: 999,
+                                                                elevation: 10,
+                                                            }}
+                                                        >
+                                                            <ScrollView
+                                                                style={{
+                                                                    maxHeight: 130,
+                                                                }}
+                                                                contentContainerStyle={{
+                                                                    paddingVertical: 4,
+                                                                }}
+                                                                nestedScrollEnabled
+                                                                keyboardShouldPersistTaps="handled"
+                                                                showsVerticalScrollIndicator={
+                                                                    false
+                                                                }
+                                                            >
+                                                                {DAY_OPTIONS.map(
+                                                                    (opt) => (
+                                                                        <Pressable
+                                                                            key={opt}
+                                                                            onPress={() => {
+                                                                                handleChangeExercise(
+                                                                                    index,
+                                                                                    'day',
+                                                                                    opt,
+                                                                                );
+                                                                                setOpenDayMenuIndex(
+                                                                                    null,
+                                                                                );
+                                                                            }}
+                                                                            style={{
+                                                                                paddingVertical: 4,
+                                                                                paddingHorizontal: 8,
+                                                                            }}
+                                                                        >
+                                                                            <Text
+                                                                                style={{
+                                                                                    color:
+                                                                                        exercise.day ===
+                                                                                            opt
+                                                                                            ? COLORS.primary
+                                                                                            : COLORS.textLight,
+                                                                                    fontSize: 11,
+                                                                                }}
+                                                                            >
+                                                                                {opt}
+                                                                            </Text>
+                                                                        </Pressable>
+                                                                    ),
+                                                                )}
+                                                            </ScrollView>
+                                                        </View>
+                                                    )}
                                                 </View>
-                                            )}
-                                        </View>
 
-                                        {/* SEGUNDA LÍNEA: notas + botón borrar */}
-                                        <View className="flex-row items-center mt-1">
-                                            <View className="flex-1 mr-2">
+                                                {/* SEGUNDA LÍNEA: notas + botón borrar */}
+                                                <View className="flex-row items-center mt-1">
+                                                    <View className="flex-1 mr-2">
+                                                        <TextInput
+                                                            value={exercise.notes}
+                                                            onChangeText={(text) =>
+                                                                handleChangeExercise(
+                                                                    index,
+                                                                    'notes',
+                                                                    text,
+                                                                )
+                                                            }
+                                                            onFocus={() =>
+                                                                setSelectedExerciseIndex(
+                                                                    index,
+                                                                )
+                                                            }
+                                                            placeholder="Notas: peso, tempo, técnica, rango, etc."
+                                                            placeholderTextColor={
+                                                                COLORS.textMuted
+                                                            }
+                                                            className="px-2 py-1 rounded-lg text-sm"
+                                                            style={{
+                                                                backgroundColor:
+                                                                    '#111111',
+                                                                color: COLORS.textLight,
+                                                                borderWidth: 1,
+                                                                borderColor:
+                                                                    '#333333',
+                                                            }}
+                                                        />
+                                                    </View>
 
-                                                <TextInput
-                                                    value={exercise.notes}
-                                                    onChangeText={(text) =>
-                                                        handleChangeExercise(index, 'notes', text)
-                                                    }
-                                                    onFocus={() => setSelectedExerciseIndex(index)}
-                                                    placeholder="Notas: peso, tempo, técnica, rango, etc."
-                                                    placeholderTextColor={COLORS.textMuted}
-                                                    className="px-2 py-1 rounded-lg text-sm"
-                                                    style={{
-                                                        backgroundColor: '#111111',
-                                                        color: COLORS.textLight,
-                                                        borderWidth: 1,
-                                                        borderColor: '#333333',
-                                                    }}
-                                                />
+                                                    {/* Botón borrar: solo si la fila está seleccionada */}
+                                                    {isSelected && (
+                                                        <Pressable
+                                                            onPress={() => {
+                                                                setPendingDeleteIndex(
+                                                                    index,
+                                                                );
+                                                                setDeleteModalVisible(
+                                                                    true,
+                                                                );
+                                                            }}
+                                                            style={{
+                                                                width: 28,
+                                                                height: 28,
+                                                                borderRadius: 999,
+                                                                backgroundColor:
+                                                                    '#ff5555',
+                                                                alignItems: 'center',
+                                                                justifyContent:
+                                                                    'center',
+                                                            }}
+                                                            hitSlop={{
+                                                                top: 2,
+                                                                bottom: 2,
+                                                                left: 6,
+                                                                right: 6,
+                                                            }}
+                                                        >
+                                                            <Feather
+                                                                name="trash-2"
+                                                                size={15}
+                                                                color={
+                                                                    isSelected
+                                                                        ? '#FFFFFF'
+                                                                        : '#111111'
+                                                                }
+                                                            />
+                                                        </Pressable>
+                                                    )}
+                                                </View>
                                             </View>
-
-                                            {/* Botón borrar: solo si la fila está seleccionada */}
-                                            {isSelected && (
-                                                <Pressable
-                                                    onPress={() => {
-                                                        setPendingDeleteIndex(index);
-                                                        setDeleteModalVisible(true);
-                                                    }}
-                                                    style={{
-                                                        width: 28,
-                                                        height: 28,
-                                                        borderRadius: 999,
-                                                        backgroundColor: '#ff5555',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                    }}
-                                                    hitSlop={{ top: 2, bottom: 2, left: 6, right: 6 }}
-                                                >
-                                                    <Feather
-                                                        name="trash-2"      // icono de tacho
-                                                        size={15}
-                                                        color={isSelected ? '#FFFFFF' : '#111111'}
-                                                    />
-                                                </Pressable>
-                                            )}
-                                        </View>
-                                    </View>
-                                );
-                            })}
-
-
-                            <Modal
-                                visible={deleteModalVisible}
-                                transparent
-                                animationType="fade"
-                                onRequestClose={() => setDeleteModalVisible(false)}
-                            >
-                                <View className="flex-1 items-center justify-center bg-black/60">
-                                    <View
-                                        className="w-72 rounded-2xl p-4"
-                                        style={{
-                                            backgroundColor: '#111111',
-                                            borderWidth: 1,
-                                            borderColor: COLORS.primary,
-                                        }}
-                                    >
-                                        <Text
-                                            className="text-base font-semibold mb-3"
-                                            style={{ color: COLORS.textLight }}
-                                        >
-                                            ¿Realmente quieres borrar el ejercicio?
-                                        </Text>
-
-                                        <View className="flex-row justify-center mt-2">
-                                            <Pressable
-                                                onPress={() => setDeleteModalVisible(false)}
-                                                className="px-8 py-2 rounded-full mr-2"
-                                                style={{ backgroundColor: '#333333' }}
-                                            >
-                                                <Text style={{ color: COLORS.textLight }}>Cancelar</Text>
-                                            </Pressable>
-
-                                            <Pressable
-                                                onPress={handleDeleteSelectedExercise}
-                                                className="px-8 py-2 rounded-full"
-                                                style={{ backgroundColor: '#FF4B4B' }}
-                                            >
-                                                <Text
-                                                    style={{ color: '#111111', fontWeight: '600' }}
-                                                >
-                                                    Aceptar
-                                                </Text>
-                                            </Pressable>
-                                        </View>
-                                    </View>
-                                </View>
-                            </Modal>
-
-
-
-
-
-                        </ScrollView>
+                                        );
+                                    })}
+                                </ScrollView>
+                            </View>
+                        </View>
                     </View>
 
-                    {/* BOTONES INFERIORES */}
+                    {/* BOTONES INFERIORES FIJOS */}
                     <View className="flex-row justify-between mt-4">
-                        {/* 1) VOLVER ATRÁS */}
+                        {/* VOLVER ATRÁS */}
                         <Pressable
                             className="flex-1 mr-2 px-4 py-3 rounded-xl items-center justify-center"
                             style={{ backgroundColor: '#444444' }}
@@ -642,14 +695,14 @@ export default function NewRoutineScreen() {
                                 style={{
                                     color: COLORS.textLight,
                                     fontSize: 14,
-                                    lineHeight: 16,   // 👈 centra mejor verticalmente
+                                    lineHeight: 16,
                                 }}
                             >
                                 Volver atrás
                             </Text>
                         </Pressable>
 
-                        {/* 2) AÑADIR EJERCICIO (+) */}
+                        {/* AÑADIR EJERCICIO */}
                         <Pressable
                             className="flex-1 mx-1 px-4 py-3 rounded-xl items-center justify-center"
                             style={{ backgroundColor: COLORS.primary }}
@@ -667,7 +720,7 @@ export default function NewRoutineScreen() {
                             </Text>
                         </Pressable>
 
-                        {/* 3) GUARDAR RUTINA */}
+                        {/* GUARDAR RUTINA */}
                         <Pressable
                             className="flex-1 ml-2 px-4 py-3 rounded-xl items-center justify-center"
                             style={{ backgroundColor: '#444444' }}
@@ -685,140 +738,212 @@ export default function NewRoutineScreen() {
                             </Text>
                         </Pressable>
                     </View>
-
-                    {/* MODAL CONFIRMAR VOLVER ATRÁS */}
-                    <Modal
-                        visible={backModalVisible}
-                        transparent
-                        animationType="fade"
-                        onRequestClose={() => setBackModalVisible(false)}
-                    >
-                        <View
-                            className="flex-1 items-center justify-center"
-                            style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
-                        >
-                            <View
-                                className="w-10/11 rounded-2xl p-4"
-                                style={{
-                                    backgroundColor: '#111111',
-                                    borderWidth: 1,
-                                    borderColor: COLORS.primary,
-                                }}
-                            >
-                                <Text
-                                    className="text-base font-semibold mb-2 text-center"
-                                    style={{ color: COLORS.textLight }}
-                                >
-                                    ¿Realmente quieres volver al menú principal?
-                                </Text>
-
-                                <Text
-                                    className="text-xs text-center mb-4"
-                                    style={{ color: COLORS.textMuted }}
-                                >
-                                    Se perderán los cambios que no hayas guardado.
-                                </Text>
-
-                                <View className="flex-row mt-2">
-                                    <Pressable
-                                        className="flex-1 mr-2 py-2 rounded-full items-center justify-center"
-                                        style={{ backgroundColor: '#333333' }}
-                                        onPress={() => setBackModalVisible(false)}
-                                    >
-                                        <Text style={{ color: COLORS.textLight, fontWeight: '600' }}>
-                                            Cancelar
-                                        </Text>
-                                    </Pressable>
-
-                                    <Pressable
-                                        className="flex-1 ml-2 py-2 rounded-full items-center justify-center"
-                                        style={{ backgroundColor: COLORS.primary }}
-                                        onPress={() => {
-                                            setBackModalVisible(false);
-                                            handleBack();
-                                        }}
-                                    >
-                                        <Text style={{ color: '#111111', fontWeight: '700' }}>
-                                            Aceptar
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                            </View>
-                        </View>
-                    </Modal>
-                    {/* MODAL CONFIRMAR GUARDAR */}
-                    <Modal
-                        visible={saveModalVisible}
-                        transparent
-                        animationType="fade"
-                        onRequestClose={() => setSaveModalVisible(false)}
-                    >
-                        <View
-                            className="flex-1 items-center justify-center"
-                            style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
-                        >
-                            <View
-                                className="w-10/11 rounded-2xl p-4"
-                                style={{
-                                    backgroundColor: '#111111',
-                                    borderWidth: 1,
-                                    borderColor: COLORS.primary,
-                                }}
-                            >
-                                <Text
-                                    className="text-base font-semibold mb-2 text-center"
-                                    style={{ color: COLORS.textLight }}
-                                >
-                                    ¿Quieres guardar esta rutina?
-                                </Text>
-
-                                <Text
-                                    className="text-xs text-center mb-4"
-                                    style={{ color: COLORS.textMuted }}
-                                >
-                                    Podrás editarla más adelante desde el menú principal.
-                                </Text>
-
-                                <View className="flex-row mt-2">
-                                    <Pressable
-                                        className="flex-1 mr-2 py-2 rounded-full items-center justify-center"
-                                        style={{ backgroundColor: '#333333' }}
-                                        onPress={() => setSaveModalVisible(false)}
-                                    >
-                                        <Text style={{ color: COLORS.textLight, fontWeight: '600' }}>
-                                            Cancelar
-                                        </Text>
-                                    </Pressable>
-
-                                    <Pressable
-                                        className="flex-1 ml-2 py-2 rounded-full items-center justify-center"
-                                        style={{ backgroundColor: COLORS.primary }}
-                                        onPress={async () => {
-                                            setSaveModalVisible(false);
-                                            await handleSave();
-                                        }}
-                                    >
-                                        <Text style={{ color: '#111111', fontWeight: '700' }}>
-                                            Aceptar
-                                        </Text>
-                                    </Pressable>
-                                </View>
-                            </View>
-                        </View>
-                    </Modal>
-
-
-                    {/* FOOTER */}
-                    <View className="items-center mt-4">
-                        <Text className="font-bold" style={{ color: COLORS.accent }}>
-                            MGP <Text style={{ color: COLORS.primary }}>RUTINA FITNESS</Text>
-                        </Text>
-                        <Text style={{ color: COLORS.textLight }}>
-                            ¡Tu entrenamiento al instante!
-                        </Text>
-                    </View>
                 </View>
+
+                {/* MODALES (fuera del panel, pero da igual visualmente) */}
+
+                {/* MODAL BORRAR EJERCICIO */}
+                <Modal
+                    visible={deleteModalVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setDeleteModalVisible(false)}
+                >
+                    <View className="flex-1 items-center justify-center bg-black/60">
+                        <View
+                            className="w-72 rounded-2xl p-4"
+                            style={{
+                                backgroundColor: '#111111',
+                                borderWidth: 1,
+                                borderColor: COLORS.primary,
+                            }}
+                        >
+                            <Text
+                                className="text-base font-semibold mb-3"
+                                style={{ color: COLORS.textLight }}
+                            >
+                                ¿Realmente quieres borrar el ejercicio?
+                            </Text>
+
+                            <View className="flex-row justify-center mt-2">
+                                <Pressable
+                                    onPress={() => setDeleteModalVisible(false)}
+                                    className="px-8 py-2 rounded-full mr-2"
+                                    style={{ backgroundColor: '#333333' }}
+                                >
+                                    <Text
+                                        style={{
+                                            color: COLORS.textLight,
+                                        }}
+                                    >
+                                        Cancelar
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    onPress={handleDeleteSelectedExercise}
+                                    className="px-8 py-2 rounded-full"
+                                    style={{ backgroundColor: '#FF4B4B' }}
+                                >
+                                    <Text
+                                        style={{
+                                            color: '#111111',
+                                            fontWeight: '600',
+                                        }}
+                                    >
+                                        Aceptar
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* MODAL CONFIRMAR VOLVER ATRÁS */}
+                <Modal
+                    visible={backModalVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setBackModalVisible(false)}
+                >
+                    <View
+                        className="flex-1 items-center justify-center"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                    >
+                        <View
+                            className="w-10/11 rounded-2xl p-4"
+                            style={{
+                                backgroundColor: '#111111',
+                                borderWidth: 1,
+                                borderColor: COLORS.primary,
+                            }}
+                        >
+                            <Text
+                                className="text-base font-semibold mb-2 text-center"
+                                style={{ color: COLORS.textLight }}
+                            >
+                                ¿Realmente quieres volver al menú principal?
+                            </Text>
+
+                            <Text
+                                className="text-xs text-center mb-4"
+                                style={{ color: COLORS.textMuted }}
+                            >
+                                Se perderán los cambios que no hayas guardado.
+                            </Text>
+
+                            <View className="flex-row mt-2">
+                                <Pressable
+                                    className="flex-1 mr-2 py-2 rounded-full items-center justify-center"
+                                    style={{ backgroundColor: '#333333' }}
+                                    onPress={() => setBackModalVisible(false)}
+                                >
+                                    <Text
+                                        style={{
+                                            color: COLORS.textLight,
+                                            fontWeight: '600',
+                                        }}
+                                    >
+                                        Cancelar
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    className="flex-1 ml-2 py-2 rounded-full items-center justify-center"
+                                    style={{ backgroundColor: COLORS.primary }}
+                                    onPress={() => {
+                                        setBackModalVisible(false);
+                                        handleBack();
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color: '#111111',
+                                            fontWeight: '700',
+                                        }}
+                                    >
+                                        Aceptar
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* MODAL CONFIRMAR GUARDAR */}
+                <Modal
+                    visible={saveModalVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setSaveModalVisible(false)}
+                >
+                    <View
+                        className="flex-1 items-center justify-center"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                    >
+                        <View
+                            className="w-10/11 rounded-2xl p-4"
+                            style={{
+                                backgroundColor: '#111111',
+                                borderWidth: 1,
+                                borderColor: COLORS.primary,
+                            }}
+                        >
+                            <Text
+                                className="text-base font-semibold mb-2 text-center"
+                                style={{ color: COLORS.textLight }}
+                            >
+                                ¿Quieres guardar esta rutina?
+                            </Text>
+
+                            <Text
+                                className="text-xs text-center mb-4"
+                                style={{ color: COLORS.textMuted }}
+                            >
+                                Podrás editarla más adelante desde el menú
+                                principal.
+                            </Text>
+
+                            <View className="flex-row mt-2">
+                                <Pressable
+                                    className="flex-1 mr-2 py-2 rounded-full items-center justify-center"
+                                    style={{ backgroundColor: '#333333' }}
+                                    onPress={() => setSaveModalVisible(false)}
+                                >
+                                    <Text
+                                        style={{
+                                            color: COLORS.textLight,
+                                            fontWeight: '600',
+                                        }}
+                                    >
+                                        Cancelar
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    className="flex-1 ml-2 py-2 rounded-full items-center justify-center"
+                                    style={{ backgroundColor: COLORS.primary }}
+                                    onPress={async () => {
+                                        setSaveModalVisible(false);
+                                        await handleSave();
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color: '#111111',
+                                            fontWeight: '700',
+                                        }}
+                                    >
+                                        Aceptar
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
+
+
 }

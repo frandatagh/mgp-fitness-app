@@ -6,7 +6,7 @@ import { COLORS } from '../constants/colors';
 import { RoutineCard } from '../components/RoutineCard';
 import { router } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
-import { getRoutines, Routine } from '../lib/routines';
+import { getRoutines, Routine, deleteRoutine } from '../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
 
 
@@ -65,6 +65,21 @@ export default function HomeScreen() {
         await logout();
         // el efecto de arriba se encargará de mandarte a "/"
     };
+    const handleDeleteRoutine = async (id: string) => {
+        try {
+            setRoutinesError(null);
+            await deleteRoutine(id); // 🔥 borra en el backend
+            // y ahora actualizamos el listado en memoria
+            setRoutines((prev) => prev.filter((r) => r.id !== id));
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : 'Error al borrar la rutina';
+            setRoutinesError(message);
+        }
+    };
+
 
     const latestRoutineId = useMemo(() => {
         if (!routines.length) return null;
@@ -110,7 +125,8 @@ export default function HomeScreen() {
                 <View className="items-center">
                     <Image
                         source={require('../assets/img/iconhome.png')}
-                        style={{ width: 110, height: 110, resizeMode: 'contain' }}
+                        style={{ width: 110, height: 110 }}
+                        resizeMode="contain"
                     />
                 </View>
 
@@ -176,8 +192,10 @@ export default function HomeScreen() {
                                 style={{ color: COLORS.textMuted }}
                             >
                                 Aún no tienes rutinas guardadas. Crea tu primera rutina con el
-                                botón de abajo.
+                                botón de abajo 'Crear rutina'.
+
                             </Text>
+
                         )}
 
                         {routines.map((routine) => (
@@ -188,20 +206,24 @@ export default function HomeScreen() {
                                 highlighted={routine.id === latestRoutineId}
                                 exercisesPreview={routine.exercises ?? []}
                                 onOpen={() => {
-                                    router.push({ pathname: '/routine/[id]', params: { id: routine.id } });
+                                    router.push({
+                                        pathname: '/routine/[id]',
+                                        params: { id: routine.id },
+                                    });
                                 }}
                                 onEdit={() => {
-                                    router.push({ pathname: '/routine/edit/[id]', params: { id: routine.id } });
+                                    router.push({
+                                        pathname: '/routine/edit/[id]',
+                                        params: { id: routine.id },
+                                    });
                                 }}
-                                onDelete={() => {
-                                    // luego podemos agregar un Alert y deleteRoutine(...)
-                                    console.log('Borrar rutina', routine.id);
-                                }}
+                                onDelete={() => handleDeleteRoutine(routine.id)}
                                 onShare={() => {
                                     console.log('Compartir / exportar rutina', routine.id);
                                 }}
                             />
                         ))}
+
                     </ScrollView>
 
                     {/* MENÚ AJUSTES */}
@@ -326,8 +348,8 @@ export default function HomeScreen() {
 
 
 
-            </View>
-        </SafeAreaView>
+            </View >
+        </SafeAreaView >
     );
 }
 

@@ -14,6 +14,8 @@ import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { COLORS } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
 import { getRoutine, Routine, RoutineExercise } from '../../lib/routines';
+import { Ionicons } from '@expo/vector-icons';
+
 
 // Columnas alineadas para la “tabla”
 const colName = { flex: 4 };   // nombre ejercicio
@@ -149,6 +151,7 @@ export default function RoutineDetailScreen() {
             className="flex-1"
             style={{ backgroundColor: COLORS.background }}
         >
+
             <View className="flex-1 px-4 pt-1 pb-4"
                 style={{ maxWidth: 800, alignSelf: 'center' }}>
                 {/* Encabezado superior */}
@@ -157,12 +160,12 @@ export default function RoutineDetailScreen() {
                     {/* Logo centrado */}
                     <View className="items-center">
                         <Image
-                            source={require('../../assets/img/iconrun.png')}
+                            source={require('../../assets/img/icontwist.png')}
                             style={{
                                 width: 180,        // ajustá a gusto
                                 height: 90,
-                                resizeMode: 'contain',
                             }}
+                            resizeMode="contain"
                         />
                     </View>
 
@@ -375,34 +378,45 @@ export default function RoutineDetailScreen() {
                 </View>
 
                 {/* Botones inferiores */}
-                <View className="mt-4 flex-row justify-between px-4 pb-4">
-                    {/* Botón "Realizada" gris, con tilde. Verde si ya fue marcada */}
+                <View className="mt-2 flex-row justify-between px-2 pb-2">
+                    {/* Botón "Realizada" - 2x más ancho */}
                     <Pressable
                         onPress={handleDonePress}
-                        className="flex-1 mr-2 rounded-full py-2 items-center justify-center"
+                        className="flex-[2] mr-2 px-4 py-4 rounded-xl items-center justify-center"
                         style={{
                             backgroundColor: doneMarked ? COLORS.primary : '#444444',
                         }}
                     >
-                        <Text
-                            className="text-[14px] font-semibold"
-                            style={{ color: doneMarked ? '#111111' : COLORS.textLight }}
-                        >
-                            ✔ Realizada
-                        </Text>
+                        <View className="flex-row items-center justify-center">
+                            <Ionicons
+                                name={doneMarked ? 'checkmark-circle' : 'checkmark'}
+                                size={18}
+                                color={doneMarked ? '#111111' : COLORS.textLight}
+                            />
+                            <Text
+                                className="text-[14px] font-normal ml-2"
+                                style={{ color: doneMarked ? '#111111' : COLORS.textLight }}
+                            >
+                                Realizada por hoy
+                            </Text>
+                        </View>
                     </Pressable>
 
-                    {/* Botón "Volver atrás" gris */}
+                    {/* Botón "Volver atrás" - tamaño normal */}
                     <Pressable
                         onPress={handleBack}
-                        className="flex-1 ml-2 rounded-full py-2 items-center justify-center"
+                        className="flex-1  px-4 py-4 rounded-xl items-center justify-center"
                         style={{ backgroundColor: '#444444' }}
                     >
-                        <Text className="text-[14px] font-semibold" style={{ color: COLORS.textLight }}>
+                        <Text
+                            className="text-[14px] font-normal"
+                            style={{ color: COLORS.textLight }}
+                        >
                             Volver atrás
                         </Text>
                     </Pressable>
                 </View>
+
                 {/* Modal: confirmar rutina realizada */}
                 <Modal
                     visible={doneModalVisible}

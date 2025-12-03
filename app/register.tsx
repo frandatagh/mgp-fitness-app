@@ -83,17 +83,18 @@ export default function RegisterScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
             {/* LOGO GRANDE */}
-            <View className="items-center">
+            <View className="items-center mb-4">
                 <Image
                     source={require('../assets/img/icontwist.png')}
-                    style={{ width: 220, height: 220, resizeMode: 'contain' }}
+                    style={{ width: 200, height: 200 }}
+                    resizeMode="contain"
                 />
             </View>
 
             {/* CARD REGISTRO */}
             <View
-                className="w-full rounded-3xl px-6 py-7"
-                style={{ backgroundColor: COLORS.card }}
+                className="w-full mt-2 rounded-3xl px-6 py-7 shadow-black shadow-md"
+                style={{ backgroundColor: COLORS.card, maxWidth: 600 }}
             >
                 <Text
                     className="text-2xl font-bold mb-6 text-center"
@@ -225,7 +226,7 @@ export default function RegisterScreen() {
                 )}
 
                 {/* Términos */}
-                <Text className="text-xs mb-4" style={{ color: COLORS.textMuted }}>
+                <Text className="text-sm mt-3 mb-3 text-center" style={{ color: COLORS.textMuted }}>
                     ☐ Aceptar{' '}
                     <Text style={{ textDecorationLine: 'underline' }}>
                         Términos y Condiciones
@@ -234,15 +235,27 @@ export default function RegisterScreen() {
 
                 {/* Botón crear cuenta */}
                 <Pressable
-                    className="rounded-full py-3 items-center mb-4"
-                    style={{ backgroundColor: COLORS.primary }}
+                    className="rounded-full py-3 items-center mb-4 shadow-neutral-700 shadow-md"
+                    style={{
+                        backgroundColor: COLORS.primary,
+                        width: 220,
+                        alignSelf: 'center'
+                    }}
                     onPress={handleSubmit(onSubmit)}
                     disabled={isSubmitting}
                 >
-                    <Text className="text-base font-bold" style={{ color: '#224000' }}>
-                        {isSubmitting ? 'Creando cuenta...' : 'Crear nueva cuenta'}
+                    <Text className="text-base font-bold" style={{ color: '#000000' }}>
+                        {isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
                     </Text>
                 </Pressable>
+
+                {/* Regresar al login */}
+                <Text className="text-xs text-center" style={{ color: COLORS.textMuted }}>
+
+                    <Text >
+                        Volver a Iniciar Sesión
+                    </Text>
+                </Text>
 
                 {serverError && (
                     <Text

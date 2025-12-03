@@ -76,22 +76,23 @@ export default function LoginScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
             {/* LOGO / TITULO */}
-            <View className="items-center mb-5">
+            <View className="items-center mb-6">
                 {/* LOGO SUPERIOR */}
                 <View className="items-center">
                     <Image
                         source={require('../assets/img/iconhome.png')}
-                        style={{ width: 220, height: 220, resizeMode: 'contain' }}
+                        style={{ width: 280, height: 280 }}
+                        resizeMode="contain"
                     />
                 </View>
-                <Text className=" text-base" style={{ color: COLORS.textLight }}>
+                <Text className=" text-base mb-4" style={{ color: COLORS.textMuted }}>
                     ¡Tu entrenamiento al instante!
                 </Text>
             </View>
 
             {/* CARD LOGIN */}
             <View
-                className="w-full rounded-3xl px-6 py-7"
+                className="w-full rounded-3xl px-6 py-7 shadow-black shadow-md"
                 style={{ backgroundColor: COLORS.card, maxWidth: 600 }}
             >
                 <Text
@@ -165,7 +166,7 @@ export default function LoginScreen() {
                 )}
 
                 {/* Recordarme / Olvidé */}
-                <View className="flex-row justify-between items-center mb-5">
+                <View className="flex-row justify-between items-center mb-5 px-2">
                     <Text className="text-xs" style={{ color: COLORS.textMuted }}>
                         Recordarme
                     </Text>
@@ -176,12 +177,16 @@ export default function LoginScreen() {
 
                 {/* Botón ingresar */}
                 <Pressable
-                    className="rounded-full py-3 items-center mb-4"
-                    style={{ backgroundColor: COLORS.primary }}
+                    className="rounded-full py-3 items-center mb-4 shadow-neutral-700 shadow-md"
+                    style={{
+                        backgroundColor: COLORS.primary,
+                        width: 220,
+                        alignSelf: 'center',
+                    }}
                     onPress={handleSubmit(onSubmit)}
                     disabled={isSubmitting}
                 >
-                    <Text className="text-base font-bold" style={{ color: '#224000' }}>
+                    <Text className="text-base font-semibold" style={{ color: '#000000' }}>
                         {isSubmitting ? 'Ingresando...' : 'Ingresar cuenta'}
                     </Text>
                 </Pressable>
@@ -200,7 +205,7 @@ export default function LoginScreen() {
                 <Pressable onPress={() => router.push('/register')}>
                     <Text className="text-center text-sm" style={{ color: COLORS.textLight }}>
                         ¿Eres nuevo?{' '}
-                        <Text style={{ textDecorationLine: 'underline' }}>Registrarse</Text>
+                        <Text style={{ textDecorationLine: 'underline' }}>Regístrate</Text>
                     </Text>
                 </Pressable>
             </View>

@@ -174,7 +174,6 @@ export default function EditRoutineScreen() {
         setSelectedRowIndex(index);
     };
 
-
     const handleAddExercise = () => {
         setExercises((prev) => [...prev, EMPTY_EXERCISE]);
         setSelectedRowIndex(exercises.length); // seleccionamos el nuevo
@@ -251,8 +250,6 @@ export default function EditRoutineScreen() {
         try {
             setSaving(true);
 
-            // IMPORTANTE: para que esto funcione, hay que permitir "exercises"
-            // en el payload de updateRoutine en lib/routines.ts (te lo explico abajo).
             await updateRoutine(String(id), {
                 title: title.trim(),
                 notes: notes.trim() || undefined,
@@ -312,6 +309,7 @@ export default function EditRoutineScreen() {
 
     // ---------- Render principal ----------
 
+    // ---------- Render principal ----------
     return (
         <SafeAreaView
             className="flex-1"
@@ -322,29 +320,26 @@ export default function EditRoutineScreen() {
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
                 keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
             >
-                <ScrollView
+                {/* CONTENEDOR CENTRAL */}
+                <View
                     className="flex-1 px-4 pt-1 pb-4"
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                    style={{ maxWidth: 800, alignSelf: 'center' }}
+                    style={{
+                        maxWidth: 800,
+                        alignSelf: "center",
+                        width: "100%",
+                    }}
                 >
-
-                    {/* LOGO + TÍTULO SUPERIOR */}
+                    {/* HEADER FIJO: LOGO + TÍTULO */}
                     <View className="mb-2">
-                        {/* Logo centrado */}
                         <View className="items-center">
                             <Image
-                                source={require('../../../assets/img/iconmgp.png')}
-                                style={{
-                                    width: 130,        // ajustá a gusto
-                                    height: 80,
-                                    resizeMode: 'contain',
-                                }}
+                                source={require("../../../assets/img/iconmgp.png")}
+                                style={{ width: 130, height: 80 }}
+                                resizeMode="contain"
                             />
                         </View>
 
-                        {/* Subtítulo alineado a la izquierda */}
-                        <View style={{ alignItems: 'flex-start' }}>
+                        <View style={{ alignItems: "flex-start" }}>
                             <Text
                                 className="text-base font-light px-4"
                                 style={{ color: COLORS.textMuted }}
@@ -354,333 +349,340 @@ export default function EditRoutineScreen() {
                         </View>
                     </View>
 
-                    {/* Tarjeta principal */}
-                    <View
-                        className="rounded-3xl px-3 py-4"
-                        style={{ borderWidth: 2, borderColor: COLORS.primary }}
-                    >
-                        {/* Título */}
-                        <Text
-                            className="mb-2 text-[13px]"
-                            style={{ color: COLORS.textMuted }}
-                        >
-                            Título de rutina
-                        </Text>
-                        <TextInput
-                            value={title}
-                            onChangeText={setTitle}
-                            placeholder="Título de la rutina"
-                            placeholderTextColor="#666"
-                            className="rounded-xl px-3 py-2 text-[14px]"
-                            style={{
-                                backgroundColor: "#111111",
-                                color: COLORS.textLight,
-                                borderWidth: 1,
-                                borderColor: COLORS.primary,
-                            }}
-                        />
-
-                        {/* Descripción */}
-                        <Text
-                            className="mt-4 mb-2 text-[13px]"
-                            style={{ color: COLORS.textMuted }}
-                        >
-                            Descripción / notas
-                        </Text>
-                        <TextInput
-                            value={notes}
-                            onChangeText={setNotes}
-                            placeholder="Notas o descripción general de la rutina"
-                            placeholderTextColor="#666"
-                            multiline
-                            textAlignVertical="top"
-                            className="rounded-xl px-3 py-2 text-[14px]"
-                            style={{
-                                minHeight: 80,
-                                backgroundColor: "#111111",
-                                color: COLORS.textLight,
-                                borderWidth: 1,
-                                borderColor: COLORS.primary,
-                            }}
-                        />
-
-                        {/* Separador */}
+                    {/* ZONA CENTRAL: TARJETA CON SCROLL INTERNO */}
+                    <View className="flex-1 mt-2">
                         <View
-                            className="my-4"
-                            style={{ height: 1, backgroundColor: COLORS.textMuted }}
-                        />
+                            className="flex-1 rounded-3xl px-3 py-4"
+                            style={{ borderWidth: 2, borderColor: COLORS.primary }}
+                        >
+                            {/* Título */}
+                            <Text
+                                className="mb-2 text-[13px]"
+                                style={{ color: COLORS.textMuted }}
+                            >
+                                Título de rutina
+                            </Text>
+                            <TextInput
+                                value={title}
+                                onChangeText={setTitle}
+                                placeholder="Título de la rutina"
+                                placeholderTextColor="#666"
+                                className="rounded-xl px-3 py-2 text-[14px]"
+                                style={{
+                                    backgroundColor: "#111111",
+                                    color: COLORS.textLight,
+                                    borderWidth: 1,
+                                    borderColor: COLORS.primary,
+                                }}
+                            />
 
-                        {/* Cabecera de tabla de ejercicios */}
-                        <View className="flex-row mb-2">
-                            <View className="flex-[4]">
-                                <Text
-                                    className="font-semibold text-[12px]"
-                                    style={{ color: COLORS.textLight }}
-                                >
-                                    Ejercicios.
-                                </Text>
-                            </View>
-                            <View className="flex-[2] items-center">
-                                <Text
-                                    className="font-semibold text-[12px]"
-                                    style={{ color: COLORS.textLight }}
-                                >
-                                    Series.
-                                </Text>
-                            </View>
-                            <View className="flex-[2] items-center">
-                                <Text
-                                    className="font-semibold text-[12px]"
-                                    style={{ color: COLORS.textLight }}
-                                >
-                                    Reps.
-                                </Text>
-                            </View>
-                            <View className="flex-[2] items-center">
-                                <Text
-                                    className="font-semibold text-[12px]"
-                                    style={{ color: COLORS.textLight }}
-                                >
-                                    Día
-                                </Text>
-                            </View>
-                        </View>
+                            {/* Descripción */}
+                            <Text
+                                className="mt-4 mb-2 text-[13px]"
+                                style={{ color: COLORS.textMuted }}
+                            >
+                                Descripción / notas
+                            </Text>
+                            <TextInput
+                                value={notes}
+                                onChangeText={setNotes}
+                                placeholder="Notas o descripción general de la rutina"
+                                placeholderTextColor="#666"
+                                multiline
+                                textAlignVertical="top"
+                                className="rounded-xl px-3 py-2 text-[14px]"
+                                style={{
+                                    minHeight: 80,
+                                    backgroundColor: "#111111",
+                                    color: COLORS.textLight,
+                                    borderWidth: 1,
+                                    borderColor: COLORS.primary,
+                                }}
+                            />
 
-                        {/* Filas de ejercicios */}
-                        {exercises.map((exercise, index) => {
-                            const isSelected = selectedRowIndex === index;
+                            {/* Separador */}
+                            <View
+                                className="my-4"
+                                style={{ height: 1, backgroundColor: COLORS.textMuted }}
+                            />
 
-                            return (
-                                <View key={exercise.id ?? index} className="mb-2">
-                                    <Pressable
-                                        onPress={() => setSelectedRowIndex(index)}
-                                        style={{
-                                            borderRadius: 10,
-                                            paddingVertical: 4,
-                                            paddingHorizontal: 4,
-                                            borderWidth: 1,
-                                            borderColor: isSelected ? "#ff4d4d" : "#333333",
-                                            backgroundColor: isSelected ? "#1b1010" : "transparent",
-                                        }}
+                            {/* Cabecera de tabla de ejercicios */}
+                            <View className="flex-row mb-2">
+                                <View className="flex-[4]">
+                                    <Text
+                                        className="font-semibold text-[12px]"
+                                        style={{ color: COLORS.textLight }}
                                     >
-                                        {/* Fila principal: nombre / series / reps / día */}
-                                        <View className="flex-row items-center mb-1">
-                                            {/* Nombre */}
-                                            <View className="flex-[4] mr-1">
-                                                <TextInput
-                                                    value={exercise.name}
-                                                    onChangeText={(text) =>
-                                                        handleChangeExercise(index, "name", text)
-                                                    }
-                                                    onFocus={() => setSelectedRowIndex(index)}
-                                                    placeholder="Press banca"
-                                                    placeholderTextColor={COLORS.textMuted}
-                                                    className="px-2 py-1 rounded-lg text-xs"
-                                                    style={{
-                                                        backgroundColor: "#111111",
-                                                        color: COLORS.textLight,
-                                                        borderWidth: 1,
-                                                        borderColor: "#333333",
-                                                    }}
-                                                />
-                                            </View>
+                                        Ejercicios.
+                                    </Text>
+                                </View>
+                                <View className="flex-[2] items-center">
+                                    <Text
+                                        className="font-semibold text-[12px]"
+                                        style={{ color: COLORS.textLight }}
+                                    >
+                                        Series.
+                                    </Text>
+                                </View>
+                                <View className="flex-[2] items-center">
+                                    <Text
+                                        className="font-semibold text-[12px]"
+                                        style={{ color: COLORS.textLight }}
+                                    >
+                                        Reps.
+                                    </Text>
+                                </View>
+                                <View className="flex-[2] items-center">
+                                    <Text
+                                        className="font-semibold text-[12px]"
+                                        style={{ color: COLORS.textLight }}
+                                    >
+                                        Día
+                                    </Text>
+                                </View>
+                            </View>
 
-                                            {/* Series */}
-                                            <View className="flex-[2] mx-1">
-                                                <TextInput
-                                                    value={exercise.sets}
-                                                    onChangeText={(text) =>
-                                                        handleChangeExercise(index, "sets", text)
-                                                    }
-                                                    onFocus={() => setSelectedRowIndex(index)}
-                                                    keyboardType="numeric"
-                                                    placeholder="3"
-                                                    placeholderTextColor={COLORS.textMuted}
-                                                    className="px-2 py-1 rounded-lg text-xs text-center"
-                                                    style={{
-                                                        backgroundColor: "#111111",
-                                                        color: COLORS.textLight,
-                                                        borderWidth: 1,
-                                                        borderColor: "#333333",
-                                                    }}
-                                                />
-                                            </View>
+                            {/* SCROLL SOLO DENTRO DEL CUADRANTE */}
+                            <View style={{ flex: 1 }}>
+                                <ScrollView
+                                    className="no-scrollbar"
+                                    showsVerticalScrollIndicator={false}
+                                    nestedScrollEnabled
+                                    keyboardShouldPersistTaps="handled"
+                                    contentContainerStyle={{ paddingBottom: 8 }}
+                                >
+                                    {exercises.map((exercise, index) => {
+                                        const isSelected = selectedRowIndex === index;
 
-                                            {/* Reps */}
-                                            <View className="flex-[2] mx-1">
-                                                <TextInput
-                                                    value={exercise.reps}
-                                                    onChangeText={(text) =>
-                                                        handleChangeExercise(index, "reps", text)
-                                                    }
-                                                    onFocus={() => setSelectedRowIndex(index)}
-                                                    keyboardType="numeric"
-                                                    placeholder="10"
-                                                    placeholderTextColor={COLORS.textMuted}
-                                                    className="px-2 py-1 rounded-lg text-xs text-center"
-                                                    style={{
-                                                        backgroundColor: "#111111",
-                                                        color: COLORS.textLight,
-                                                        borderWidth: 1,
-                                                        borderColor: "#333333",
-                                                    }}
-                                                />
-                                            </View>
-
-                                            {/* Día: botón + menú flotante */}
-                                            <View className="flex-[2]">
+                                        return (
+                                            <View key={exercise.id ?? index} className="mb-2">
                                                 <Pressable
-                                                    onPress={() =>
-                                                        setOpenDayMenuIndex(
-                                                            openDayMenuIndex === index ? null : index
-                                                        )
-                                                    }
+                                                    onPress={() => setSelectedRowIndex(index)}
                                                     style={{
-                                                        backgroundColor: "#111111",
+                                                        position: 'relative',              // 👈 importante
+                                                        borderRadius: 10,
+                                                        paddingVertical: 4,
+                                                        paddingHorizontal: 4,
                                                         borderWidth: 1,
-                                                        borderColor: "#555555",
-                                                        borderRadius: 8,
-                                                        height: 30,
-                                                        alignItems: "center",
-                                                        justifyContent: "center",
+                                                        borderColor: isSelected ? '#ff4d4d' : '#333333',
+                                                        backgroundColor: isSelected ? '#1b1010' : 'transparent',
                                                     }}
                                                 >
-                                                    <Text
-                                                        style={{
-                                                            color: exercise.day
-                                                                ? COLORS.textLight
-                                                                : COLORS.textMuted,
-                                                            fontSize: 11,
-                                                        }}
-                                                    >
-                                                        {exercise.day || "Día"}
-                                                    </Text>
-                                                </Pressable>
+                                                    {/* FILA 1: nombre / series / reps / día */}
+                                                    <View className="flex-row items-center mb-1">
+                                                        {/* Nombre */}
+                                                        <View className="flex-[4] mr-1">
+                                                            <TextInput
+                                                                value={exercise.name}
+                                                                onChangeText={(text) =>
+                                                                    handleChangeExercise(index, 'name', text)
+                                                                }
+                                                                onFocus={() => setSelectedRowIndex(index)}
+                                                                placeholder="Press banca"
+                                                                placeholderTextColor={COLORS.textMuted}
+                                                                className="px-2 py-1 rounded-lg text-xs"
+                                                                style={{
+                                                                    backgroundColor: '#111111',
+                                                                    color: COLORS.textLight,
+                                                                    borderWidth: 1,
+                                                                    borderColor: '#333333',
+                                                                }}
+                                                            />
+                                                        </View>
 
-                                                {/* Menú flotante de días */}
-                                                {openDayMenuIndex === index && (
-                                                    <View
-                                                        className="absolute"
-                                                        style={{
-                                                            top: 36,
-                                                            right: 0,
-                                                            backgroundColor: "#111111",
-                                                            borderWidth: 1,
-                                                            borderColor: "#555555",
-                                                            borderRadius: 8,
-                                                            width: 110,
-                                                            zIndex: 999,
-                                                            elevation: 10,
-                                                        }}
-                                                    >
-                                                        <ScrollView
-                                                            style={{ maxHeight: 150 }}
-                                                            contentContainerStyle={{ paddingVertical: 4 }}
-                                                            nestedScrollEnabled
-                                                            keyboardShouldPersistTaps="handled"
-                                                            showsVerticalScrollIndicator={false}
-                                                        >
-                                                            {DAY_OPTIONS.map((opt) => (
-                                                                <Pressable
-                                                                    key={opt}
-                                                                    onPress={() => {
-                                                                        handleChangeExercise(index, "day", opt);
-                                                                        setOpenDayMenuIndex(null);
-                                                                    }}
+                                                        {/* Series */}
+                                                        <View className="flex-[2] mx-1">
+                                                            <TextInput
+                                                                value={exercise.sets}
+                                                                onChangeText={(text) =>
+                                                                    handleChangeExercise(index, 'sets', text)
+                                                                }
+                                                                onFocus={() => setSelectedRowIndex(index)}
+                                                                keyboardType="numeric"
+                                                                placeholder="4"
+                                                                placeholderTextColor={COLORS.textMuted}
+                                                                className="px-2 py-1 rounded-lg text-xs text-center"
+                                                                style={{
+                                                                    backgroundColor: '#111111',
+                                                                    color: COLORS.textLight,
+                                                                    borderWidth: 1,
+                                                                    borderColor: '#333333',
+                                                                }}
+                                                            />
+                                                        </View>
+
+                                                        {/* Reps */}
+                                                        <View className="flex-[2] mx-1">
+                                                            <TextInput
+                                                                value={exercise.reps}
+                                                                onChangeText={(text) =>
+                                                                    handleChangeExercise(index, 'reps', text)
+                                                                }
+                                                                onFocus={() => setSelectedRowIndex(index)}
+                                                                keyboardType="numeric"
+                                                                placeholder="12"
+                                                                placeholderTextColor={COLORS.textMuted}
+                                                                className="px-2 py-1 rounded-lg text-xs text-center"
+                                                                style={{
+                                                                    backgroundColor: '#111111',
+                                                                    color: COLORS.textLight,
+                                                                    borderWidth: 1,
+                                                                    borderColor: '#333333',
+                                                                }}
+                                                            />
+                                                        </View>
+
+                                                        {/* Botón Día */}
+                                                        <View className="flex-[2]">
+                                                            <Pressable
+                                                                onPress={() =>
+                                                                    setOpenDayMenuIndex(
+                                                                        openDayMenuIndex === index ? null : index
+                                                                    )
+                                                                }
+                                                                style={{
+                                                                    backgroundColor: '#111111',
+                                                                    borderWidth: 1,
+                                                                    borderColor: '#555555',
+                                                                    borderRadius: 8,
+                                                                    height: 30,
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                }}
+                                                            >
+                                                                <Text
                                                                     style={{
-                                                                        paddingVertical: 4,
-                                                                        paddingHorizontal: 8,
+                                                                        color: exercise.day ? COLORS.textLight : COLORS.textMuted,
+                                                                        fontSize: 11,
                                                                     }}
                                                                 >
-                                                                    <Text
+                                                                    {exercise.day || 'Día'}
+                                                                </Text>
+                                                            </Pressable>
+                                                        </View>
+                                                    </View>
+
+                                                    {/* FILA 2: notas + borrar */}
+                                                    <View className="flex-row items-center mt-1">
+                                                        <Text
+                                                            className="text-[10px] mr-1"
+                                                            style={{ color: COLORS.textMuted }}
+                                                        >
+                                                            Notas:
+                                                        </Text>
+                                                        <TextInput
+                                                            value={exercise.notes}
+                                                            onChangeText={(text) =>
+                                                                handleChangeExercise(index, 'notes', text)
+                                                            }
+                                                            onFocus={() => setSelectedRowIndex(index)}
+                                                            placeholder="Tempo, técnica, rango, etc."
+                                                            placeholderTextColor={COLORS.textMuted}
+                                                            className="px-2 py-1 rounded-lg text-[11px] flex-1"
+                                                            style={{
+                                                                backgroundColor: '#111111',
+                                                                color: COLORS.textLight,
+                                                                borderWidth: 1,
+                                                                borderColor: '#333333',
+                                                            }}
+                                                        />
+
+                                                        {isSelected && (
+                                                            <Pressable
+                                                                onPress={() => askDeleteExercise(index)}
+                                                                style={{
+                                                                    marginLeft: 6,
+                                                                    paddingHorizontal: 4,
+                                                                    paddingVertical: 4,
+                                                                }}
+                                                            >
+                                                                <MaterialIcons
+                                                                    name="delete-outline"
+                                                                    size={18}
+                                                                    color="#FFBABA"
+                                                                />
+                                                            </Pressable>
+                                                        )}
+                                                    </View>
+
+                                                    {/* MENÚ DE DÍAS – AHORA VIENE DESPUÉS DE TODO, SIEMPRE ARRIBA */}
+                                                    {openDayMenuIndex === index && (
+                                                        <View
+                                                            style={{
+                                                                position: 'absolute',
+                                                                top: 34,
+                                                                right: 4,
+                                                                backgroundColor: '#111111',
+                                                                borderWidth: 1,
+                                                                borderColor: '#555555',
+                                                                borderRadius: 8,
+                                                                width: 120,
+                                                                maxHeight: 200,           // 👈 un poco más chica
+                                                                zIndex: 50,
+                                                                elevation: 50,
+                                                                overflow: 'hidden',       // recorta dentro del cuadro
+                                                            }}
+                                                        >
+                                                            <ScrollView
+                                                                className="no-scrollbar"  // 👈 oculta la barra física en web
+                                                                contentContainerStyle={{ paddingVertical: 4 }}
+                                                                nestedScrollEnabled
+                                                                keyboardShouldPersistTaps="handled"
+                                                                showsVerticalScrollIndicator={false} // sin indicador en native
+                                                            >
+                                                                {DAY_OPTIONS.map((opt) => (
+                                                                    <Pressable
+                                                                        key={opt}
+                                                                        onPress={() => {
+                                                                            handleChangeExercise(index, 'day', opt);
+                                                                            setOpenDayMenuIndex(null);
+                                                                        }}
                                                                         style={{
-                                                                            color:
-                                                                                exercise.day === opt
-                                                                                    ? COLORS.primary
-                                                                                    : COLORS.textLight,
-                                                                            fontSize: 11,
+                                                                            paddingVertical: 4,
+                                                                            paddingHorizontal: 8,
                                                                         }}
                                                                     >
-                                                                        {opt}
-                                                                    </Text>
-                                                                </Pressable>
-                                                            ))}
-                                                        </ScrollView>
-                                                    </View>
-                                                )}
-                                            </View>
-                                        </View>
+                                                                        <Text
+                                                                            style={{
+                                                                                color:
+                                                                                    exercise.day === opt ? COLORS.primary : COLORS.textLight,
+                                                                                fontSize: 11,
+                                                                            }}
+                                                                        >
+                                                                            {opt}
+                                                                        </Text>
+                                                                    </Pressable>
+                                                                ))}
+                                                            </ScrollView>
+                                                        </View>
+                                                    )}
 
-                                        {/* Segunda fila: Notas + botón eliminar */}
-                                        <View className="flex-row items-center mt-1">
-                                            <Text
-                                                className="text-[10px] mr-1"
-                                                style={{ color: COLORS.textMuted }}
-                                            >
-                                                Notas:
-                                            </Text>
-                                            <TextInput
-                                                value={exercise.notes}
-                                                onChangeText={(text) =>
-                                                    handleChangeExercise(index, "notes", text)
-                                                }
-                                                onFocus={() => setSelectedRowIndex(index)}
-                                                placeholder="Tempo, técnica, rango, etc."
-                                                placeholderTextColor={COLORS.textMuted}
-                                                className="px-2 py-1 rounded-lg text-[11px] flex-1"
-                                                style={{
-                                                    backgroundColor: "#111111",
-                                                    color: COLORS.textLight,
-                                                    borderWidth: 1,
-                                                    borderColor: "#333333",
-                                                }}
-                                            />
-
-                                            {/* Botón eliminar solo cuando la fila está seleccionada */}
-                                            {isSelected && (
-                                                <Pressable
-                                                    onPress={() => askDeleteExercise(index)}
-                                                    style={{
-                                                        marginLeft: 6,
-                                                        paddingHorizontal: 4,
-                                                        paddingVertical: 4,
-                                                    }}
-                                                >
-                                                    <MaterialIcons
-                                                        name="delete-outline"
-                                                        size={18}
-                                                        color="#FFBABA"
-                                                    />
                                                 </Pressable>
-                                            )}
-                                        </View>
-                                    </Pressable>
-                                </View>
-                            );
-                        })}
+                                            </View>
+                                        );
+                                    })}
 
-                        {/* Botón "Añadir ejercicio" dentro de la tarjeta (opcional) */}
-                        <View className="mt-3">
-                            <Pressable
-                                onPress={handleAddExercise}
-                                className="rounded-full py-2 items-center justify-center"
-                                style={{ backgroundColor: COLORS.primary }}
-                            >
-                                <Text
-                                    className="text-[13px] font-semibold"
-                                    style={{ color: "#111111" }}
-                                >
-                                    + Añadir ejercicio
-                                </Text>
-                            </Pressable>
+                                </ScrollView>
+                            </View>
                         </View>
                     </View>
 
-                    {/* Botones inferiores */}
-                    <View className="mt-6 flex-row justify-between">
+                    {/* BOTONES INFERIORES FIJOS (3 BOTONES) */}
+                    <View className="mt-4 flex-row justify-between">
+                        {/* AGREGAR EJERCICIO - verde */}
+                        <Pressable
+                            onPress={handleAddExercise}
+                            className="flex-1 ml-2 px-4 py-3 rounded-xl items-center justify-center"
+                            style={{ backgroundColor: COLORS.primary }}
+                        >
+                            <Text className="text-center text-[14px] font-semibold" style={{ color: "#111111" }}>
+                                + Agregar ejercicio
+                            </Text>
+                        </Pressable>
+                        {/* VOLVER ATRÁS - gris */}
                         <Pressable
                             onPress={handleCancel}
-                            className="flex-1 mr-2 rounded-full py-2 items-center justify-center"
+                            className="flex-1 ml-2 px-4 py-3 rounded-xl items-center justify-center"
                             style={{ backgroundColor: "#444444" }}
                         >
                             <Text className="text-[14px] font-semibold text-gray-100">
@@ -688,21 +690,24 @@ export default function EditRoutineScreen() {
                             </Text>
                         </Pressable>
 
+
+
+                        {/* GUARDAR CAMBIOS - verde */}
                         <Pressable
                             onPress={handleSave}
                             disabled={saving}
-                            className="flex-1 ml-2 rounded-full py-2 items-center justify-center"
+                            className="flex-1 ml-2 px-4 py-3 rounded-xl items-center justify-center"
                             style={{ backgroundColor: COLORS.primary }}
                         >
-                            <Text className="text-[14px] font-semibold text-black">
+                            <Text className="text-center text-[14px] font-semibold text-black">
                                 {saving ? "Guardando..." : "Guardar cambios"}
                             </Text>
                         </Pressable>
                     </View>
-                </ScrollView>
+                </View>
             </KeyboardAvoidingView>
 
-            {/* Modal de confirmación para borrar ejercicio */}
+            {/* MODAL CONFIRMAR ELIMINAR EJERCICIO (igual que antes) */}
             <Modal
                 visible={deleteModalVisible}
                 transparent
@@ -763,4 +768,7 @@ export default function EditRoutineScreen() {
             </Modal>
         </SafeAreaView>
     );
+
 }
+
+

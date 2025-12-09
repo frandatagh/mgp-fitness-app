@@ -232,7 +232,7 @@ export default function NewRoutineScreen() {
             >
                 {/* CONTENEDOR CENTRAL */}
                 <View
-                    className="flex-1 px-4 pb-4"
+                    className="flex-1 px-4"
                     style={{
                         maxWidth: 800,
                         alignSelf: 'center',
@@ -240,7 +240,7 @@ export default function NewRoutineScreen() {
                     }}
                 >
                     {/* HEADER FIJO: LOGO + TÍTULO */}
-                    <View className="mb-2">
+                    <View>
                         <View className="items-center">
                             <Image
                                 source={require('../../assets/img/icontwist.png')}
@@ -251,8 +251,8 @@ export default function NewRoutineScreen() {
 
                         <View style={{ alignItems: 'flex-start' }}>
                             <Text
-                                className="text-base font-light px-4"
-                                style={{ color: COLORS.textMuted }}
+                                className="text-base font-light px-4 text-gray-500"
+
                             >
                                 Crear rutina
                             </Text>
@@ -683,7 +683,7 @@ export default function NewRoutineScreen() {
                     </View>
 
                     {/* BOTONES INFERIORES FIJOS */}
-                    <View className="flex-row justify-between mt-4">
+                    <View className="flex-row justify-between mt-2 mb-2">
                         {/* VOLVER ATRÁS */}
                         <Pressable
                             className="flex-1 mr-2 px-4 py-3 rounded-xl items-center justify-center"
@@ -691,7 +691,7 @@ export default function NewRoutineScreen() {
                             onPress={() => setBackModalVisible(true)}
                         >
                             <Text
-                                className="font-semibold text-center"
+                                className="font-normal text-center"
                                 style={{
                                     color: COLORS.textLight,
                                     fontSize: 14,
@@ -709,7 +709,7 @@ export default function NewRoutineScreen() {
                             onPress={handleAddExercise}
                         >
                             <Text
-                                className="font-semibold text-center"
+                                className="font-normal text-center"
                                 style={{
                                     color: '#111111',
                                     fontSize: 14,
@@ -727,7 +727,7 @@ export default function NewRoutineScreen() {
                             onPress={() => setSaveModalVisible(true)}
                         >
                             <Text
-                                className="font-semibold text-center"
+                                className="font-normal text-center"
                                 style={{
                                     color: COLORS.textLight,
                                     fontSize: 14,

@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { COLORS } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
-import { getRoutine, Routine, RoutineExercise } from '../../lib/routines';
+import { getRoutine, Routine, RoutineExercise, markRoutineDone } from '../../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
 
 
@@ -36,6 +36,12 @@ export default function RoutineDetailScreen() {
 
     const [doneModalVisible, setDoneModalVisible] = useState(false);
     const [doneMarked, setDoneMarked] = useState(false);
+    const [editModalVisible, setEditModalVisible] = useState(false);
+
+    const [exerciseModalVisible, setExerciseModalVisible] = useState(false);
+    const [selectedExercise, setSelectedExercise] = useState<RoutineExercise | null>(null);
+    const [selectedExerciseDay, setSelectedExerciseDay] = useState<string | null>(null);
+
 
     if (!isAuthenticated) {
         return <Redirect href="/" />;
@@ -79,18 +85,64 @@ export default function RoutineDetailScreen() {
     };
 
     // NUEVO: confirmar rutina realizada
-    const handleConfirmDone = () => {
-        setDoneMarked(true);
-        setDoneModalVisible(false);
+    const [markingDone, setMarkingDone] = useState(false);
 
-        // Más adelante: acá podemos mandar al backend, registrar estadísticas, etc.
-        console.log('Rutina marcada como realizada:', routine?.id);
+    const handleConfirmDone = async () => {
+        if (!routine?.id) return;
+
+        try {
+            setMarkingDone(true);
+            const updated = await markRoutineDone(routine.id);
+
+            setRoutine(updated);   // actualizamos el estado local
+            setDoneMarked(true);   // visualmente marcada
+            console.log('Rutina marcada como realizada:', updated.id);
+        } catch (err) {
+            console.error(err);
+            // si querés, podés mostrar un Alert aquí
+        } finally {
+            setMarkingDone(false);
+            setDoneModalVisible(false);
+        }
     };
+
 
     // NUEVO: cerrar modal sin marcar como realizada
     const handleContinue = () => {
         setDoneModalVisible(false);
     };
+
+    const handleEditPress = () => {
+        setEditModalVisible(true);
+    };
+
+    const handleConfirmEdit = () => {
+        setEditModalVisible(false);
+        if (routine?.id) {
+            router.push({
+                pathname: '/routine/edit/[id]',
+                params: { id: routine.id },
+            });
+        }
+    };
+
+    const handleCancelEdit = () => {
+        setEditModalVisible(false);
+    };
+
+    const openExerciseModal = (exercise: RoutineExercise, day: string) => {
+        setSelectedExercise(exercise);
+        setSelectedExerciseDay(day);
+        setExerciseModalVisible(true);
+    };
+
+    const closeExerciseModal = () => {
+        setExerciseModalVisible(false);
+        setSelectedExercise(null);
+        setSelectedExerciseDay(null);
+    };
+
+
 
     if (loading) {
         return (
@@ -152,8 +204,13 @@ export default function RoutineDetailScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
 
-            <View className="flex-1 px-4 pt-1 pb-4"
-                style={{ maxWidth: 800, alignSelf: 'center' }}>
+            <View className="flex-1 px-4 pt-1"
+                style={{
+                    maxWidth: 800,
+                    alignSelf: 'center',
+                    width: '100%',
+                    minHeight: 0,
+                }}>
                 {/* Encabezado superior */}
                 {/* LOGO + TÍTULO SUPERIOR */}
                 <View className="mb-1">
@@ -174,215 +231,322 @@ export default function RoutineDetailScreen() {
 
                 {/* Contenedor principal de la tarjeta */}
                 <View
-                    className="flex-1 rounded-3xl px-3 py-4"
-                    style={{ borderWidth: 2, borderColor: COLORS.primary }}
+                    className="flex-1 rounded-3xl py-3"
+                    style={{
+                        borderWidth: 2,
+                        borderColor: COLORS.primary,
+                        overflow: 'hidden',   // no necesitamos popups aquí
+                        marginBottom: 8,      // un poco de aire antes de los botones
+                        minHeight: 0,         // 👈 deja que el ScrollView se adapte
+                    }}
                 >
-                    <ScrollView showsVerticalScrollIndicator={false}>
-                        {/* Título + botón menú */}
-                        <View className="flex-row items-center justify-between mb-4 px-4">
-                            <View >
-                                <Text className=" text-[16px] underline font-semibold text-white">
-                                    {routine.title}
-                                </Text>
-                            </View>
-
-                            {/* Botón tres puntos, minimal */}
-                            <Pressable
-                                onPress={() => setMenuVisible(true)}
-                                hitSlop={8}
-                                style={({ pressed }) => ({
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: 9999,
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: pressed ? '#3f3f3f' : 'transparent', // gris al presionar (podés usar COLORS.primary si lo querés verde)
-                                })}
-                            >
-                                <Text style={{ fontSize: 20, color: '#ffffff' }}>⋯</Text>
-                            </Pressable>
+                    {/* TÍTULO + BOTÓN MENÚ (FIJOS) */}
+                    <View className="flex-row items-center justify-between mb-3 px-4">
+                        <View>
+                            <Text className="text-[16px] underline font-semibold text-white">
+                                {routine.title}
+                            </Text>
                         </View>
 
+                        <Pressable
+                            onPress={() => setMenuVisible(true)}
+                            hitSlop={8}
+                            style={({ pressed }) => ({
+                                width: 32,
+                                height: 32,
+                                borderRadius: 9999,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: pressed ? '#3f3f3f' : 'transparent',
+                            })}
+                        >
+                            <Text style={{ fontSize: 20, color: '#ffffff' }}>⋯</Text>
+                        </Pressable>
+                    </View>
 
-                        {/* Descripción */}
-                        {routine.notes && (
-                            <Text
-                                className="text-[16px] leading-5 text-gray-200 mb-2 px-4"
-                                style={{ color: COLORS.textMuted }}
-                            >
-                                {routine.notes}
-                            </Text>
-                        )}
+                    {/* ZONA SCROLLEABLE: DESCRIPCIÓN + TABLA */}
+                    <View style={{ flex: 1 }}>
+                        <ScrollView
+                            style={{ flex: 1 }}
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ paddingBottom: 16 }}
+                        >
+                            {/* Descripción */}
+                            {routine.notes && (
+                                <Text
+                                    className="text-[14px] leading-5 text-gray-200 mb-2 px-4"
+                                    style={{ color: COLORS.textMuted }}
+                                >
+                                    {routine.notes}
+                                </Text>
+                            )}
 
-                        {/* TABLA AGRUPADA POR DÍA */}
-                        <View className="mt-3 px-4">
-                            {Object.entries(groupedByDay).map(([day, exs]) => (
-                                <View key={day} className="mb-3">
-                                    {/* “Chip” con el día */}
-                                    <View className="mb-1">
-                                        <Text
-                                            className="text-left text-[13px] font-bold text-gray-400"
-
-                                        >
-                                            {day}
-                                        </Text>
-                                    </View>
-
-                                    {/* Cabecera de columnas */}
-                                    <View className="flex-row border-b border-lime-400 pb-1 mb-1">
-                                        <Text
-                                            style={colName}
-                                            className="text-[14px] font-semibold text-gray-100"
-                                        >
-                                            Ejercicios
-                                        </Text>
-                                        <Text
-                                            style={colSets}
-                                            className="text-[14px] font-semibold text-gray-100 text-center"
-                                        >
-                                            Series
-                                        </Text>
-                                        <Text
-                                            style={colReps}
-                                            className="text-[14px] font-semibold text-gray-100 text-center"
-                                        >
-                                            Reps.
-                                        </Text>
-                                        <Text
-                                            style={colNotes}
-                                            className="text-[14px] font-semibold text-gray-100 text-right"
-                                        >
-                                            Notas
-                                        </Text>
-                                    </View>
-
-                                    {/* Filas de ese día */}
-                                    {exs.map((ex, index) => (
-                                        <View
-                                            key={ex.id ?? `${day}-${index}`}
-                                            className="flex-row py-1 border-b border-neutral-800"
-                                        >
+                            {/* TABLA AGRUPADA POR DÍA */}
+                            <View className="mt-3 px-4">
+                                {Object.entries(groupedByDay).map(([day, exs]) => (
+                                    <View key={day} className="mb-3">
+                                        {/* Día */}
+                                        <View className="mb-1">
                                             <Text
-                                                style={colName}
-                                                className="text-[14px] text-gray-200"
-                                                numberOfLines={1}
+                                                className="text-left text-[13px] font-bold text-gray-400"
                                             >
-                                                {ex.name}
-                                            </Text>
-
-                                            <Text
-                                                style={colSets}
-                                                className="text-[14px] text-gray-300 text-center"
-                                            >
-                                                {ex.sets ?? '-'}
-                                            </Text>
-
-                                            <Text
-                                                style={colReps}
-                                                className="text-[14px] text-gray-300 text-center"
-                                            >
-                                                {ex.reps ?? '-'}
-                                            </Text>
-
-                                            <Text
-                                                style={colNotes}
-                                                className="text-[14px] text-gray-300 text-right"
-                                                numberOfLines={1}
-                                            >
-                                                {ex.notes ?? '-'}
+                                                {day}
                                             </Text>
                                         </View>
-                                    ))}
-                                </View>
-                            ))}
-                        </View>
 
-                        <Modal
-                            visible={menuVisible}
-                            transparent
-                            animationType="fade"
-                            onRequestClose={() => setMenuVisible(false)}
-                        >
-                            <View
-                                className="flex-1 justify-center items-center"
-                                style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
-                            >
-                                <View
-                                    className="w-72 rounded-3xl px-4 py-4"
-                                    style={{
-                                        backgroundColor: '#111111',
-                                        borderWidth: 1,
-                                        borderColor: COLORS.primary,
-                                    }}
-                                >
-                                    <Text
-                                        className="text-base font-semibold mb-3 text-center"
-                                        style={{ color: COLORS.textLight }}
-                                    >
-                                        Opciones de tu rutina
-                                    </Text>
-
-                                    {menuItems.map((item, index) => (
-                                        <Pressable
-                                            key={item.action}
-                                            onPress={() => {
-                                                setMenuVisible(false);
-
-                                                if (item.action === 'edit' && routine?.id) {
-                                                    // Ir a pantalla de edición
-                                                    router.push({
-                                                        pathname: '/routine/edit/[id]',
-                                                        params: { id: routine.id },
-                                                    });
-                                                } else if (item.action === 'delete' && routine?.id) {
-                                                    // TODO: más adelante: confirm + borrar rutina real
-                                                    console.log('Borrar rutina', routine.id);
-                                                } else if (item.action === 'export') {
-                                                    console.log('Exportar rutina', routine?.id);
-                                                } else if (item.action === 'share') {
-                                                    console.log('Compartir rutina', routine?.id);
-                                                } else if (item.action === 'close') {
-                                                    handleBack();
-                                                }
-                                            }}
-                                            className={`py-2 ${index !== 0 ? 'border-t border-neutral-800' : ''}`}
-                                        >
+                                        {/* Encabezados */}
+                                        <View className="flex-row border-b border-lime-400 pb-1 mb-1">
                                             <Text
-                                                className="text-[14px]"
-                                                style={{
-                                                    color: item.destructive ? '#FFBABA' : COLORS.textLight,
-                                                }}
+                                                style={colName}
+                                                className="text-[14px] font-semibold text-gray-100"
                                             >
-                                                {item.label}
+                                                Ejercicios
                                             </Text>
-                                        </Pressable>
-                                    ))}
+                                            <Text
+                                                style={colSets}
+                                                className="text-[14px] font-semibold text-gray-100 text-center"
+                                            >
+                                                Series
+                                            </Text>
+                                            <Text
+                                                style={colReps}
+                                                className="text-[14px] font-semibold text-gray-100 text-center"
+                                            >
+                                                Reps.
+                                            </Text>
+                                            <Text
+                                                style={colNotes}
+                                                className="text-[14px] font-semibold text-gray-100 text-right"
+                                            >
+                                                Notas
+                                            </Text>
+                                        </View>
 
-                                    <Pressable
-                                        onPress={() => setMenuVisible(false)}
-                                        className="mt-4 py-2 rounded-full items-center"
-                                        style={{ backgroundColor: COLORS.primary }}
-                                    >
-                                        <Text
-                                            className="text-[14px] font-semibold"
-                                            style={{ color: '#111111' }}
-                                        >
-                                            Cerrar
-                                        </Text>
-                                    </Pressable>
-                                </View>
+                                        {/* Filas */}
+                                        {exs.map((ex, index) => (
+                                            <Pressable
+                                                key={ex.id ?? `${day}-${index}`}
+                                                className="flex-row py-1 border-b border-neutral-800"
+                                                onPress={() => openExerciseModal(ex, day)}
+                                            >
+                                                <Text
+                                                    style={colName}
+                                                    className="text-[14px] text-gray-200"
+                                                    numberOfLines={1}
+                                                >
+                                                    {ex.name}
+                                                </Text>
+
+                                                <Text
+                                                    style={colSets}
+                                                    className="text-[14px] text-gray-300 text-center"
+                                                >
+                                                    {ex.sets ?? '-'}
+                                                </Text>
+
+                                                <Text
+                                                    style={colReps}
+                                                    className="text-[14px] text-gray-300 text-center"
+                                                >
+                                                    {ex.reps ?? '-'}
+                                                </Text>
+
+                                                <Text
+                                                    style={colNotes}
+                                                    className="text-[14px] text-gray-300 text-right"
+                                                    numberOfLines={1}
+                                                >
+                                                    {ex.notes ?? '-'}
+                                                </Text>
+                                            </Pressable>
+                                        ))}
+
+                                    </View>
+                                ))}
                             </View>
-                        </Modal>
-
-                    </ScrollView>
+                        </ScrollView>
+                    </View>
                 </View>
 
+                {/* Modal: detalle de ejercicio (solo lectura) */}
+                <Modal
+                    visible={exerciseModalVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={closeExerciseModal}
+                >
+                    <View
+                        className="flex-1 justify-center items-center"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                    >
+                        {selectedExercise && (
+                            <View
+                                className="w-10/11 rounded-3xl px-4 py-4"
+                                style={{
+                                    backgroundColor: '#111111',
+                                    borderWidth: 1,
+                                    borderColor: COLORS.primary,
+                                }}
+                            >
+                                {/* Cabecera: nombre + botón cerrar */}
+                                <View className="flex-row items-start justify-between mb-3">
+                                    <View style={{ flex: 1, paddingRight: 8 }}>
+                                        <Text
+                                            className="text-[16px] font-semibold mb-1"
+                                            style={{ color: COLORS.textLight }}
+                                        >
+                                            {selectedExercise.name}
+                                        </Text>
+
+                                        {selectedExerciseDay && (
+                                            <Text
+                                                className="text-[12px]"
+                                                style={{ color: COLORS.textMuted }}
+                                            >
+                                                Día: {selectedExerciseDay}
+                                            </Text>
+                                        )}
+                                    </View>
+
+                                    <Pressable onPress={closeExerciseModal} hitSlop={8}>
+                                        <Ionicons name="close" size={20} color={COLORS.textLight} />
+                                    </Pressable>
+                                </View>
+
+                                {/* Detalles del ejercicio */}
+                                <View className="mb-1">
+                                    <Text
+                                        className="text-[12px] mb-1"
+                                        style={{ color: COLORS.textMuted }}
+                                    >
+                                        Series
+                                    </Text>
+                                    <Text
+                                        className="text-[14px] mb-2"
+                                        style={{ color: COLORS.textLight }}
+                                    >
+                                        {selectedExercise.sets ?? '-'}
+                                    </Text>
+
+                                    <Text
+                                        className="text-[12px] mb-1"
+                                        style={{ color: COLORS.textMuted }}
+                                    >
+                                        Repeticiones
+                                    </Text>
+                                    <Text
+                                        className="text-[14px] mb-2"
+                                        style={{ color: COLORS.textLight }}
+                                    >
+                                        {selectedExercise.reps ?? '-'}
+                                    </Text>
+
+                                    <Text
+                                        className="text-[12px] mb-1"
+                                        style={{ color: COLORS.textMuted }}
+                                    >
+                                        Notas
+                                    </Text>
+                                    <Text
+                                        className="text-[14px]"
+                                        style={{ color: COLORS.textLight }}
+                                    >
+                                        {selectedExercise.notes && selectedExercise.notes.trim().length > 0
+                                            ? selectedExercise.notes
+                                            : 'Sin notas adicionales.'}
+                                    </Text>
+                                </View>
+                            </View>
+                        )}
+                    </View>
+                </Modal>
+
+
+                {/* Modal opciones de rutina */}
+                <Modal
+                    visible={menuVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setMenuVisible(false)}
+                >
+                    <View
+                        className="flex-1 justify-center items-center"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                    >
+                        <View
+                            className="w-72 rounded-3xl px-4 py-4"
+                            style={{
+                                backgroundColor: '#111111',
+                                borderWidth: 1,
+                                borderColor: COLORS.primary,
+                            }}
+                        >
+                            <Text
+                                className="text-base font-semibold mb-3 text-center"
+                                style={{ color: COLORS.textLight }}
+                            >
+                                Opciones de tu rutina
+                            </Text>
+
+                            {menuItems.map((item, index) => (
+                                <Pressable
+                                    key={item.action}
+                                    onPress={() => {
+                                        setMenuVisible(false);
+
+                                        if (item.action === 'edit' && routine?.id) {
+                                            router.push({
+                                                pathname: '/routine/edit/[id]',
+                                                params: { id: routine.id },
+                                            });
+                                        } else if (item.action === 'delete' && routine?.id) {
+                                            console.log('Borrar rutina', routine.id);
+                                        } else if (item.action === 'export') {
+                                            console.log('Exportar rutina', routine?.id);
+                                        } else if (item.action === 'share') {
+                                            console.log('Compartir rutina', routine?.id);
+                                        } else if (item.action === 'close') {
+                                            handleBack();
+                                        }
+                                    }}
+                                    className={`py-2 ${index !== 0 ? 'border-t border-neutral-800' : ''
+                                        }`}
+                                >
+                                    <Text
+                                        className="text-[14px]"
+                                        style={{
+                                            color: item.destructive ? '#FFBABA' : COLORS.textLight,
+                                        }}
+                                    >
+                                        {item.label}
+                                    </Text>
+                                </Pressable>
+                            ))}
+
+                            <Pressable
+                                onPress={() => setMenuVisible(false)}
+                                className="mt-4 py-2 rounded-full items-center"
+                                style={{ backgroundColor: COLORS.primary }}
+                            >
+                                <Text
+                                    className="text-[14px] font-semibold"
+                                    style={{ color: '#111111' }}
+                                >
+                                    Cerrar
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </Modal>
+
+
                 {/* Botones inferiores */}
-                <View className="mt-2 flex-row justify-between px-2 pb-2">
-                    {/* Botón "Realizada" - 2x más ancho */}
+
+                <View className="flex-row justify-between mb-2">
+                    {/* REALIZADA - más grande (2x) */}
                     <Pressable
                         onPress={handleDonePress}
-                        className="flex-[2] mr-2 px-4 py-4 rounded-xl items-center justify-center"
+                        className="flex-1 mr-2 px-4 py-3 rounded-xl items-center justify-center"
                         style={{
                             backgroundColor: doneMarked ? COLORS.primary : '#444444',
                         }}
@@ -397,15 +561,32 @@ export default function RoutineDetailScreen() {
                                 className="text-[14px] font-normal ml-2"
                                 style={{ color: doneMarked ? '#111111' : COLORS.textLight }}
                             >
-                                Realizada por hoy
+                                Realizada
                             </Text>
                         </View>
                     </Pressable>
 
-                    {/* Botón "Volver atrás" - tamaño normal */}
+                    {/* EDITAR RUTINA */}
+                    <Pressable
+                        onPress={handleEditPress}
+                        className="flex-1 mx-1 px-4 py-3 rounded-xl items-center justify-center"
+                        style={{ backgroundColor: '#444444' }}
+                    >
+                        <View className="flex-row items-center justify-center">
+                            <Ionicons name="create-outline" size={18} style={{ color: COLORS.textLight }} />
+                            <Text
+                                className="text-[14px] font-normal ml-2"
+                                style={{ color: COLORS.textLight }}
+                            >
+                                Editar rutina
+                            </Text>
+                        </View>
+                    </Pressable>
+
+                    {/* VOLVER ATRÁS */}
                     <Pressable
                         onPress={handleBack}
-                        className="flex-1  px-4 py-4 rounded-xl items-center justify-center"
+                        className="flex-1 ml-2 px-4 py-3 rounded-xl items-center justify-center"
                         style={{ backgroundColor: '#444444' }}
                     >
                         <Text
@@ -416,6 +597,7 @@ export default function RoutineDetailScreen() {
                         </Text>
                     </Pressable>
                 </View>
+
 
                 {/* Modal: confirmar rutina realizada */}
                 <Modal
@@ -485,6 +667,72 @@ export default function RoutineDetailScreen() {
                         </View>
                     </View>
                 </Modal>
+                {/* Modal: confirmar edición de rutina */}
+                <Modal
+                    visible={editModalVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={handleCancelEdit}
+                >
+                    <View
+                        className="flex-1 justify-center items-center"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                    >
+                        <View
+                            className="w-72 rounded-3xl px-4 py-4"
+                            style={{
+                                backgroundColor: '#111111',
+                                borderWidth: 1,
+                                borderColor: COLORS.primary,
+                            }}
+                        >
+                            <Text
+                                className="text-base font-semibold mb-4 text-center"
+                                style={{ color: COLORS.textLight }}
+                            >
+                                ¿Quieres editar esta rutina?
+                            </Text>
+
+                            <Text
+                                className="text-xs mb-4 text-center"
+                                style={{ color: COLORS.textMuted }}
+                            >
+                                Podrás modificar ejercicios, series, repeticiones y notas. Los cambios se guardarán al confirmar en la siguiente pantalla.
+                            </Text>
+
+                            <View className="flex-row justify-between mt-4">
+                                {/* Cancelar */}
+                                <Pressable
+                                    onPress={handleCancelEdit}
+                                    className="flex-1 mr-2 rounded-full py-2 items-center justify-center"
+                                    style={{ backgroundColor: '#444444' }}
+                                >
+                                    <Text
+                                        className="text-[13px] font-semibold"
+                                        style={{ color: COLORS.textLight }}
+                                    >
+                                        Cancelar
+                                    </Text>
+                                </Pressable>
+
+                                {/* Ir a editar */}
+                                <Pressable
+                                    onPress={handleConfirmEdit}
+                                    className="flex-1 ml-2 rounded-full py-2 items-center justify-center"
+                                    style={{ backgroundColor: COLORS.primary }}
+                                >
+                                    <Text
+                                        className="text-[13px] font-semibold"
+                                        style={{ color: '#111111' }}
+                                    >
+                                        Editar ahora
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+
 
             </View>
         </SafeAreaView >

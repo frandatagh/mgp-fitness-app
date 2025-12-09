@@ -18,6 +18,7 @@ export interface Routine {
     exercises?: RoutineExercise[];
     createdAt?: string;
     updatedAt?: string;
+    lastDoneAt?: string | null;
 }
 
 interface RoutineListResponse {
@@ -128,4 +129,17 @@ export async function deleteRoutine(id: string): Promise<void> {
     if (!res.ok) {
         throw new Error('Error al borrar la rutina');
     }
+}
+
+export async function markRoutineDone(id: string): Promise<Routine> {
+    const res = await apiFetch(`/routines/${id}/done`, {
+        method: 'PATCH',
+    });
+
+    if (!res.ok) {
+        throw new Error('No se pudo marcar la rutina como realizada');
+    }
+
+    const data = (await res.json()) as Routine;
+    return data;
 }

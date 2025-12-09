@@ -1,5 +1,5 @@
 // components/RoutineCard.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, Pressable, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
@@ -10,6 +10,7 @@ type RoutineCardProps = {
     description?: string | null;
     highlighted?: boolean;
     exercisesPreview?: RoutineExercise[] | null;
+    isRecent?: boolean;
     onOpen: () => void;
     onEdit: () => void;
     onDelete: () => Promise<void> | void; // se llama al backend
@@ -21,6 +22,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
     description,
     highlighted,
     exercisesPreview,
+    isRecent,
     onOpen,
     onEdit,
     onDelete,
@@ -51,8 +53,8 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
     const handleConfirmDelete = async () => {
         try {
             setDeleting(true);
-            await onDelete();          // 🔥 llama a handleDeleteRoutine del Home
-            setConfirmVisible(false);  // cerrar modal si todo fue bien
+            await onDelete(); // 🔥 llama a handleDeleteRoutine del Home
+            setConfirmVisible(false); // cerrar modal si todo fue bien
         } catch (error) {
             console.error('Error eliminando rutina', error);
         } finally {
@@ -61,6 +63,12 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
     };
 
     const exerciseCount = exercisesPreview?.length ?? 0;
+
+    // Tomamos solo los dos primeros ejercicios para mostrar en la tarjeta
+    const firstExercises = useMemo(
+        () => (exercisesPreview ?? []).slice(0, 2),
+        [exercisesPreview]
+    );
 
     return (
         <>
@@ -75,8 +83,9 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                 onPress={onOpen}
             >
                 <View className="flex-row justify-between items-start">
-                    {/* Título y descripción */}
+                    {/* Contenido izquierdo: título, descripción y preview de ejercicios */}
                     <View className="flex-1 pr-2">
+                        {/* Título */}
                         <Text
                             className="text-base font-semibold"
                             style={{ color: COLORS.textLight }}
@@ -85,6 +94,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                             {title}
                         </Text>
 
+                        {/* Descripción corta de la rutina */}
                         {description ? (
                             <Text
                                 className="text-xs mt-1"
@@ -95,22 +105,54 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                             </Text>
                         ) : null}
 
+                        {/* Preview de ejercicios (máx. 2) */}
+                        {firstExercises.length > 0 && (
+                            <View className="mt-2">
+                                {firstExercises.map((ex, index) => (
+                                    <View
+                                        key={ex.id ?? index}
+                                        className="flex-row justify-between items-center mb-1"
+                                    >
+                                        <Text
+                                            className="text-[11px]"
+                                            style={{ color: COLORS.textLight }}
+                                            numberOfLines={1}
+                                        >
+                                            {index + 1}. {ex.name}
+                                        </Text>
+
+                                        <Text
+                                            className="text-[11px] text-right"
+                                            style={{ color: COLORS.textMuted }}
+                                        >
+                                            {(ex.sets ?? '-')}{' '}
+                                            {ex.reps ? `x ${ex.reps}` : ''}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
+                        )}
+
+                        {/* Total de ejercicios */}
                         {exerciseCount > 0 && (
                             <Text
                                 className="text-[11px] mt-2"
                                 style={{ color: COLORS.textMuted }}
                             >
                                 {exerciseCount} ejercicio
-                                {exerciseCount !== 1 && 's'}
+                                {exerciseCount !== 1 && 's'} en total
                             </Text>
                         )}
                     </View>
 
-                    {/* Botón de opciones */}
+                    {/* Botón de opciones (tres puntos) */}
                     <Pressable
                         className="p-1 rounded-full"
                         hitSlop={10}
-                        onPress={handleOpenOptions}
+                        onPress={(e) => {
+                            e.stopPropagation(); // para que no dispare onOpen
+                            handleOpenOptions();
+                        }}
                     >
                         <Ionicons
                             name="ellipsis-horizontal"
@@ -119,6 +161,17 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                         />
                     </Pressable>
                 </View>
+                {isRecent && (
+                    <View className="mt-2 flex-row justify-end">
+                        <Text
+                            className="text-[10px] font-semibold"
+                            style={{ color: COLORS.primary }}
+                        >
+                            Actividad reciente
+                        </Text>
+                    </View>
+                )}
+
             </Pressable>
 
             {/* MODAL DE OPCIONES */}
@@ -160,9 +213,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                                 onOpen();
                             }}
                         >
-                            <Text style={{ color: COLORS.textLight }}>
-                                Ver rutina
-                            </Text>
+                            <Text style={{ color: COLORS.textLight }}>Ver rutina</Text>
                         </Pressable>
 
                         <Pressable
@@ -172,9 +223,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                                 onEdit();
                             }}
                         >
-                            <Text style={{ color: COLORS.textLight }}>
-                                Editar rutina
-                            </Text>
+                            <Text style={{ color: COLORS.textLight }}>Editar rutina</Text>
                         </Pressable>
 
                         <Pressable
@@ -209,9 +258,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                             className="mt-3 py-2 items-center"
                             onPress={handleCloseOptions}
                         >
-                            <Text style={{ color: COLORS.textMuted }}>
-                                Cancelar
-                            </Text>
+                            <Text style={{ color: COLORS.textMuted }}>Cancelar</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -259,9 +306,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                                 onPress={handleCancelDelete}
                                 disabled={deleting}
                             >
-                                <Text style={{ color: COLORS.textLight }}>
-                                    Cancelar
-                                </Text>
+                                <Text style={{ color: COLORS.textLight }}>Cancelar</Text>
                             </Pressable>
 
                             <Pressable
@@ -286,4 +331,3 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
         </>
     );
 };
-

@@ -322,7 +322,7 @@ export default function EditRoutineScreen() {
             >
                 {/* CONTENEDOR CENTRAL */}
                 <View
-                    className="flex-1 px-4 pt-1 pb-4"
+                    className="flex-1 px-4 pt-1"
                     style={{
                         maxWidth: 800,
                         alignSelf: "center",
@@ -668,11 +668,11 @@ export default function EditRoutineScreen() {
                     </View>
 
                     {/* BOTONES INFERIORES FIJOS (3 BOTONES) */}
-                    <View className="mt-4 flex-row justify-between">
+                    <View className="flex-row justify-between mt-2 mb-2">
                         {/* AGREGAR EJERCICIO - verde */}
                         <Pressable
                             onPress={handleAddExercise}
-                            className="flex-1 ml-2 px-4 py-3 rounded-xl items-center justify-center"
+                            className="flex-1 mr-2 px-4 py-3 rounded-xl items-center justify-center"
                             style={{ backgroundColor: COLORS.primary }}
                         >
                             <Text className="text-center text-[14px] font-semibold" style={{ color: "#111111" }}>
@@ -682,7 +682,7 @@ export default function EditRoutineScreen() {
                         {/* VOLVER ATRÁS - gris */}
                         <Pressable
                             onPress={handleCancel}
-                            className="flex-1 ml-2 px-4 py-3 rounded-xl items-center justify-center"
+                            className="flex-1 mx-1 px-4 py-3 rounded-xl items-center justify-center"
                             style={{ backgroundColor: "#444444" }}
                         >
                             <Text className="text-[14px] font-semibold text-gray-100">

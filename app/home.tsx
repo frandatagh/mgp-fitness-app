@@ -9,6 +9,16 @@ import { useAuth } from '../context/AuthContext';
 import { getRoutines, Routine, deleteRoutine } from '../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
 
+function getLastActivityTime(routine: Routine): number {
+    const dateStr =
+        routine.lastDoneAt ??
+        routine.updatedAt ??
+        routine.createdAt ??
+        '';
+
+    return dateStr ? new Date(dateStr).getTime() : 0;
+}
+
 
 export default function HomeScreen() {
     const { user, isAuthenticated, logout } = useAuth();
@@ -81,22 +91,23 @@ export default function HomeScreen() {
     };
 
 
-    const latestRoutineId = useMemo(() => {
-        if (!routines.length) return null;
 
-        const latest = routines.reduce((currentLatest, routine) => {
-            // usamos updatedAt si existe, sino createdAt
-            const currentDateStr = currentLatest.updatedAt ?? currentLatest.createdAt ?? '';
-            const routineDateStr = routine.updatedAt ?? routine.createdAt ?? '';
 
-            const currentDate = currentDateStr ? new Date(currentDateStr).getTime() : 0;
-            const routineDate = routineDateStr ? new Date(routineDateStr).getTime() : 0;
+    const sortedRoutines = useMemo(() => {
+        if (!routines.length) return [];
 
-            return routineDate > currentDate ? routine : currentLatest;
-        }, routines[0]);
-
-        return latest.id;
+        return [...routines].sort((a, b) => {
+            return getLastActivityTime(b) - getLastActivityTime(a);
+        });
     }, [routines]);
+
+
+    const latestRoutineId = sortedRoutines[0]?.id ?? null;
+
+
+
+
+
 
 
     // 👉 Si por algún motivo aún no está autenticado, mostramos un fallback
@@ -191,19 +202,38 @@ export default function HomeScreen() {
                                 className="text-sm mb-2"
                                 style={{ color: COLORS.textMuted }}
                             >
-                                Aún no tienes rutinas guardadas. Crea tu primera rutina con el
-                                botón de abajo 'Crear rutina'.
-
+                                Aún no tienes rutinas guardadas. Crea tu primera rutina con el botón de abajo "Crear rutina".
+                                {'\n\n'}
+                                <Text className="underline font-semibold">
+                                    Subir archivo:
+                                </Text>{' '}
+                                Carga tu rutina de entrenamiento desde un archivo ya existente.
+                                {'\n\n'}
+                                <Text className="underline font-semibold">
+                                    Puntos cercanos:
+                                </Text>{' '}
+                                Ubica puntos de entrenamiento al aire libre cercanos a tu zona, además de gimnasios y clubes disponibles cerca de tu ubicación.
+                                {'\n\n'}
+                                <Text className="underline font-semibold">
+                                    Sugerencias:
+                                </Text>{' '}
+                                Conoce nuestras recomendaciones de entrenamiento, consejos de uso de la aplicación y elige entre rutinas de prueba para comenzar con intensidad baja, media o alta.
+                                {'\n\n'}
+                                <Text className="underline font-semibold">
+                                    Personalizar IA:
+                                </Text>{' '}
+                                Sección para crear tu rutina con un entrenador de Inteligencia Artificial que se ajuste a tus necesidades y objetivos.
                             </Text>
-
                         )}
 
-                        {routines.map((routine) => (
+
+                        {sortedRoutines.map((routine) => (
                             <RoutineCard
                                 key={routine.id}
                                 title={routine.title}
                                 description={routine.notes}
                                 highlighted={routine.id === latestRoutineId}
+                                isRecent={routine.id === latestRoutineId}
                                 exercisesPreview={routine.exercises ?? []}
                                 onOpen={() => {
                                     router.push({

@@ -129,7 +129,7 @@ export default function HomeScreen() {
             className="flex-1"
             style={{ backgroundColor: COLORS.background }}
         >
-            <View className="flex-1 px-4"
+            <View className="flex-1 w-full px-4"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
                 {/* LOGO SUPERIOR */}
@@ -316,7 +316,7 @@ export default function HomeScreen() {
                 <View className="flex-row justify-between mt-2 mb-2">
                     {/* Crear rutina */}
                     <Pressable
-                        className="flex-1 mr-2 px-4 py-3 rounded-xl items-center"
+                        className="flex-1 mr-2 px-4 py-3 rounded-xl items-center justify-center"
                         style={{ backgroundColor: '#444444' }}
                         onPress={() => router.push('/routine/new')}
                     >
@@ -335,19 +335,19 @@ export default function HomeScreen() {
                         </View>
                     </Pressable>
 
-                    {/* Subir archivo (sin icono por ahora) */}
+                    {/* Subir archivo*/}
                     <Pressable
-                        className="flex-1 mx-1 px-4 py-3 rounded-xl items-center"
+                        className="flex-1 mx-1 px-4 py-3 rounded-xl "
                         style={{ backgroundColor: '#444444' }}
                     >
-                        <View className="flex-row items-center justify-center">
+                        <View className="flex-row pl-1 items-center justify-center">
                             <Ionicons
                                 name="cloud-upload-outline"
                                 size={18}
                                 color={COLORS.textLight}
                             />
                             <Text
-                                className="ml-2"
+                                className="ml-2 "
                                 style={{ color: COLORS.textLight }}
                             >
                                 Subir archivo
@@ -357,8 +357,9 @@ export default function HomeScreen() {
 
                     {/* Puntos cercanos */}
                     <Pressable
-                        className="flex-1 ml-2 px-4 py-3 rounded-xl items-center"
+                        className="flex-1 ml-2 px-4 py-3 rounded-xl "
                         style={{ backgroundColor: '#444444' }}
+                        onPress={() => router.push('/nearby')}
                     >
                         <View className="flex-row items-center justify-center">
                             <Ionicons

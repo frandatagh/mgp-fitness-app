@@ -23,7 +23,7 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { COLORS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
+
 
 
 
@@ -124,8 +124,7 @@ export default function NearbyScreen() {
         : undefined;
 
     const [selectedPoint, setSelectedPoint] = useState<TrainingPoint | null>(null);
-
-    const [fixedPoint, setFixedPoint] = useState<TrainingPoint | null>(null); // 👈 nuevo
+    const [runConfirmVisible, setRunConfirmVisible] = useState(false);
 
 
     const handleBackToRoutines = () => {
@@ -207,16 +206,6 @@ export default function NearbyScreen() {
                             region={initialRegion}
                             points={points}
                             onPointPress={setSelectedPoint}
-                            routeFrom={
-                                location
-                                    ? { latitude: location.latitude, longitude: location.longitude }
-                                    : undefined
-                            }
-                            routeTo={
-                                fixedPoint
-                                    ? { latitude: fixedPoint.latitude, longitude: fixedPoint.longitude }
-                                    : undefined
-                            }
                         />
                     )}
 
@@ -249,7 +238,7 @@ export default function NearbyScreen() {
                                 {/* Título centrado */}
                                 <View className="mb-3">
                                     <Text
-                                        className="text-xl font-semibold text-center"
+                                        className="text-base font-semibold text-center"
                                         style={{ color: COLORS.textLight }}
                                         numberOfLines={2}
                                     >
@@ -260,7 +249,7 @@ export default function NearbyScreen() {
                                 {/* Tipo + descripción */}
                                 {selectedPoint && (
                                     <Text
-                                        className="text-[13px] mb-1 text-center"
+                                        className="text-[11px] mb-1 text-center"
                                         style={{ color: COLORS.accent }}
                                     >
                                         {selectedPoint.type === 'outdoor'
@@ -273,7 +262,7 @@ export default function NearbyScreen() {
 
                                 {selectedPoint?.description && (
                                     <Text
-                                        className="text-[13px] mb-4 text-center"
+                                        className="text-xs mb-4 text-center"
                                         style={{ color: COLORS.textMuted }}
                                     >
                                         {selectedPoint.description}
@@ -282,47 +271,27 @@ export default function NearbyScreen() {
 
                                 {/* Botones */}
                                 <View className="mt-2">
-                                    {/* Fijar punto: botón grande */}
+                                    {/* Botón principal: Correr hacia el punto */}
                                     <Pressable
                                         className="rounded-full py-2 mb-3 items-center justify-center"
                                         style={{ backgroundColor: COLORS.primary }}
                                         onPress={() => {
-                                            if (selectedPoint) {
-                                                setFixedPoint(selectedPoint);  // 👈 fijamos el punto para la ruta
-                                            }
-                                            setSelectedPoint(null);          // cerramos el modal
+                                            // abrimos el modal de confirmación de “modo correr”
+                                            setRunConfirmVisible(true);
                                         }}
                                     >
                                         <Text
                                             className="text-[13px] font-semibold"
                                             style={{ color: '#111111' }}
                                         >
-                                            Fijar punto
+                                            Correr hacia el punto
                                         </Text>
                                     </Pressable>
 
-
-                                    {/* Fila: Correr ahora + Cancelar */}
+                                    {/* Botón Cancelar */}
                                     <View className="flex-row justify-between">
                                         <Pressable
-                                            className="flex-1 mr-2 rounded-full py-2 items-center justify-center"
-                                            style={{ backgroundColor: '#444444' }}
-                                            onPress={() => {
-                                                console.log('Correr ahora', selectedPoint?.id);
-                                                // más adelante: navegar a pantalla de carrera
-                                                setSelectedPoint(null);
-                                            }}
-                                        >
-                                            <Text
-                                                className="text-[13px] font-semibold"
-                                                style={{ color: COLORS.textLight }}
-                                            >
-                                                Correr ahora
-                                            </Text>
-                                        </Pressable>
-
-                                        <Pressable
-                                            className="flex-1 ml-2 rounded-full py-2 items-center justify-center"
+                                            className="flex-1 rounded-full py-2 items-center justify-center"
                                             style={{ backgroundColor: '#222222' }}
                                             onPress={() => setSelectedPoint(null)}
                                         >
@@ -338,6 +307,85 @@ export default function NearbyScreen() {
                             </View>
                         </View>
                     </Modal>
+                    {/* MODAL: confirmar ir al modo correr */}
+                    <Modal
+                        visible={runConfirmVisible}
+                        transparent
+                        animationType="fade"
+                        onRequestClose={() => setRunConfirmVisible(false)}
+                    >
+                        <View
+                            className="flex-1 justify-center items-center"
+                            style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                        >
+                            {/* Tocar fuera = cerrar solo este modal */}
+                            <Pressable
+                                className="absolute inset-0"
+                                onPress={() => setRunConfirmVisible(false)}
+                            />
+
+                            <View
+                                className="w-72 rounded-3xl px-4 py-4"
+                                style={{
+                                    backgroundColor: '#111111',
+                                    borderWidth: 1,
+                                    borderColor: COLORS.primary,
+                                }}
+                            >
+                                <Text
+                                    className="text-base font-semibold mb-3 text-center"
+                                    style={{ color: COLORS.textLight }}
+                                >
+                                    ¿Ir al modo correr hacia este punto?
+                                </Text>
+
+                                {selectedPoint && (
+                                    <Text
+                                        className="text-xs mb-4 text-center"
+                                        style={{ color: COLORS.textMuted }}
+                                    >
+                                        Punto seleccionado: {selectedPoint.name}
+                                    </Text>
+                                )}
+
+                                <View className="flex-row justify-between mt-2">
+                                    {/* Confirmar: Ir al modo correr */}
+                                    <Pressable
+                                        className="flex-1 mr-2 rounded-full py-2 items-center justify-center"
+                                        style={{ backgroundColor: COLORS.primary }}
+                                        onPress={() => {
+                                            console.log('Ir al modo correr hacia', selectedPoint?.id);
+                                            // 🔜 acá más adelante: router.push('/run') o similar
+                                            setRunConfirmVisible(false);
+                                            setSelectedPoint(null);
+                                        }}
+                                    >
+                                        <Text
+                                            className="text-[13px] font-semibold"
+                                            style={{ color: '#111111' }}
+                                        >
+                                            Ir al modo correr
+                                        </Text>
+                                    </Pressable>
+
+                                    {/* Cancelar */}
+                                    <Pressable
+                                        className="flex-1 ml-2 rounded-full py-2 items-center justify-center"
+                                        style={{ backgroundColor: '#444444' }}
+                                        onPress={() => setRunConfirmVisible(false)}
+                                    >
+                                        <Text
+                                            className="text-[13px] font-semibold"
+                                            style={{ color: COLORS.textLight }}
+                                        >
+                                            Cancelar
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                            </View>
+                        </View>
+                    </Modal>
+
 
 
                 </View>

@@ -143,3 +143,31 @@ export async function markRoutineDone(id: string): Promise<Routine> {
     const data = (await res.json()) as Routine;
     return data;
 }
+
+export async function getSuggestedRoutines(): Promise<Routine[]> {
+    const res = await apiFetch("/routines/suggestions", { method: "GET" });
+
+    if (!res.ok) {
+        throw new Error("No se pudieron cargar las rutinas sugeridas");
+    }
+
+    const data = (await res.json()) as { items: Routine[] };
+    return data.items ?? [];
+}
+
+// 🔹 NUEVO: detalle de una rutina sugerida
+export async function getSuggestedRoutine(id: string): Promise<Routine> {
+    const res = await apiFetch(`/routines/suggestions/${id}`, {
+        method: 'GET',
+    });
+
+    if (!res.ok) {
+        if (res.status === 404) {
+            throw new Error('Rutina sugerida no encontrada');
+        }
+        throw new Error('Error al cargar la rutina sugerida');
+    }
+
+    const data = (await res.json()) as Routine;
+    return data;
+}

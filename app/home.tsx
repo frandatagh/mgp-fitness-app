@@ -160,9 +160,10 @@ export default function HomeScreen() {
                         />
                     </View>
 
-                    <View className="items-center">
+                    <Pressable className="items-center" onPress={() => router.push("/suggestions")}>
                         <Text style={{ color: COLORS.textMuted }}>Sugerencias</Text>
-                    </View>
+                    </Pressable>
+
 
                     <View className="items-center">
                         <Text style={{ color: COLORS.textMuted }}>Personalizar IA</Text>

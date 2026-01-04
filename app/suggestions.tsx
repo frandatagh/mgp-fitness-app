@@ -41,14 +41,14 @@ export default function SuggestionsScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
             <View
-                className="flex-1 px-4 pt-1 pb-4  w-full"
+                className="flex-1 px-4 pt-1 pb-2  w-full"
                 style={{ maxWidth: 800, alignSelf: "center" }}
             >
                 {/* Logo */}
                 <View className="items-center">
                     <Image
-                        source={require("../assets/img/iconhome.png")}
-                        style={{ width: 110, height: 110, resizeMode: "contain" }}
+                        source={require("../assets/img/iconmgp.png")}
+                        style={{ width: 85, height: 85, resizeMode: "contain" }}
                     />
                 </View>
 
@@ -66,12 +66,21 @@ export default function SuggestionsScreen() {
                 >
                     <ScrollView showsVerticalScrollIndicator={false}>
                         <Text
-                            className="text-[13px] mb-3"
+                            className="text-[13px] mb-3 py-2 px-2"
                             style={{ color: COLORS.textMuted }}
                         >
                             Aquí encontrarás rutinas recomendadas listas para usar. Explora
                             las opciones, revisa los detalles y copia la rutina que más se
                             adapte a tus objetivos.
+                            {'\n'}
+                            {'\n'}
+                            Puedes editarla luego según tus preferencias e ir añadiendo tus notas de ejercicios.
+                            {'\n'}
+                            {'\n'}
+                            Recuerda empezar con un buen calentamiento y ajustar la intensidad según tu nivel. Haz click aquí para saber cómo prevenir lesiones o accidentes durante tu entrenamiento.
+                            {'\n'}
+                            {'\n'}
+                            ¡Es hora de entrenar! 💪
                         </Text>
 
                         {loading && (
@@ -118,18 +127,30 @@ export default function SuggestionsScreen() {
                     </ScrollView>
 
                 </View>
-                {/* Botón inferior para volver al home */}
-                <View className="mt-3 flex-row justify-center">
+                {/* Botónes inferiores*/}
+                <View className="mt-2 flex-row justify-between px-2">
                     <Pressable
-                        className="px-6 py-3 rounded-full items-center justify-center"
+                        className="flex-1 mr-2 px-4 py-4 rounded-xl items-center justify-center"
                         style={{ backgroundColor: '#444444' }}
                         onPress={() => router.replace('/home')}
                     >
                         <Text
-                            className="text-[14px] font-semibold"
+                            className="text-[14px] font-normal"
                             style={{ color: COLORS.textLight }}
                         >
                             Volver al inicio
+                        </Text>
+                    </Pressable>
+                    <Pressable
+                        className="flex-1  px-4 py-4 rounded-xl items-center justify-center"
+                        style={{ backgroundColor: '#444444' }}
+                        onPress={() => router.push('/routine/new')}
+                    >
+                        <Text
+                            className="text-[14px] font-normal"
+                            style={{ color: COLORS.textLight }}
+                        >
+                            Crear nueva rutina
                         </Text>
                     </Pressable>
                 </View>

@@ -166,14 +166,27 @@ export default function HomeScreen() {
 
 
                     <View className="items-center">
-                        <Text style={{ color: COLORS.textMuted }}>Personalizar IA</Text>
+                        <Text style={{ color: COLORS.textMuted }}>Perfil</Text>
                     </View>
 
                     <Pressable
                         className="items-center"
                         onPress={() => setSettingsOpen(prev => !prev)}
                     >
-                        <Text style={{ color: COLORS.textMuted }}>Ajustes</Text>
+                        <Text
+                            style={{
+                                color: settingsOpen ? COLORS.accent : COLORS.textMuted,
+                            }}
+                        >
+                            Ajustes
+                        </Text>
+
+                        {settingsOpen && (
+                            <View
+                                className="mt-1 h-1 w-8 rounded-full"
+                                style={{ backgroundColor: COLORS.primary }}
+                            />
+                        )}
                     </Pressable>
                 </View>
 
@@ -259,57 +272,85 @@ export default function HomeScreen() {
 
                     {/* MENÚ AJUSTES */}
                     {settingsOpen && (
-                        <View
-                            className="absolute rounded-2xl p-3"
-                            style={{
-                                top: 10,
-                                right: 10,
-                                backgroundColor: '#111111',
-                                borderWidth: 1,
-                                borderColor: COLORS.primary,
-                            }}
-                        >
+                        <>
+                            {/* Fondo táctil para cerrar al tocar fuera */}
                             <Pressable
-                                className="py-1"
+                                className="absolute inset-0"
                                 onPress={() => setSettingsOpen(false)}
-                            >
-                                <Text className="text-sm" style={{ color: COLORS.textLight }}>
-                                    Información
-                                </Text>
-                            </Pressable>
-
-                            <Pressable
-                                className="py-1"
-                                onPress={() => setSettingsOpen(false)}
-                            >
-                                <Text className="text-sm" style={{ color: COLORS.textLight }}>
-                                    Acerca de nosotros
-                                </Text>
-                            </Pressable>
-
-                            <Pressable
-                                className="py-1"
-                                onPress={() => setSettingsOpen(false)}
-                            >
-                                <Text className="text-sm" style={{ color: COLORS.textLight }}>
-                                    Términos y condiciones
-                                </Text>
-                            </Pressable>
-
-                            <View
-                                className="h-px my-2"
-                                style={{ backgroundColor: COLORS.textMuted }}
+                                style={{ backgroundColor: 'transparent' }}
                             />
 
-                            <Pressable className="py-1" onPress={handleLogout}>
-                                <Text
-                                    className="text-sm font-semibold"
-                                    style={{ color: '#FFBABA' }}
+                            {/* Tarjeta del menú */}
+                            <View
+                                className="absolute rounded-2xl p-3"
+                                style={{
+                                    top: 10,
+                                    right: 10,
+                                    backgroundColor: '#111111',
+                                    borderWidth: 1,
+                                    borderColor: COLORS.primary,
+                                }}
+                            >
+                                <Pressable
+                                    className="py-1"
+                                    onPress={() => setSettingsOpen(false)}
                                 >
-                                    Cerrar sesión
-                                </Text>
-                            </Pressable>
-                        </View>
+                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
+                                        Información
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    className="py-1"
+                                    onPress={() => setSettingsOpen(false)}
+                                >
+                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
+                                        Acerca de nosotros
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    className="py-1"
+                                    onPress={() => setSettingsOpen(false)}
+                                >
+                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
+                                        Soporte & Ayuda
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    className="py-1"
+                                    onPress={() => setSettingsOpen(false)}
+                                >
+                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
+                                        Contacto
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    className="py-1"
+                                    onPress={() => setSettingsOpen(false)}
+                                >
+                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
+                                        Términos y condiciones
+                                    </Text>
+                                </Pressable>
+
+                                <View
+                                    className="h-px my-2"
+                                    style={{ backgroundColor: COLORS.textMuted }}
+                                />
+
+                                <Pressable className="py-1" onPress={handleLogout}>
+                                    <Text
+                                        className="text-sm font-semibold"
+                                        style={{ color: '#FFBABA' }}
+                                    >
+                                        Cerrar sesión
+                                    </Text>
+                                </Pressable>
+                            </View>
+                        </>
                     )}
                 </View>
 

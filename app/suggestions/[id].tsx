@@ -172,11 +172,11 @@ export default function SuggestedRoutineDetailScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
             <View
-                className="flex-1 px-4 pt-1 pb-4 w-full"
+                className="flex-1 px-4 pt-1 pb-2 w-full"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
                 {/* LOGO + TÍTULO SUPERIOR */}
-                <View className="mb-1">
+                <View className="mb-2">
                     <View className="items-center">
                         <Image
                             source={require('../../assets/img/icontwist.png')}
@@ -294,7 +294,7 @@ export default function SuggestedRoutineDetailScreen() {
                 </View>
 
                 {/* Botones inferiores */}
-                <View className="mt-2 flex-row justify-between px-2 pb-2">
+                <View className="mt-2 flex-row justify-between px-2">
                     {/* Volver atrás */}
                     <Pressable
                         onPress={handleBack}
@@ -312,7 +312,7 @@ export default function SuggestedRoutineDetailScreen() {
                     {/* Copiar rutina -> abre modal */}
                     <Pressable
                         onPress={handleRequestCopy}
-                        className="flex-1 ml-2 px-4 py-4 rounded-xl items-center justify-center"
+                        className="flex-1  px-4 py-4 rounded-xl items-center justify-center"
                         style={{ backgroundColor: COLORS.primary }}
                         disabled={copying}
                     >

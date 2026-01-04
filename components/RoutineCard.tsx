@@ -66,7 +66,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
 
     // Tomamos solo los dos primeros ejercicios para mostrar en la tarjeta
     const firstExercises = useMemo(
-        () => (exercisesPreview ?? []).slice(0, 2),
+        () => (exercisesPreview ?? []).slice(0, 3),
         [exercisesPreview]
     );
 
@@ -99,13 +99,13 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                             <Text
                                 className="text-xs mt-1"
                                 style={{ color: COLORS.textMuted }}
-                                numberOfLines={2}
+                                numberOfLines={3}
                             >
                                 {description}
                             </Text>
                         ) : null}
 
-                        {/* Preview de ejercicios (máx. 2) */}
+                        {/* Preview de ejercicios (máx. 3) */}
                         {firstExercises.length > 0 && (
                             <View className="mt-2">
                                 {firstExercises.map((ex, index) => (
@@ -114,20 +114,14 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                                         className="flex-row justify-between items-center mb-1"
                                     >
                                         <Text
-                                            className="text-[11px]"
+                                            className="text-[12px] font-semibold"
                                             style={{ color: COLORS.textLight }}
                                             numberOfLines={1}
                                         >
-                                            {index + 1}. {ex.name}
+                                            . {ex.name}
                                         </Text>
 
-                                        <Text
-                                            className="text-[11px] text-right"
-                                            style={{ color: COLORS.textMuted }}
-                                        >
-                                            {(ex.sets ?? '-')}{' '}
-                                            {ex.reps ? `x ${ex.reps}` : ''}
-                                        </Text>
+
                                     </View>
                                 ))}
                             </View>

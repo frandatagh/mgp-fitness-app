@@ -105,18 +105,20 @@ export default function SuggestionsScreen() {
                                     description={routine.notes}
                                     highlighted={false}
                                     exercisesPreview={routine.exercises ?? []}
+                                    mode="suggestion"  // 👈 importante
+
                                     onOpen={() =>
                                         router.push({
                                             pathname: "/suggestions/[id]",
                                             params: { id: routine.id },
                                         })
                                     }
+
+                                    // Estos quedan por compatibilidad, pero no se usan en modo suggestion
                                     onEdit={() => {
-                                        // en sugerencias no se edita
                                         console.log("Editar rutina sugerida (no disponible)");
                                     }}
                                     onDelete={() => {
-                                        // no se elimina una sugerida desde aquí
                                         return;
                                     }}
                                     onShare={() => {
@@ -124,6 +126,7 @@ export default function SuggestionsScreen() {
                                     }}
                                 />
                             ))}
+
                     </ScrollView>
 
                 </View>

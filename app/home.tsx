@@ -165,9 +165,10 @@ export default function HomeScreen() {
                     </Pressable>
 
 
-                    <View className="items-center">
+                    <Pressable className="items-center" onPress={() => router.push("/profile")}>
+
                         <Text style={{ color: COLORS.textMuted }}>Perfil</Text>
-                    </View>
+                    </Pressable>
 
                     <Pressable
                         className="items-center"
@@ -293,7 +294,10 @@ export default function HomeScreen() {
                             >
                                 <Pressable
                                     className="py-1"
-                                    onPress={() => setSettingsOpen(false)}
+                                    onPress={() => {
+                                        setSettingsOpen(false);
+                                        router.push('/info');
+                                    }}
                                 >
                                     <Text className="text-sm" style={{ color: COLORS.textLight }}>
                                         Información

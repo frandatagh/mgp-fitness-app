@@ -315,7 +315,11 @@ export default function HomeScreen() {
 
                                 <Pressable
                                     className="py-1"
-                                    onPress={() => setSettingsOpen(false)}
+                                    onPress={() => {
+                                        setSettingsOpen(false);
+                                        router.push('/support');
+                                    }}
+
                                 >
                                     <Text className="text-sm" style={{ color: COLORS.textLight }}>
                                         Soporte & Ayuda
@@ -324,7 +328,10 @@ export default function HomeScreen() {
 
                                 <Pressable
                                     className="py-1"
-                                    onPress={() => setSettingsOpen(false)}
+                                    onPress={() => {
+                                        setSettingsOpen(false);
+                                        router.push('/contact');
+                                    }}
                                 >
                                     <Text className="text-sm" style={{ color: COLORS.textLight }}>
                                         Contacto

@@ -54,7 +54,7 @@ export default function HomeScreen() {
                 setLoadingRoutines(true);
 
                 const data = await getRoutines();
-                console.log('RUTINAS DESDE API:', data);
+
                 setRoutines(data);
             } catch (error) {
                 const message =
@@ -306,7 +306,10 @@ export default function HomeScreen() {
 
                                 <Pressable
                                     className="py-1"
-                                    onPress={() => setSettingsOpen(false)}
+                                    onPress={() => {
+                                        setSettingsOpen(false);
+                                        router.push('/about');
+                                    }}
                                 >
                                     <Text className="text-sm" style={{ color: COLORS.textLight }}>
                                         Acerca de nosotros
@@ -340,7 +343,10 @@ export default function HomeScreen() {
 
                                 <Pressable
                                     className="py-1"
-                                    onPress={() => setSettingsOpen(false)}
+                                    onPress={() => {
+                                        setSettingsOpen(false);
+                                        router.push('/terms');
+                                    }}
                                 >
                                     <Text className="text-sm" style={{ color: COLORS.textLight }}>
                                         Términos y condiciones

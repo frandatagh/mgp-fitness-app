@@ -53,7 +53,7 @@ export default function InfoScreen() {
                 {/* LOGO SUPERIOR */}
                 <View className="items-center mb-2">
                     <Image
-                        source={require('../assets/img/icontwist.png')}
+                        source={require('../assets/img/iconmgp.png')}
                         style={{ width: 85, height: 85, resizeMode: 'contain' }}
                     />
                 </View>

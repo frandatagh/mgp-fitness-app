@@ -58,3 +58,54 @@ export async function registerRequest(
     const data = (await res.json()) as AuthResponse;
     return data;
 }
+/**
+ * Forgot password: solicita envío de enlace de recuperación
+ */
+export async function forgotPasswordRequest(email: string): Promise<{ message: string }> {
+    const res = await apiFetch('/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+    });
+
+    const data = (await res.json().catch(() => null)) as { message?: string } | null;
+
+    if (!res.ok) {
+        throw new Error(
+            data?.message || 'No se pudo procesar la solicitud de recuperación'
+        );
+    }
+
+    return {
+        message:
+            data?.message ||
+            'Si el correo existe, te enviaremos instrucciones para recuperar tu contraseña.',
+    };
+}
+
+/**
+ * Reset password: recibe token + nueva contraseña
+ */
+export async function resetPasswordRequest(
+    token: string,
+    password: string
+): Promise<{ message: string }> {
+    const res = await apiFetch('/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, password }),
+    });
+
+    const data = (await res.json().catch(() => null)) as { message?: string } | null;
+
+    if (!res.ok) {
+        throw new Error(
+            data?.message || 'No se pudo restablecer la contraseña'
+        );
+    }
+
+    return {
+        message:
+            data?.message || 'La contraseña fue restablecida correctamente.',
+    };
+}

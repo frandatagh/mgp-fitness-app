@@ -235,7 +235,7 @@ export default function SupportScreen() {
                             className="text-[14px] font-normal"
                             style={{ color: COLORS.textLight }}
                         >
-                            Volver al home
+                            Volver
                         </Text>
                     </Pressable>
 

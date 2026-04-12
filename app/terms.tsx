@@ -45,6 +45,13 @@ export default function TermsScreen() {
         router.replace(isAuthenticated ? '/home' : '/');
     };
 
+    const handleSectionLayout = (section: SectionKey, y: number) => {
+        setSectionPositions(prev => ({
+            ...prev,
+            [section]: y,
+        }));
+    };
+
     return (
         <SafeAreaView
             className="flex-1"
@@ -174,12 +181,10 @@ export default function TermsScreen() {
 
                         {/* INTRODUCCIÓN */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    introduccion: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('introduccion', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -214,12 +219,10 @@ export default function TermsScreen() {
 
                         {/* USO DE LA APLICACIÓN */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    uso: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('uso', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -257,12 +260,10 @@ export default function TermsScreen() {
 
                         {/* RESPONSABILIDAD DEL USUARIO */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    responsabilidad: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('responsabilidad', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -299,12 +300,10 @@ export default function TermsScreen() {
 
                         {/* LIMITACIÓN DE RESPONSABILIDAD */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    limitacion: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('limitacion', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -342,12 +341,10 @@ export default function TermsScreen() {
 
                         {/* CUENTA Y DATOS */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    cuenta: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('cuenta', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -384,12 +381,10 @@ export default function TermsScreen() {
 
                         {/* FUNCIONES EN DESARROLLO */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    desarrollo: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('desarrollo', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -420,12 +415,10 @@ export default function TermsScreen() {
 
                         {/* CONTACTO */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    contacto: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('contacto', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -458,7 +451,7 @@ export default function TermsScreen() {
                     <Pressable
                         onPress={handleBack}
                         className="px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
+                        style={{ backgroundColor: '#111111', borderColor: '#2B2B2B', borderWidth: 1 }}
                     >
                         <Text
                             className="text-[14px] font-normal"

@@ -242,11 +242,11 @@ export default function SupportScreen() {
                     <Pressable
                         onPress={() => router.push('/contact')}
                         className="flex-1  px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: COLORS.primary }}
+                        style={{ backgroundColor: '#444444' }}
                     >
                         <Text
                             className="text-[14px] font-semibold"
-                            style={{ color: '#111111' }}
+                            style={{ color: COLORS.textLight }}
                         >
                             Contáctanos
                         </Text>

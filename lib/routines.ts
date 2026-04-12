@@ -171,3 +171,67 @@ export async function getSuggestedRoutine(id: string): Promise<Routine> {
     const data = (await res.json()) as Routine;
     return data;
 }
+
+export type ExerciseCheckinPayload = {
+    routineId: string;
+    score: number;
+    notes?: string | null;
+};
+
+export type ExerciseCheckinResponse = {
+    message: string;
+    item: {
+        id: string;
+        userId: string;
+        routineId: string;
+        exerciseId: string;
+        score: number;
+        notes?: string | null;
+        createdAt: string;
+    };
+};
+
+export async function saveExerciseCheckin(
+    exerciseId: string,
+    payload: {
+        routineId: string;
+        score: number;
+    }
+) {
+    const res = await apiFetch(`/exercises/${exerciseId}/checkin`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.log('Error guardando checkin del ejercicio:', text);
+        throw new Error('No se pudo guardar el estado del ejercicio');
+    }
+
+    return res.json();
+}
+
+export async function saveRoutineCheckin(
+    routineId: string,
+    payload: { score: number }
+) {
+    const res = await apiFetch(`/routines/${routineId}/checkin`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.log('Error guardando checkin de rutina:', text);
+        throw new Error('No se pudo guardar el estado de la rutina');
+    }
+
+    return res.json();
+}

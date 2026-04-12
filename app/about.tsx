@@ -261,7 +261,7 @@ export default function AboutScreen() {
                     <Pressable
                         onPress={handleBack}
                         className="px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
+                        style={{ backgroundColor: '#111111', borderColor: '#2B2B2B', borderWidth: 1 }}
                     >
                         <Text
                             className="text-[14px] font-normal"

@@ -100,6 +100,9 @@ export default function NewRoutineScreen() {
     const [backModalVisible, setBackModalVisible] = useState(false);
     const [saveModalVisible, setSaveModalVisible] = useState(false);
 
+    const [dayPickerVisible, setDayPickerVisible] = useState(false);
+
+    const [saving, setSaving] = useState(false);
 
     if (!isAuthenticated) {
         return <Redirect href="/" />;
@@ -150,13 +153,13 @@ export default function NewRoutineScreen() {
 
     const handleSave = async () => {
         const trimmedTitle = title.trim();
+
         if (!trimmedTitle) {
             Alert.alert('Falta título', 'Por favor ingresa un título para la rutina.');
             return;
         }
 
-        // Solo ejercicios con nombre
-        const filledExercises = exercises.filter(e => e.name.trim());
+        const filledExercises = exercises.filter((e) => e.name.trim());
 
         if (filledExercises.length === 0) {
             Alert.alert(
@@ -175,8 +178,6 @@ export default function NewRoutineScreen() {
             order: index,
         }));
 
-
-
         const payload: CreateRoutinePayload = {
             title: trimmedTitle,
             notes: description.trim() || undefined,
@@ -188,23 +189,13 @@ export default function NewRoutineScreen() {
             const created = await createRoutine(payload);
             console.log('Rutina creada en servidor:', created);
 
-            if (Platform.OS === 'web') {
-                router.replace('/home');
-            } else {
-                Alert.alert('Rutina guardada', 'La rutina se guardó correctamente.', [
-                    {
-                        text: 'OK',
-                        onPress: () => {
-                            router.replace('/home');
-                        },
-                    },
-                ]);
-            }
+            router.replace('/home');
         } catch (error) {
             const message =
                 error instanceof Error
                     ? error.message
                     : 'Ocurrió un error al guardar la rutina.';
+
             console.log('Error creando rutina:', error);
             Alert.alert('Error', message);
         }
@@ -492,15 +483,9 @@ export default function NewRoutineScreen() {
                                                     <View className="flex-[2] ml-1">
                                                         <Pressable
                                                             onPress={() => {
-                                                                setSelectedExerciseIndex(
-                                                                    index,
-                                                                );
-                                                                setOpenDayMenuIndex(
-                                                                    openDayMenuIndex ===
-                                                                        index
-                                                                        ? null
-                                                                        : index,
-                                                                );
+                                                                setSelectedExerciseIndex(index);
+                                                                setOpenDayMenuIndex(index);
+                                                                setDayPickerVisible(true);
                                                             }}
                                                             style={{
                                                                 backgroundColor:
@@ -531,74 +516,7 @@ export default function NewRoutineScreen() {
                                                         </Pressable>
                                                     </View>
 
-                                                    {/* MENÚ DÍAS */}
-                                                    {openDayMenuIndex === index && (
-                                                        <View
-                                                            className="absolute"
-                                                            style={{
-                                                                top: 32,
-                                                                right: 0,
-                                                                backgroundColor:
-                                                                    '#111111',
-                                                                borderWidth: 1,
-                                                                borderColor:
-                                                                    '#555555',
-                                                                borderRadius: 8,
-                                                                width: 100,
-                                                                zIndex: 999,
-                                                                elevation: 10,
-                                                            }}
-                                                        >
-                                                            <ScrollView
-                                                                style={{
-                                                                    maxHeight: 130,
-                                                                }}
-                                                                contentContainerStyle={{
-                                                                    paddingVertical: 4,
-                                                                }}
-                                                                nestedScrollEnabled
-                                                                keyboardShouldPersistTaps="handled"
-                                                                showsVerticalScrollIndicator={
-                                                                    false
-                                                                }
-                                                            >
-                                                                {DAY_OPTIONS.map(
-                                                                    (opt) => (
-                                                                        <Pressable
-                                                                            key={opt}
-                                                                            onPress={() => {
-                                                                                handleChangeExercise(
-                                                                                    index,
-                                                                                    'day',
-                                                                                    opt,
-                                                                                );
-                                                                                setOpenDayMenuIndex(
-                                                                                    null,
-                                                                                );
-                                                                            }}
-                                                                            style={{
-                                                                                paddingVertical: 4,
-                                                                                paddingHorizontal: 8,
-                                                                            }}
-                                                                        >
-                                                                            <Text
-                                                                                style={{
-                                                                                    color:
-                                                                                        exercise.day ===
-                                                                                            opt
-                                                                                            ? COLORS.primary
-                                                                                            : COLORS.textLight,
-                                                                                    fontSize: 11,
-                                                                                }}
-                                                                            >
-                                                                                {opt}
-                                                                            </Text>
-                                                                        </Pressable>
-                                                                    ),
-                                                                )}
-                                                            </ScrollView>
-                                                        </View>
-                                                    )}
+
                                                 </View>
 
                                                 {/* SEGUNDA LÍNEA: notas + botón borrar */}
@@ -705,18 +623,18 @@ export default function NewRoutineScreen() {
                         {/* AÑADIR EJERCICIO */}
                         <Pressable
                             className="flex-1 mx-1 px-4 py-3 rounded-xl items-center justify-center"
-                            style={{ backgroundColor: COLORS.primary }}
+                            style={{ backgroundColor: '#444444' }}
                             onPress={handleAddExercise}
                         >
                             <Text
                                 className="font-normal text-center"
                                 style={{
-                                    color: '#111111',
+                                    color: COLORS.textLight,
                                     fontSize: 14,
                                     lineHeight: 16,
                                 }}
                             >
-                                + Añadir ejercicio
+                                Añadir ejercicio
                             </Text>
                         </Pressable>
 
@@ -866,6 +784,102 @@ export default function NewRoutineScreen() {
                                     </Text>
                                 </Pressable>
                             </View>
+                        </View>
+                    </View>
+                </Modal>
+
+                {/* MODAL SELECTOR DE DÍA */}
+                <Modal
+                    visible={dayPickerVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => {
+                        setDayPickerVisible(false);
+                        setOpenDayMenuIndex(null);
+                    }}
+                >
+                    <View
+                        className="flex-1 items-center justify-center"
+                        style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                    >
+                        <View
+                            className="w-60 rounded-2xl p-4"
+                            style={{
+                                backgroundColor: '#111111',
+                                borderWidth: 1,
+                                borderColor: COLORS.primary,
+                            }}
+                        >
+                            <Text
+                                className="text-base font-semibold mb-3 text-center"
+                                style={{ color: COLORS.textLight }}
+                            >
+                                Selecciona un día
+                            </Text>
+
+                            <ScrollView
+                                style={{ maxHeight: 250 }}
+                                showsVerticalScrollIndicator={false}
+                            >
+                                {DAY_OPTIONS.map((opt) => {
+                                    const selectedDay =
+                                        openDayMenuIndex !== null
+                                            ? exercises[openDayMenuIndex]?.day
+                                            : '';
+
+                                    return (
+                                        <Pressable
+                                            key={opt}
+                                            onPress={() => {
+                                                if (openDayMenuIndex !== null) {
+                                                    handleChangeExercise(openDayMenuIndex, 'day', opt);
+                                                }
+                                                setDayPickerVisible(false);
+                                                setOpenDayMenuIndex(null);
+                                            }}
+                                            className="py-2 rounded-lg mb-2 mx-8"
+                                            style={{
+                                                backgroundColor:
+                                                    selectedDay === opt ? '#1f3d1f' : '#1a1a1a',
+                                                borderWidth: 1,
+                                                borderColor:
+                                                    selectedDay === opt ? COLORS.primary : '#333333',
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    color:
+                                                        selectedDay === opt
+                                                            ? COLORS.primary
+                                                            : COLORS.textLight,
+                                                    fontSize: 14,
+                                                    textAlign: 'center',
+                                                }}
+                                            >
+                                                {opt}
+                                            </Text>
+                                        </Pressable>
+                                    );
+                                })}
+                            </ScrollView>
+
+                            <Pressable
+                                onPress={() => {
+                                    setDayPickerVisible(false);
+                                    setOpenDayMenuIndex(null);
+                                }}
+                                className="mt-3 py-3 rounded-full items-center justify-center"
+                                style={{ backgroundColor: '#333333' }}
+                            >
+                                <Text
+                                    style={{
+                                        color: COLORS.textLight,
+                                        fontWeight: '600',
+                                    }}
+                                >
+                                    Cerrar
+                                </Text>
+                            </Pressable>
                         </View>
                     </View>
                 </Modal>

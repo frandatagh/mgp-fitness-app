@@ -673,10 +673,10 @@ export default function EditRoutineScreen() {
                         <Pressable
                             onPress={handleAddExercise}
                             className="flex-1 mr-2 px-4 py-3 rounded-xl items-center justify-center"
-                            style={{ backgroundColor: COLORS.primary }}
+                            style={{ backgroundColor: "#444444" }}
                         >
-                            <Text className="text-center text-[14px] font-semibold" style={{ color: "#111111" }}>
-                                + Agregar ejercicio
+                            <Text className="text-center text-[14px] font-semibold text-gray-100">
+                                Agregar ejercicio
                             </Text>
                         </Pressable>
                         {/* VOLVER ATRÁS - gris */}
@@ -697,9 +697,9 @@ export default function EditRoutineScreen() {
                             onPress={handleSave}
                             disabled={saving}
                             className="flex-1 ml-2 px-4 py-3 rounded-xl items-center justify-center"
-                            style={{ backgroundColor: COLORS.primary }}
+                            style={{ backgroundColor: "#444444" }}
                         >
-                            <Text className="text-center text-[14px] font-semibold text-black">
+                            <Text className="text-center text-[14px] font-semibold text-gray-100">
                                 {saving ? "Guardando..." : "Guardar cambios"}
                             </Text>
                         </Pressable>
@@ -766,7 +766,7 @@ export default function EditRoutineScreen() {
                     </View>
                 </View>
             </Modal>
-        </SafeAreaView>
+        </SafeAreaView >
     );
 
 }

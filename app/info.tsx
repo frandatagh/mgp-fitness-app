@@ -6,8 +6,6 @@ import {
     ScrollView,
     Pressable,
     Image,
-    NativeScrollEvent,
-    NativeSyntheticEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
@@ -39,6 +37,13 @@ export default function InfoScreen() {
         if (scrollViewRef.current) {
             scrollViewRef.current.scrollTo({ y, animated: true });
         }
+    };
+
+    const handleSectionLayout = (section: SectionKey, y: number) => {
+        setSectionPositions(prev => ({
+            ...prev,
+            [section]: y,
+        }));
     };
 
     return (
@@ -174,12 +179,10 @@ export default function InfoScreen() {
 
                         {/* SECCIÓN 1: ¿Qué es MGP Rutina Fitness? */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    mgp: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('mgp', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -201,12 +204,10 @@ export default function InfoScreen() {
 
                         {/* SECCIÓN 2: Primeros pasos en la aplicación */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    primerospasos: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('primerospasos', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -228,12 +229,10 @@ export default function InfoScreen() {
 
                         {/* SECCIÓN 3: Sección “Mis rutinas” */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    rutinas: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('rutinas', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -254,12 +253,10 @@ export default function InfoScreen() {
                         </View>
                         {/* SECCIÓN 4: Sección “Sugerencias” */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    sugerencias: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('sugerencias', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -280,12 +277,10 @@ export default function InfoScreen() {
                         </View>
                         {/* SECCIÓN 5: Sección “Puntos cercanos” */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    puntos: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('puntos', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -305,12 +300,10 @@ export default function InfoScreen() {
                         </View>
                         {/* SECCIÓN 6: Consejos de uso responsable */}
                         <View
-                            onLayout={e =>
-                                setSectionPositions(prev => ({
-                                    ...prev,
-                                    consejos: e.nativeEvent.layout.y,
-                                }))
-                            }
+                            onLayout={(e) => {
+                                const y = e.nativeEvent.layout.y;
+                                handleSectionLayout('consejos', y);
+                            }}
                         >
                             <Text
                                 className="text-[15px] font-semibold mb-2"
@@ -350,11 +343,11 @@ export default function InfoScreen() {
                     <Pressable
                         onPress={() => router.push('/contact')}
                         className="flex-1 px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: COLORS.primary }}
+                        style={{ backgroundColor: '#444444' }}
                     >
                         <Text
                             className="text-[14px] font-semibold"
-                            style={{ color: '#111111' }}
+                            style={{ color: COLORS.textLight }}
                         >
                             Contactanos
                         </Text>

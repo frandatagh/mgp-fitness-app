@@ -19,6 +19,10 @@ import { useAuth } from '../../context/AuthContext';
 import { getRoutine, Routine, RoutineExercise, markRoutineDone, saveExerciseCheckin, saveRoutineCheckin } from '../../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
 import { cssInterop } from 'nativewind';
+import {
+    saveExerciseCheckinWithOfflineSupport,
+    saveRoutineCheckinWithOfflineSupport,
+} from '../../lib/offlineActions';
 
 
 // Columnas alineadas para la “tabla”
@@ -195,7 +199,8 @@ export default function RoutineDetailScreen() {
             await wait(2000);
 
             const updatedRoutine = await markRoutineDone(routine.id);
-            await saveRoutineCheckin(routine.id, { score });
+            const result = await saveRoutineCheckinWithOfflineSupport(routine.id, { score });
+            console.log('Resultado checkin rutina:', result);
 
             setRoutine(updatedRoutine);
             setDoneMarked(true);
@@ -314,10 +319,11 @@ export default function RoutineDetailScreen() {
 
             await wait(2000);
 
-            await saveExerciseCheckin(selectedExercise.id, {
+            const result = await saveExerciseCheckinWithOfflineSupport(selectedExercise.id, {
                 routineId: routine.id,
                 score,
             });
+            console.log('Resultado checkin ejercicio:', result);
 
             successAnim.setValue(0);
             setExerciseUiPhase('successLoading');

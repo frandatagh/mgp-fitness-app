@@ -18,7 +18,7 @@ import { router, Redirect } from 'expo-router';
 import { COLORS } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
 import { createRoutine, CreateRoutinePayload } from '../../lib/routines';
-
+import { createRoutineWithOfflineSupport } from '../../lib/offlineActions';
 import { Feather } from '@expo/vector-icons';
 
 // -------------------- TIPOS Y OPCIONES --------------------
@@ -186,8 +186,8 @@ export default function NewRoutineScreen() {
 
         try {
             console.log('Enviando rutina al backend:', payload);
-            const created = await createRoutine(payload);
-            console.log('Rutina creada en servidor:', created);
+            const result = await createRoutineWithOfflineSupport(payload);
+            console.log('Resultado guardado rutina:', result);
 
             router.replace('/home');
         } catch (error) {

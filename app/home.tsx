@@ -394,24 +394,22 @@ export default function HomeScreen() {
                         </View>
                     </Pressable>
 
-                    {/* Subir archivo*/}
+                    {/* Liverun Mode*/}
                     <Pressable
-                        className="flex-1 mx-1 px-4 py-3 rounded-xl "
-                        style={{ backgroundColor: '#444444' }}
+                        onPress={() => router.push('/liverun')}
+                        className="flex-1 px-4 py-3 rounded-xl items-center justify-center"
+                        style={{
+                            backgroundColor: COLORS.primary,
+                            borderWidth: 2,
+                            borderColor: '#C6FF00',
+                        }}
                     >
-                        <View className="flex-row pl-1 items-center justify-center">
-                            <Ionicons
-                                name="cloud-upload-outline"
-                                size={18}
-                                color={COLORS.textLight}
-                            />
-                            <Text
-                                className="ml-2 "
-                                style={{ color: COLORS.textLight }}
-                            >
-                                Subir archivo
-                            </Text>
-                        </View>
+                        <Text
+                            className="text-[15px] font-semibold"
+                            style={{ color: '#111111' }}
+                        >
+                            RUN
+                        </Text>
                     </Pressable>
 
                     {/* Puntos cercanos */}

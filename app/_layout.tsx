@@ -1,6 +1,7 @@
 import '../global.css';
 import { Stack } from 'expo-router';
 import { View, Text, ActivityIndicator } from 'react-native';
+import 'expo-dev-client';
 
 // 👇 IMPORTAMOS AuthProvider *y* useAuth
 import { AuthProvider, useAuth } from '../context/AuthContext';

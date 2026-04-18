@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mgp-fitness-app",
-    "slug": "mgp-fitness-app",
+    "name": "MGP Rutina Fitness",
+    "slug": "mgp-rutina-fitness",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -19,7 +19,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.mgprutinafitness.app"
     },
     "web": {
       "output": "static",
@@ -39,11 +40,25 @@
           }
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+       "expo-location",
+       {
+         "locationWhenInUsePermission": "Permitir que MGP Rutina Fitness use tu ubicación mientras entrenas."
+       }
+      ],
+      "@maplibre/maplibre-react-native"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "543e160d-bad4-4246-863e-58c9ab04832b"
+      }
+    },
+    "owner": "mgprutinafitness"
   }
 }

@@ -354,8 +354,14 @@ export default function NearbyScreen() {
                                         className="flex-1 mr-2 rounded-full py-2 items-center justify-center"
                                         style={{ backgroundColor: COLORS.primary }}
                                         onPress={() => {
-                                            console.log('Ir al modo correr hacia', selectedPoint?.id);
-                                            // 🔜 acá más adelante: router.push('/run') o similar
+                                            router.push({
+                                                pathname: '/liverun' as const,
+                                                params: {
+                                                    targetLat: String(selectedPoint?.latitude ?? ''),
+                                                    targetLng: String(selectedPoint?.longitude ?? ''),
+                                                    targetName: selectedPoint?.name ?? '',
+                                                },
+                                            });
                                             setRunConfirmVisible(false);
                                             setSelectedPoint(null);
                                         }}

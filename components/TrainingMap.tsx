@@ -44,7 +44,7 @@ type Props = {
 };
 
 
-const outdoorMarker = require('../assets/img/runblackico.png');
+const outdoorMarker = require('../assets/img/runblackicon.png');
 
 
 export default function TrainingMap({

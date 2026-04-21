@@ -24,9 +24,14 @@ import {
     type RunSession,
 } from '../lib/runSessions';
 
+import * as ImagePicker from 'expo-image-picker';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import Share from 'react-native-share';
-import ShareCardSimple from '../components/share/ShareCardSimple';
+
+import ShareCardVertical from '../components/share/ShareCardVertical';
+import ShareCardHorizontal from '../components/share/ShareCardHorizontal';
+import SharePhotoComposer from '../components/share/SharePhotoComposer';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 type RunPoint = {
     latitude: number;
@@ -313,12 +318,49 @@ export default function LiveRunScreen() {
 
     const [recenterTick, setRecenterTick] = useState(0);
 
-    const [shareOptionsVisible, setShareOptionsVisible] = useState(false);
-    const [shareMode, setShareMode] = useState<'simple' | 'map' | 'route' | null>(null);
 
-    const simpleShareCardRef = useRef<any>(null);
-    const [pendingShareMode, setPendingShareMode] = useState<'simple' | 'map' | 'route' | null>(null);
+    const verticalShareRef = useRef<any>(null);
+    const horizontalShareRef = useRef<any>(null);
+    const photoComposerRef = useRef<any>(null);
+
+    const [shareMainVisible, setShareMainVisible] = useState(false);
+    const [sharePhotoModeVisible, setSharePhotoModeVisible] = useState(false);
+
+    const [pendingShareMode, setPendingShareMode] = useState<'vertical' | 'horizontal' | null>(null);
+
+    const [customPhotoUri, setCustomPhotoUri] = useState<string | null>(null);
+    const [customComposerVisible, setCustomComposerVisible] = useState(false);
+
+    const [showSessionSticker, setShowSessionSticker] = useState(true);
+    const [confirmCloseComposerVisible, setConfirmCloseComposerVisible] = useState(false);
+
+    const PREVIEW_WIDTH = 320;
+    const PREVIEW_HEIGHT = 570;
+    const PREVIEW_STICKER_WIDTH = 250;
+    const PREVIEW_STICKER_HEIGHT = 95;
+    const PREVIEW_STICKER_INTERACTION_PADDING = 28;
+
+    const PREVIEW_STICKER_TOTAL_WIDTH =
+        PREVIEW_STICKER_WIDTH + PREVIEW_STICKER_INTERACTION_PADDING * 2;
+
+    const PREVIEW_STICKER_TOTAL_HEIGHT =
+        PREVIEW_STICKER_HEIGHT + PREVIEW_STICKER_INTERACTION_PADDING * 2;
+
+    const centeredSticker = {
+        x: (PREVIEW_WIDTH - PREVIEW_STICKER_TOTAL_WIDTH) / 2,
+        y: (PREVIEW_HEIGHT - PREVIEW_STICKER_TOTAL_HEIGHT) / 2,
+        scale: 1,
+        rotation: 0,
+    };
+
+    const [stickerTransform, setStickerTransform] = useState(centeredSticker);
+    const stickerTransformRef = useRef(centeredSticker);
+
+    const [stickerStyleIndex, setStickerStyleIndex] = useState<0 | 1 | 2>(0);
+
     const [sharingInProgress, setSharingInProgress] = useState(false);
+
+
 
     useEffect(() => {
         const loadProfileImage = async () => {
@@ -333,6 +375,12 @@ export default function LiveRunScreen() {
 
         loadProfileImage();
     }, []);
+
+
+
+    useEffect(() => {
+        stickerTransformRef.current = stickerTransform;
+    }, [stickerTransform]);
 
 
     useEffect(() => {
@@ -385,7 +433,14 @@ export default function LiveRunScreen() {
         };
     }, []);
 
-
+    const openShareImage = async (uri: string) => {
+        await Share.open({
+            url: uri.startsWith('file://') ? uri : `file://${uri}`,
+            type: 'image/png',
+            failOnCancel: false,
+            title: 'Compartir sesión',
+        });
+    };
 
     const startTimer = () => {
         if (timerRef.current) return;
@@ -571,24 +626,189 @@ export default function LiveRunScreen() {
 
     const handleShareSession = () => {
         if (!selectedHistorySession) return;
-        setShareOptionsVisible(true);
+        setShareMainVisible(true);
     };
 
-    const handleSelectShareMode = async (mode: 'simple' | 'map' | 'route') => {
-        setShareMode(mode);
-        setShareOptionsVisible(false);
+    const handleOpenPhotoFormats = () => {
+        setShareMainVisible(false);
+        setSharePhotoModeVisible(true);
+    };
 
-        if (mode === 'simple') {
-            setPendingShareMode('simple');
-        } else {
-            Alert.alert(
-                'Próximamente',
-                mode === 'map'
-                    ? 'El formato de compartir con mapa estará disponible pronto.'
-                    : 'El formato de compartir solo con la ruta estará disponible pronto.'
-            );
+    const handleRequestCloseComposer = () => {
+        setConfirmCloseComposerVisible(true);
+    };
+
+    const handleContinueEditingComposer = () => {
+        setConfirmCloseComposerVisible(false);
+    };
+
+    const handleDiscardComposer = () => {
+        setConfirmCloseComposerVisible(false);
+        setCustomComposerVisible(false);
+        setCustomPhotoUri(null);
+        setShowSessionSticker(true);
+
+        setShowSessionSticker(true);
+        setStickerTransform(centeredSticker);
+        stickerTransformRef.current = centeredSticker;
+        setStickerStyleIndex(0);
+    };
+
+
+
+    const handlePickCamera = async () => {
+        try {
+            setShareMainVisible(false);
+
+            const permission = await ImagePicker.requestCameraPermissionsAsync();
+            if (!permission.granted) {
+                Alert.alert('Permiso requerido', 'Debes permitir acceso a la cámara.');
+                return;
+            }
+
+            const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                quality: 1,
+                allowsEditing: false,
+            });
+
+            if (result.canceled || !result.assets?.[0]?.uri) return;
+
+            const initialPosition = { x: 16, y: 24 };
+
+            setCustomPhotoUri(result.assets[0].uri);
+            setShowSessionSticker(true);
+            setStickerTransform(centeredSticker);
+            stickerTransformRef.current = centeredSticker;
+            setStickerStyleIndex(0);
+            setCustomComposerVisible(true);
+        } catch (error) {
+            console.error('Error tomando foto:', error);
+            Alert.alert('Error', 'No se pudo tomar la foto.');
         }
     };
+
+    const handlePickGallery = async () => {
+        try {
+            setShareMainVisible(false);
+
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permission.granted) {
+                Alert.alert('Permiso requerido', 'Debes permitir acceso a la galería.');
+                return;
+            }
+
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ['images'],
+                quality: 1,
+                allowsEditing: false,
+            });
+
+            if (result.canceled || !result.assets?.[0]?.uri) return;
+
+            const initialPosition = { x: 16, y: 24 };
+
+            setCustomPhotoUri(result.assets[0].uri);
+            setShowSessionSticker(true);
+            setStickerTransform(centeredSticker);
+            stickerTransformRef.current = centeredSticker;
+            setStickerStyleIndex(0);
+            setCustomComposerVisible(true);
+        } catch (error) {
+            console.error('Error eligiendo imagen:', error);
+            Alert.alert('Error', 'No se pudo elegir la imagen.');
+        }
+    };
+
+
+
+    const handleSelectPhotoFormat = (mode: 'vertical' | 'horizontal') => {
+        setSharePhotoModeVisible(false);
+        setPendingShareMode(mode);
+    };
+
+    const shareVerticalCard = async () => {
+        if (!selectedHistorySession || !verticalShareRef.current) return;
+
+        try {
+            setSharingInProgress(true);
+
+            const uri = await captureRef(verticalShareRef, {
+                format: 'png',
+                quality: 1,
+                result: 'tmpfile',
+            });
+
+            await openShareImage(uri);
+        } catch (error) {
+            console.error('Error compartiendo formato vertical:', error);
+            Alert.alert('Error', 'No se pudo compartir la imagen vertical.');
+        } finally {
+            setPendingShareMode(null);
+            setSharingInProgress(false);
+        }
+    };
+
+    const shareHorizontalCard = async () => {
+        if (!selectedHistorySession || !horizontalShareRef.current) return;
+
+        try {
+            setSharingInProgress(true);
+
+            const uri = await captureRef(horizontalShareRef, {
+                format: 'png',
+                quality: 1,
+                result: 'tmpfile',
+            });
+
+            await openShareImage(uri);
+        } catch (error) {
+            console.error('Error compartiendo formato horizontal:', error);
+            Alert.alert('Error', 'No se pudo compartir la imagen horizontal.');
+        } finally {
+            setPendingShareMode(null);
+            setSharingInProgress(false);
+        }
+    };
+
+    const shareCustomPhotoComposition = async () => {
+        if (!customPhotoUri || !photoComposerRef.current) return;
+
+        try {
+            setSharingInProgress(true);
+
+            const uri = await captureRef(photoComposerRef, {
+                format: 'png',
+                quality: 1,
+                result: 'tmpfile',
+            });
+
+            await openShareImage(uri);
+        } catch (error) {
+            console.error('Error compartiendo composición personalizada:', error);
+            Alert.alert('Error', 'No se pudo compartir la imagen personalizada.');
+        } finally {
+            setSharingInProgress(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!selectedHistorySession) return;
+
+        const timeout = setTimeout(() => {
+            if (pendingShareMode === 'vertical') {
+                shareVerticalCard();
+            }
+
+            if (pendingShareMode === 'horizontal') {
+                shareHorizontalCard();
+            }
+        }, 300);
+
+        return () => clearTimeout(timeout);
+    }, [pendingShareMode, selectedHistorySession]);
+
+
 
     const handleDeleteSession = async () => {
         if (!selectedHistorySession) return;
@@ -624,63 +844,81 @@ export default function LiveRunScreen() {
         Alert.alert('Próximamente', 'La pantalla de estadísticas estará disponible pronto.');
     };
 
-    const shareSimpleCardImage = async () => {
-        if (!selectedHistorySession || !simpleShareCardRef.current) return;
+    const handleShareLastSessionSummary = () => {
+        if (!lastSessionSummary) return;
 
-        try {
-            setSharingInProgress(true);
+        const tempSession = {
+            id: 'summary-temp',
+            userId: user?.id ?? 'temp-user',
+            startedAt: new Date(startedAtMs ?? Date.now()).toISOString(),
+            endedAt: new Date().toISOString(),
+            durationSeconds: lastSessionSummary.durationSeconds,
+            distanceMeters: lastSessionSummary.distanceMeters,
+            avgPaceSecPerKm: lastSessionSummary.avgPaceSecPerKm,
+            maxSpeedMps: lastSessionSummary.maxSpeedMps,
+            pathGeoJson: buildPathGeoJson(lastSessionSummary.routePoints),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        } as RunSession;
 
-            const distanceText = formatDistance(selectedHistorySession.distanceMeters);
-            const durationText = formatDuration(selectedHistorySession.durationSeconds);
-            const paceText =
-                selectedHistorySession.avgPaceSecPerKm != null
-                    ? formatPace(
-                        selectedHistorySession.distanceMeters,
-                        selectedHistorySession.durationSeconds
-                    )
-                    : '--';
-            const maxSpeedText =
-                selectedHistorySession.maxSpeedMps != null
-                    ? formatSpeed(selectedHistorySession.maxSpeedMps)
-                    : '--';
-
-            const uri = await captureRef(simpleShareCardRef, {
-                format: 'png',
-                quality: 1,
-                result: 'tmpfile',
-            });
-
-            await Share.open({
-                url: uri.startsWith('file://') ? uri : `file://${uri}`,
-                type: 'image/png',
-                failOnCancel: false,
-                title: 'Compartir sesión',
-                message:
-                    `🏃 Corrida registrada en MGP Rutina Fitness\n\n` +
-                    `Tiempo: ${durationText}\n` +
-                    `Distancia: ${distanceText}\n` +
-                    `Ritmo: ${paceText}\n` +
-                    `Vel. máxima: ${maxSpeedText}`,
-            });
-        } catch (error) {
-            console.error('Error compartiendo tarjeta simple:', error);
-            Alert.alert('Error', 'No se pudo generar o compartir la imagen.');
-        } finally {
-            setPendingShareMode(null);
-            setSharingInProgress(false);
-        }
+        setSelectedHistorySession(tempSession);
+        setShareMainVisible(true);
     };
 
-    useEffect(() => {
-        if (pendingShareMode !== 'simple') return;
-        if (!selectedHistorySession) return;
+    const handleDeleteLastSessionSummary = () => {
+        if (!lastSessionSummary) return;
 
-        const timeout = setTimeout(() => {
-            shareSimpleCardImage();
-        }, 300);
+        Alert.alert(
+            'Borrar sesión',
+            '¿Quieres borrar esta última sesión?',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Borrar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            const data = await getMyRunSessions();
+                            const items = data.items ?? [];
 
-        return () => clearTimeout(timeout);
-    }, [pendingShareMode, selectedHistorySession]);
+                            if (items.length === 0) {
+                                Alert.alert('Aviso', 'No se encontró una sesión para borrar.');
+                                return;
+                            }
+
+                            const latestSession = items[0];
+
+                            await deleteRunSession(latestSession.id);
+
+                            setRunHistory((prev) =>
+                                prev.filter((item) => item.id !== latestSession.id)
+                            );
+
+                            setSummaryVisible(false);
+                            setLastSessionSummary(null);
+                        } catch (error) {
+                            console.error('Error borrando última sesión:', error);
+                            Alert.alert('Error', 'No se pudo borrar la sesión.');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const goPrevStickerStyle = () => {
+        setStickerStyleIndex((prev) => {
+            if (prev === 0) return 2;
+            return (prev - 1) as 0 | 1 | 2;
+        });
+    };
+
+    const goNextStickerStyle = () => {
+        setStickerStyleIndex((prev) => {
+            if (prev === 2) return 0;
+            return (prev + 1) as 0 | 1 | 2;
+        });
+    };
 
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
@@ -866,16 +1104,16 @@ export default function LiveRunScreen() {
                                             backgroundColor: 'rgba(10,10,10,0.96)',
                                             borderWidth: 1,
                                             borderColor: '#333333',
-                                            maxHeight: 240,
+                                            opacity: 0.92,
                                         }}
                                     >
                                         <Text
                                             style={{
-                                                color: COLORS.textLight,
+                                                color: COLORS.textMuted,
                                                 fontSize: 12,
                                                 fontWeight: '700',
-                                                marginBottom: 5,
-                                                marginLeft: 4,
+                                                marginBottom: 7,
+                                                marginLeft: 5,
                                             }}
                                         >
                                             Últimas corridas
@@ -908,7 +1146,7 @@ export default function LiveRunScreen() {
                                             </View>
                                         ) : (
                                             <View style={{ gap: 8 }}>
-                                                {runHistory.slice(0, 6).map((session) => (
+                                                {runHistory.slice(0, 5).map((session) => (
                                                     <Pressable
                                                         key={session.id}
                                                         onPress={() => openHistorySessionDetail(session)}
@@ -1145,27 +1383,75 @@ export default function LiveRunScreen() {
                             </>
                         )}
 
-                        <Pressable
-                            onPress={() => setSummaryVisible(false)}
-                            style={{
-                                marginTop: 16,
-                                backgroundColor: COLORS.primary,
-                                paddingVertical: 14,
-                                borderRadius: 16,
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                            }}
-                        >
-                            <Text
+                        <View style={{ marginTop: 16 }}>
+                            <View className="flex-row justify-between" style={{ gap: 10 }}>
+                                <Pressable
+                                    onPress={handleDeleteLastSessionSummary}
+                                    className="flex-1 items-center justify-center"
+                                    style={{
+                                        backgroundColor: '#1b1b1b',
+                                        borderWidth: 1,
+                                        borderColor: '#3a3a3a',
+                                        paddingVertical: 13,
+                                        borderRadius: 14,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color: '#FF6B6B',
+                                            fontSize: 13,
+                                            fontWeight: '700',
+                                        }}
+                                    >
+                                        Borrar sesión
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    onPress={handleShareLastSessionSummary}
+                                    className="flex-1 items-center justify-center"
+                                    style={{
+                                        backgroundColor: '#1b1b1b',
+                                        borderWidth: 1,
+                                        borderColor: '#3a3a3a',
+                                        paddingVertical: 13,
+                                        borderRadius: 14,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color: COLORS.textLight,
+                                            fontSize: 13,
+                                            fontWeight: '700',
+                                        }}
+                                    >
+                                        Compartir a redes
+                                    </Text>
+                                </Pressable>
+                            </View>
+
+                            <Pressable
+                                onPress={() => setSummaryVisible(false)}
                                 style={{
-                                    color: '#111111',
-                                    fontWeight: '700',
-                                    fontSize: 15,
+                                    marginTop: 12,
+                                    backgroundColor: COLORS.primary,
+                                    paddingVertical: 14,
+                                    borderRadius: 16,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
                                 }}
                             >
-                                Cerrar
-                            </Text>
-                        </Pressable>
+                                <Text
+                                    style={{
+                                        color: '#111111',
+                                        fontWeight: '700',
+                                        fontSize: 15,
+                                    }}
+                                >
+                                    Cerrar
+                                </Text>
+                            </Pressable>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -1360,12 +1646,11 @@ export default function LiveRunScreen() {
                     </View>
                 </View>
             </Modal>
-
             <Modal
-                visible={shareOptionsVisible}
+                visible={shareMainVisible}
                 transparent
                 animationType="fade"
-                onRequestClose={() => setShareOptionsVisible(false)}
+                onRequestClose={() => setShareMainVisible(false)}
             >
                 <View
                     style={{
@@ -1395,18 +1680,20 @@ export default function LiveRunScreen() {
                                     fontWeight: '700',
                                 }}
                             >
-                                Elegir formato
+                                Compartir sesión
                             </Text>
 
                             <Pressable
-                                onPress={() => setShareOptionsVisible(false)}
+                                onPress={() => setShareMainVisible(false)}
                                 style={{
-                                    width: 30,
-                                    height: 30,
-                                    borderRadius: 15,
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 16,
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     backgroundColor: '#1b1b1b',
+                                    borderWidth: 1,
+                                    borderColor: '#333333',
                                 }}
                             >
                                 <Ionicons name="close" size={18} color={COLORS.textLight} />
@@ -1414,7 +1701,7 @@ export default function LiveRunScreen() {
                         </View>
 
                         <Pressable
-                            onPress={() => handleSelectShareMode('simple')}
+                            onPress={handleOpenPhotoFormats}
                             style={{
                                 backgroundColor: '#161616',
                                 borderWidth: 1,
@@ -1425,15 +1712,15 @@ export default function LiveRunScreen() {
                             }}
                         >
                             <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
-                                Resumen simple
+                                Compartir foto
                             </Text>
                             <Text style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>
-                                Tiempo, distancia, ritmo, velocidad máxima y logo.
+                                Usa fondos fijos de la app con tus datos.
                             </Text>
                         </Pressable>
 
                         <Pressable
-                            onPress={() => handleSelectShareMode('map')}
+                            onPress={handlePickCamera}
                             style={{
                                 backgroundColor: '#161616',
                                 borderWidth: 1,
@@ -1444,15 +1731,15 @@ export default function LiveRunScreen() {
                             }}
                         >
                             <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
-                                Resumen + mapa
+                                Tomar foto
                             </Text>
                             <Text style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>
-                                Datos completos con mapa y ruta.
+                                Crea una imagen personalizada con stickers.
                             </Text>
                         </Pressable>
 
                         <Pressable
-                            onPress={() => handleSelectShareMode('route')}
+                            onPress={handlePickGallery}
                             style={{
                                 backgroundColor: '#161616',
                                 borderWidth: 1,
@@ -1462,12 +1749,358 @@ export default function LiveRunScreen() {
                             }}
                         >
                             <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
-                                Resumen + ruta
+                                Elegir de galería
                             </Text>
                             <Text style={{ color: '#9CA3AF', fontSize: 12, marginTop: 4 }}>
-                                Datos con dibujo de la ruta, sin mapa.
+                                Usa una imagen tuya y agrega datos de la sesión.
                             </Text>
                         </Pressable>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={sharePhotoModeVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setSharePhotoModeVisible(false)}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.72)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: 20,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 360,
+                            backgroundColor: '#0f0f0f',
+                            borderRadius: 24,
+                            borderWidth: 1,
+                            borderColor: COLORS.primary,
+                            padding: 18,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color: COLORS.textLight,
+                                fontSize: 18,
+                                fontWeight: '700',
+                                marginBottom: 16,
+                            }}
+                        >
+                            Elegir formato
+                        </Text>
+
+                        <Pressable
+                            onPress={() => handleSelectPhotoFormat('vertical')}
+                            style={{
+                                backgroundColor: '#161616',
+                                borderWidth: 1,
+                                borderColor: '#262626',
+                                borderRadius: 16,
+                                padding: 14,
+                                marginBottom: 10,
+                            }}
+                        >
+                            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
+                                Vertical
+                            </Text>
+                        </Pressable>
+
+                        <Pressable
+                            onPress={() => handleSelectPhotoFormat('horizontal')}
+                            style={{
+                                backgroundColor: '#161616',
+                                borderWidth: 1,
+                                borderColor: '#262626',
+                                borderRadius: 16,
+                                padding: 14,
+                            }}
+                        >
+                            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700' }}>
+                                Horizontal
+                            </Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={customComposerVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={handleRequestCloseComposer}
+            >
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                    <View
+                        style={{
+                            flex: 1,
+                            backgroundColor: 'rgba(0,0,0,0.82)',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            padding: 16,
+                        }}
+                    >
+                        <View
+                            style={{
+                                width: '100%',
+                                maxWidth: 380,
+                                backgroundColor: '#0f0f0f',
+                                borderRadius: 24,
+                                borderWidth: 1,
+                                borderColor: COLORS.primary,
+                                padding: 14,
+                            }}
+                        >
+                            <View className="flex-row items-center justify-between mb-3">
+                                <Text
+                                    style={{
+                                        color: COLORS.textMuted,
+                                        fontSize: 15,
+                                        fontWeight: '700',
+                                        marginLeft: 5,
+                                    }}
+                                >
+                                    Editor imagen personalizada
+                                </Text>
+
+                                <Pressable
+                                    onPress={handleRequestCloseComposer}
+                                    style={{
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: 16,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: '#1b1b1b',
+                                        borderWidth: 1,
+                                        borderColor: '#333333',
+                                    }}
+                                >
+                                    <Ionicons name="close" size={18} color={COLORS.textLight} />
+                                </Pressable>
+                            </View>
+
+                            {customPhotoUri && selectedHistorySession && (
+                                <View style={{ alignItems: 'center' }}>
+                                    <SharePhotoComposer
+                                        photoUri={customPhotoUri}
+                                        durationText={formatDuration(selectedHistorySession.durationSeconds)}
+                                        distanceText={formatDistance(selectedHistorySession.distanceMeters)}
+                                        paceText={
+                                            selectedHistorySession.avgPaceSecPerKm != null
+                                                ? formatPace(
+                                                    selectedHistorySession.distanceMeters,
+                                                    selectedHistorySession.durationSeconds
+                                                )
+                                                : '--'
+                                        }
+                                        maxSpeedText={
+                                            selectedHistorySession.maxSpeedMps != null
+                                                ? formatSpeed(selectedHistorySession.maxSpeedMps)
+                                                : '--'
+                                        }
+                                        showSessionSticker={showSessionSticker}
+                                        stickerTransform={stickerTransform}
+                                        stickerStyleIndex={stickerStyleIndex}
+                                        onStickerTransformChange={setStickerTransform}
+                                        mode="preview"
+                                    />
+                                </View>
+                            )}
+
+                            <View
+                                className="flex-row items-center justify-between"
+                                style={{ marginTop: 12, gap: 10 }}
+                            >
+                                <Pressable
+                                    onPress={() => {
+                                        if (showSessionSticker) {
+                                            setShowSessionSticker(false);
+                                        } else {
+                                            setStickerTransform(centeredSticker);
+                                            stickerTransformRef.current = centeredSticker;
+                                            setShowSessionSticker(true);
+                                        }
+                                    }}
+                                    style={{
+                                        backgroundColor: '#1a1a1a',
+                                        borderWidth: 1,
+                                        borderColor: '#333',
+                                        borderRadius: 12,
+                                        paddingVertical: 10,
+                                        paddingHorizontal: 14,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        minWidth: 105,
+                                    }}
+                                >
+                                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>
+                                        {showSessionSticker ? 'Sticker ON' : 'Sticker OFF'}
+                                    </Text>
+                                </Pressable>
+
+                                <View
+                                    style={{
+                                        flex: 1,
+                                        backgroundColor: '#121212',
+                                        borderWidth: 1,
+                                        borderColor: '#2a2a2a',
+                                        borderRadius: 12,
+                                        paddingVertical: 8,
+                                        paddingHorizontal: 10,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                    }}
+                                >
+                                    <Pressable
+                                        onPress={goPrevStickerStyle}
+                                        style={{
+                                            width: 32,
+                                            height: 32,
+                                            borderRadius: 16,
+                                            backgroundColor: '#222',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <Ionicons name="chevron-back" size={18} color="#fff" />
+                                    </Pressable>
+
+                                    <Text
+                                        style={{
+                                            color: '#BDBDBD',
+                                            fontSize: 12,
+                                            fontWeight: '600',
+                                        }}
+                                    >
+                                        Sticker {stickerStyleIndex + 1}
+                                    </Text>
+
+                                    <Pressable
+                                        onPress={goNextStickerStyle}
+                                        style={{
+                                            width: 32,
+                                            height: 32,
+                                            borderRadius: 16,
+                                            backgroundColor: '#222',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <Ionicons name="chevron-forward" size={18} color="#fff" />
+                                    </Pressable>
+                                </View>
+                            </View>
+
+                            <Pressable
+                                onPress={shareCustomPhotoComposition}
+                                style={{
+                                    marginTop: 12,
+                                    backgroundColor: COLORS.primary,
+                                    paddingVertical: 15,
+                                    borderRadius: 16,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text style={{ color: '#111', fontWeight: '800', fontSize: 15 }}>
+                                    Compartir imagen
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </GestureHandlerRootView>
+            </Modal>
+
+            <Modal
+                visible={confirmCloseComposerVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={handleContinueEditingComposer}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: 24,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 330,
+                            backgroundColor: '#101010',
+                            borderRadius: 22,
+                            borderWidth: 1,
+                            borderColor: COLORS.primary,
+                            padding: 18,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color: '#fff',
+                                fontSize: 17,
+                                fontWeight: '700',
+                                marginBottom: 10,
+                            }}
+                        >
+                            ¿Quieres salir?
+                        </Text>
+
+                        <Text
+                            style={{
+                                color: '#BDBDBD',
+                                fontSize: 13,
+                                lineHeight: 20,
+                                marginBottom: 16,
+                            }}
+                        >
+                            Si sales ahora, perderás la foto y los cambios de esta imagen personalizada.
+                        </Text>
+
+                        <View className="flex-row" style={{ gap: 10 }}>
+                            <Pressable
+                                onPress={handleContinueEditingComposer}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: '#1b1b1b',
+                                    borderWidth: 1,
+                                    borderColor: '#333',
+                                    paddingVertical: 13,
+                                    borderRadius: 14,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text style={{ color: '#fff', fontWeight: '700' }}>
+                                    Seguir editando
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                onPress={handleDiscardComposer}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: '#2a1212',
+                                    borderWidth: 1,
+                                    borderColor: '#7f1d1d',
+                                    paddingVertical: 13,
+                                    borderRadius: 14,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text style={{ color: '#FFB4B4', fontWeight: '700' }}>
+                                    Salir
+                                </Text>
+                            </Pressable>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -1475,21 +2108,81 @@ export default function LiveRunScreen() {
                 pointerEvents="none"
                 style={{
                     position: 'absolute',
-                    top: -3000,
-                    left: -3000,
+                    top: -4000,
+                    left: -4000,
                     opacity: 1,
                 }}
             >
                 {selectedHistorySession && (
+                    <>
+                        <ViewShot
+                            ref={verticalShareRef}
+                            options={{ format: 'png', quality: 1, result: 'tmpfile' }}
+                        >
+                            <ShareCardVertical
+                                durationText={formatDuration(selectedHistorySession.durationSeconds)}
+                                distanceText={formatDistance(selectedHistorySession.distanceMeters)}
+                                paceText={
+                                    selectedHistorySession.avgPaceSecPerKm != null
+                                        ? formatPace(
+                                            selectedHistorySession.distanceMeters,
+                                            selectedHistorySession.durationSeconds
+                                        )
+                                        : '--'
+                                }
+                                maxSpeedText={
+                                    selectedHistorySession.maxSpeedMps != null
+                                        ? formatSpeed(selectedHistorySession.maxSpeedMps)
+                                        : '--'
+                                }
+                            />
+                        </ViewShot>
+
+                        <ViewShot
+                            ref={horizontalShareRef}
+                            options={{ format: 'png', quality: 1, result: 'tmpfile' }}
+                        >
+                            <ShareCardHorizontal
+                                durationText={formatDuration(selectedHistorySession.durationSeconds)}
+                                distanceText={formatDistance(selectedHistorySession.distanceMeters)}
+                                paceText={
+                                    selectedHistorySession.avgPaceSecPerKm != null
+                                        ? formatPace(
+                                            selectedHistorySession.distanceMeters,
+                                            selectedHistorySession.durationSeconds
+                                        )
+                                        : '--'
+                                }
+                                maxSpeedText={
+                                    selectedHistorySession.maxSpeedMps != null
+                                        ? formatSpeed(selectedHistorySession.maxSpeedMps)
+                                        : '--'
+                                }
+                            />
+                        </ViewShot>
+                    </>
+                )}
+            </View>
+            <View
+                pointerEvents="none"
+                style={{
+                    position: 'absolute',
+                    top: -5000,
+                    left: -5000,
+                    opacity: 1,
+                }}
+            >
+                {customPhotoUri && selectedHistorySession && (
                     <ViewShot
-                        ref={simpleShareCardRef}
+                        ref={photoComposerRef}
                         options={{
                             format: 'png',
                             quality: 1,
                             result: 'tmpfile',
                         }}
                     >
-                        <ShareCardSimple
+                        <SharePhotoComposer
+                            photoUri={customPhotoUri}
                             durationText={formatDuration(selectedHistorySession.durationSeconds)}
                             distanceText={formatDistance(selectedHistorySession.distanceMeters)}
                             paceText={
@@ -1505,6 +2198,15 @@ export default function LiveRunScreen() {
                                     ? formatSpeed(selectedHistorySession.maxSpeedMps)
                                     : '--'
                             }
+                            showSessionSticker={showSessionSticker}
+                            stickerTransform={{
+                                x: stickerTransform.x * (1080 / PREVIEW_WIDTH),
+                                y: stickerTransform.y * (1920 / PREVIEW_HEIGHT),
+                                scale: stickerTransform.scale,
+                                rotation: stickerTransform.rotation,
+                            }}
+                            stickerStyleIndex={stickerStyleIndex}
+                            mode="export"
                         />
                     </ViewShot>
                 )}

@@ -1,6 +1,7 @@
 import '../global.css';
 import { Stack } from 'expo-router';
 import { View, Text, ActivityIndicator } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'expo-dev-client';
 
 // 👇 IMPORTAMOS AuthProvider *y* useAuth
@@ -23,8 +24,10 @@ function RootNavigator() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <RootNavigator />
-    </AuthProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }

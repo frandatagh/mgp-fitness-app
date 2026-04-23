@@ -32,6 +32,8 @@ import ShareCardVertical from '../components/share/ShareCardVertical';
 import ShareCardHorizontal from '../components/share/ShareCardHorizontal';
 import SharePhotoComposer from '../components/share/SharePhotoComposer';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { FontAwesome6 } from '@expo/vector-icons';
+import { getWalkingRoute } from '../lib/routing';
 
 type RunPoint = {
     latitude: number;
@@ -91,36 +93,52 @@ function formatPace(distanceMeters: number, elapsedSeconds: number) {
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} /km`;
 }
 
-function shouldAcceptPoint(lastPoint: RunPoint | null, nextPoint: RunPoint) {
+function shouldAcceptPoint(
+    lastPoint: RunPoint | null,
+    nextPoint: RunPoint,
+    isRunning: boolean
+) {
     const accuracy = nextPoint.accuracy ?? 999;
 
-    // 1) descartamos puntos con mala precisión
-    if (accuracy > 20) {
-        return { accept: false, distance: 0 };
+    // 1) precisión mínima aceptable
+    if (accuracy > 18) {
+        return { accept: false, distance: 0, reason: 'bad_accuracy' };
     }
 
     if (!lastPoint) {
-        return { accept: true, distance: 0 };
+        return { accept: true, distance: 0, reason: 'first_point' };
     }
 
     const distance = haversineDistanceMeters(lastPoint, nextPoint);
     const timeDiffMs = Math.max(nextPoint.timestamp - lastPoint.timestamp, 1);
     const timeDiffSec = timeDiffMs / 1000;
 
-    // 2) descartamos micro saltos muy chicos (ruido)
-    if (distance < 4) {
-        return { accept: false, distance: 0 };
+    // 2) ruido mínimo
+    if (distance < 3) {
+        return { accept: false, distance: 0, reason: 'tiny_noise' };
     }
 
-    // 3) descartamos saltos imposibles para caminata/carrera
     const impliedSpeedMps = distance / timeDiffSec;
+    const gpsSpeedMps = nextPoint.speed ?? null;
 
-    // ~28.8 km/h, muy alto para este contexto
-    if (impliedSpeedMps > 8) {
-        return { accept: false, distance: 0 };
+    // 3) límites más realistas para running
+    // 6.5 m/s ≈ 23.4 km/h, ya es altísimo para una sesión normal
+    if (impliedSpeedMps > 6.5) {
+        return { accept: false, distance: 0, reason: 'impossible_speed' };
     }
 
-    return { accept: true, distance };
+    if (gpsSpeedMps != null && gpsSpeedMps > 6.5) {
+        return { accept: false, distance: 0, reason: 'gps_speed_spike' };
+    }
+
+    // 4) si está pausado, ser todavía más estricto
+    if (!isRunning) {
+        if (distance > 8) {
+            return { accept: false, distance: 0, reason: 'paused_jump' };
+        }
+    }
+
+    return { accept: true, distance, reason: 'accepted' };
 }
 
 function buildPathGeoJson(points: {
@@ -360,7 +378,96 @@ export default function LiveRunScreen() {
 
     const [sharingInProgress, setSharingInProgress] = useState(false);
 
+    const [isSelectingFinishPoint, setIsSelectingFinishPoint] = useState(false);
 
+    const [pendingFinishPoint, setPendingFinishPoint] = useState<{
+        latitude: number;
+        longitude: number;
+    } | null>(null);
+
+    const [showPendingFinishCard, setShowPendingFinishCard] = useState(false);
+
+    const [finishPoint, setFinishPoint] = useState<{
+        latitude: number;
+        longitude: number;
+    } | null>(null);
+
+    const [confirmClearFinishVisible, setConfirmClearFinishVisible] = useState(false);
+
+    const mapRef = useRef<any>(null);
+
+    const activeFinishPoint = pendingFinishPoint ?? finishPoint;
+
+    const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
+    const [plannedRouteGeometry, setPlannedRouteGeometry] = useState<any | null>(null);
+    const [plannedRouteDistanceMeters, setPlannedRouteDistanceMeters] = useState<number | null>(null);
+    const [plannedRouteDurationSeconds, setPlannedRouteDurationSeconds] = useState<number | null>(null);
+
+    const [remainingRouteDistanceMeters, setRemainingRouteDistanceMeters] = useState<number | null>(null);
+    const [remainingRouteDurationSeconds, setRemainingRouteDurationSeconds] = useState<number | null>(null);
+
+    const [arrivalModalVisible, setArrivalModalVisible] = useState(false);
+
+    const lastRouteRefreshAtRef = useRef<number>(0);
+    const lastRouteRefreshPositionRef = useRef<{ latitude: number; longitude: number } | null>(null);
+    const arrivalHandledRef = useRef(false);
+
+    const [routeGeometry, setRouteGeometry] = useState<any>(null);
+
+    const getDistanceKm = (from: any, to: any) => {
+        if (!from || !to) return null;
+
+        const R = 6371; // km
+        const dLat = ((to.latitude - from.latitude) * Math.PI) / 180;
+        const dLon = ((to.longitude - from.longitude) * Math.PI) / 180;
+
+        const lat1 = (from.latitude * Math.PI) / 180;
+        const lat2 = (to.latitude * Math.PI) / 180;
+
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2) *
+            Math.cos(lat1) *
+            Math.cos(lat2);
+
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return R * c;
+    };
+
+    const fetchRoute = async (
+        from: { latitude: number; longitude: number },
+        to: { latitude: number; longitude: number }
+    ) => {
+        try {
+            const data = await getWalkingRoute(
+                { lat: from.latitude, lng: from.longitude },
+                { lat: to.latitude, lng: to.longitude }
+            );
+
+            setPlannedRouteGeometry(data.geometry);
+            setPlannedRouteDistanceMeters(data.distance ?? null);
+            setPlannedRouteDurationSeconds(data.duration ?? null);
+
+            setRemainingRouteDistanceMeters(data.distance ?? null);
+            setRemainingRouteDurationSeconds(data.duration ?? null);
+
+            lastRouteRefreshAtRef.current = Date.now();
+            lastRouteRefreshPositionRef.current = {
+                latitude: from.latitude,
+                longitude: from.longitude,
+            };
+        } catch (error) {
+            console.error('Error obteniendo ruta ORS:', error);
+            setPlannedRouteGeometry(null);
+            setPlannedRouteDistanceMeters(null);
+            setPlannedRouteDurationSeconds(null);
+            setRemainingRouteDistanceMeters(null);
+            setRemainingRouteDurationSeconds(null);
+        }
+    };
 
     useEffect(() => {
         const loadProfileImage = async () => {
@@ -442,6 +549,8 @@ export default function LiveRunScreen() {
         });
     };
 
+
+
     const startTimer = () => {
         if (timerRef.current) return;
 
@@ -492,13 +601,19 @@ export default function LiveRunScreen() {
                     };
 
                     setCurrentPosition(nextPoint);
-                    setCurrentSpeedMps(loc.coords.speed ?? null);
-                    const speed = loc.coords.speed ?? 0;
+                    const safeSpeed =
+                        loc.coords.speed != null && loc.coords.speed >= 0 && loc.coords.speed <= 6.5
+                            ? loc.coords.speed
+                            : null;
+
+                    setCurrentSpeedMps(safeSpeed);
+
+                    const speed = safeSpeed ?? 0;
                     setMaxSpeedMps((prev) => (speed > prev ? speed : prev));
 
                     setRoutePoints((prev) => {
                         const last = prev.length > 0 ? prev[prev.length - 1] : null;
-                        const decision = shouldAcceptPoint(last, nextPoint);
+                        const decision = shouldAcceptPoint(last, nextPoint, isRunning && !isPaused);
 
                         if (!decision.accept) {
                             return prev;
@@ -537,6 +652,8 @@ export default function LiveRunScreen() {
         watchRef.current = null;
         setIsRunning(false);
         setIsPaused(false);
+
+        clearFinishGoalState();
 
         const endedAtMs = Date.now();
 
@@ -585,6 +702,8 @@ export default function LiveRunScreen() {
         setStartedAtMs(null);
         setMaxSpeedMps(0);
 
+        clearFinishGoalState();
+
         if (currentPosition) {
             setRoutePoints([currentPosition]);
         } else {
@@ -592,7 +711,7 @@ export default function LiveRunScreen() {
         }
     };
 
-    const shouldFollowUser = true;
+    const shouldFollowUser = isRunning;
 
     const toggleHistory = async () => {
         if (historyVisible) {
@@ -621,6 +740,186 @@ export default function LiveRunScreen() {
     const closeHistorySessionDetail = () => {
         setHistoryDetailVisible(false);
         setSelectedHistorySession(null);
+    };
+
+    const handleToggleFinishSelection = () => {
+        const next = !isSelectingFinishPoint;
+
+        setIsSelectingFinishPoint(next);
+
+        if (!next) {
+            setPendingFinishPoint(null);
+            setShowPendingFinishCard(false);
+            setPlannedRouteGeometry(null);
+            setPlannedRouteDistanceMeters(null);
+            setPlannedRouteDurationSeconds(null);
+            setRemainingRouteDistanceMeters(null);
+            setRemainingRouteDurationSeconds(null);
+        }
+    };
+
+    const handleMapPressForFinishPoint = (point: {
+        latitude: number;
+        longitude: number;
+    }) => {
+        if (!isSelectingFinishPoint) return;
+        if (finishPoint) return;
+
+        setPendingFinishPoint(point);
+        setShowPendingFinishCard(false);
+
+        if (currentPosition) {
+            fetchRoute(currentPosition, point);
+
+            setTimeout(() => {
+                fitMapToRoute(currentPosition, point);
+            }, 150);
+        }
+
+        setTimeout(() => {
+            setShowPendingFinishCard(true);
+        }, 2000);
+    };
+
+    const handleConfirmFinishPoint = () => {
+        if (!pendingFinishPoint || !currentPosition) return;
+
+        const confirmedPoint = pendingFinishPoint;
+
+        setFinishPoint(confirmedPoint);
+        setPendingFinishPoint(null);
+        setShowPendingFinishCard(false);
+        setIsSelectingFinishPoint(false);
+        arrivalHandledRef.current = false;
+
+        fetchRoute(currentPosition, confirmedPoint);
+
+        setTimeout(() => {
+            fitMapToRoute(currentPosition, confirmedPoint);
+        }, 150);
+    };
+
+    const handleCancelPendingFinishPoint = () => {
+        setPendingFinishPoint(null);
+        setShowPendingFinishCard(false);
+        setPlannedRouteGeometry(null);
+        setPlannedRouteDistanceMeters(null);
+        setPlannedRouteDurationSeconds(null);
+        setRemainingRouteDistanceMeters(null);
+        setRemainingRouteDurationSeconds(null);
+
+        setTimeout(() => {
+            setRecenterTick((prev) => prev + 1);
+        }, 100);
+    };
+
+    const handleRequestClearFinishPoint = () => {
+        setConfirmClearFinishVisible(true);
+    };
+
+    const handleCloseClearFinishConfirm = () => {
+        setConfirmClearFinishVisible(false);
+    };
+
+    const handleConfirmClearFinishPoint = () => {
+        setFinishPoint(null);
+        setPendingFinishPoint(null);
+        setShowPendingFinishCard(false);
+        setIsSelectingFinishPoint(false);
+        setConfirmClearFinishVisible(false);
+        setPlannedRouteGeometry(null);
+        setPlannedRouteDistanceMeters(null);
+        setPlannedRouteDurationSeconds(null);
+        setRemainingRouteDistanceMeters(null);
+        setRemainingRouteDurationSeconds(null);
+        arrivalHandledRef.current = false;
+
+        setTimeout(() => {
+            setRecenterTick((prev) => prev + 1);
+        }, 100);
+    };
+
+    const clearFinishGoalState = () => {
+        setFinishPoint(null);
+        setPendingFinishPoint(null);
+        setShowPendingFinishCard(false);
+        setIsSelectingFinishPoint(false);
+        setConfirmClearFinishVisible(false);
+        setPlannedRouteGeometry(null);
+        setPlannedRouteDistanceMeters(null);
+        setPlannedRouteDurationSeconds(null);
+        setRemainingRouteDistanceMeters(null);
+        setRemainingRouteDurationSeconds(null);
+        setArrivalModalVisible(false);
+        arrivalHandledRef.current = false;
+    };
+
+    useEffect(() => {
+        if (!isRunning) return;
+        if (!currentPosition) return;
+        if (!finishPoint) return;
+        if (arrivalModalVisible) return;
+
+        const now = Date.now();
+        const lastAt = lastRouteRefreshAtRef.current;
+        const lastPos = lastRouteRefreshPositionRef.current;
+
+        const movedEnough =
+            lastPos
+                ? haversineDistanceMeters(
+                    {
+                        latitude: lastPos.latitude,
+                        longitude: lastPos.longitude,
+                        timestamp: 0,
+                    },
+                    {
+                        latitude: currentPosition.latitude,
+                        longitude: currentPosition.longitude,
+                        timestamp: 0,
+                    }
+                ) >= 35
+                : true;
+
+        const waitedEnough = now - lastAt >= 20000;
+
+        if (movedEnough || waitedEnough) {
+            fetchRoute(currentPosition, finishPoint);
+        }
+    }, [currentPosition, finishPoint, isRunning, arrivalModalVisible]);
+
+    useEffect(() => {
+        if (!isRunning) return;
+        if (!finishPoint) return;
+        if (arrivalHandledRef.current) return;
+        if (remainingRouteDistanceMeters == null) return;
+
+        if (remainingRouteDistanceMeters <= 25) {
+            arrivalHandledRef.current = true;
+            setArrivalModalVisible(true);
+        }
+    }, [remainingRouteDistanceMeters, finishPoint, isRunning]);
+
+    const clearArrivalGoal = () => {
+        setFinishPoint(null);
+        setPendingFinishPoint(null);
+        setShowPendingFinishCard(false);
+        setIsSelectingFinishPoint(false);
+        setPlannedRouteGeometry(null);
+        setPlannedRouteDistanceMeters(null);
+        setPlannedRouteDurationSeconds(null);
+        setRemainingRouteDistanceMeters(null);
+        setRemainingRouteDurationSeconds(null);
+    };
+
+    const handleArrivalContinue = () => {
+        setArrivalModalVisible(false);
+        clearArrivalGoal();
+    };
+
+    const handleArrivalFinishSession = async () => {
+        setArrivalModalVisible(false);
+        clearArrivalGoal();
+        await finish();
     };
 
 
@@ -920,6 +1219,25 @@ export default function LiveRunScreen() {
         });
     };
 
+    const fitMapToRoute = (
+        from: { latitude: number; longitude: number },
+        to: { latitude: number; longitude: number }
+    ) => {
+        if (!mapRef.current) return;
+
+        const north = Math.max(from.latitude, to.latitude);
+        const south = Math.min(from.latitude, to.latitude);
+        const east = Math.max(from.longitude, to.longitude);
+        const west = Math.min(from.longitude, to.longitude);
+
+        mapRef.current.fitBounds(
+            [east, north],
+            [west, south],
+            80,
+            800
+        );
+    };
+
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
             <View
@@ -973,9 +1291,82 @@ export default function LiveRunScreen() {
                                 zoomLevel={mapZoomLevel}
                                 profileImageUrl={profileImageUrl}
                                 recenterTick={recenterTick}
+                                onMapPress={handleMapPressForFinishPoint}
+                                pendingFinishPoint={pendingFinishPoint}
+                                finishPoint={finishPoint}
+                                showFinishRoute={!!finishPoint}
+                                plannedRouteGeometry={plannedRouteGeometry}
+                                ref={mapRef}
                             />
                             <Pressable
-                                onPress={() => setRecenterTick((prev) => prev + 1)}
+                                onPress={() => {
+                                    if (finishPoint) {
+                                        handleRequestClearFinishPoint();
+                                        return;
+                                    }
+
+                                    handleToggleFinishSelection();
+                                }}
+                                style={{
+                                    position: 'absolute',
+                                    right: 14,
+                                    bottom: 68,
+                                    width: 46,
+                                    height: 46,
+                                    borderRadius: 23,
+                                    backgroundColor:
+                                        isSelectingFinishPoint || finishPoint
+                                            ? COLORS.primary
+                                            : 'rgba(17,17,17,0.94)',
+                                    borderWidth: 1,
+                                    borderColor: COLORS.primary,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 15,
+                                }}
+                            >
+                                <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                                    <FontAwesome6
+                                        name="flag-checkered"
+                                        size={18}
+                                        color={isSelectingFinishPoint || finishPoint ? '#111111' : COLORS.textLight}
+                                    />
+
+                                    {finishPoint && (
+                                        <View
+                                            style={{
+                                                position: 'absolute',
+                                                top: -6,
+                                                right: -8,
+                                                width: 16,
+                                                height: 16,
+                                                borderRadius: 8,
+                                                backgroundColor: '#111111',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                borderWidth: 1,
+                                                borderColor: COLORS.primary,
+                                            }}
+                                        >
+                                            <Ionicons name="close" size={10} color={COLORS.primary} />
+                                        </View>
+                                    )}
+                                </View>
+                            </Pressable>
+
+                            <Pressable
+                                onPress={() => {
+                                    if (!currentPosition) return;
+
+                                    if (mapRef.current?.recenterOnUser) {
+                                        mapRef.current.recenterOnUser(
+                                            [currentPosition.longitude, currentPosition.latitude],
+                                            isRunning ? mapZoomLevel : 15
+                                        );
+                                    } else {
+                                        setRecenterTick((prev) => prev + 1);
+                                    }
+                                }}
                                 style={{
                                     position: 'absolute',
                                     right: 14,
@@ -1014,6 +1405,7 @@ export default function LiveRunScreen() {
                                         >
                                             {isRunning ? 'Sesión libre (en vivo)' : 'Sesión libre'}
                                         </Text>
+
 
                                         <Pressable
                                             onPress={toggleHistory}
@@ -1095,6 +1487,58 @@ export default function LiveRunScreen() {
                                         </View>
                                     </View>
                                 </View>
+
+
+
+                                {pendingFinishPoint && showPendingFinishCard && (
+                                    <View
+                                        style={{
+                                            position: 'absolute',
+                                            top: 110,
+                                            alignSelf: 'center',
+                                            backgroundColor: 'rgba(17,17,17,0.96)',
+                                            borderWidth: 1,
+                                            borderColor: COLORS.primary,
+                                            borderRadius: 16,
+                                            padding: 12,
+                                            zIndex: 25,
+                                            minWidth: 220,
+                                        }}
+                                    >
+                                        <View className="items-center justify-between" style={{ marginBottom: 10 }}>
+                                            <Text
+                                                style={{
+                                                    color: COLORS.textLight,
+                                                    fontSize: 13,
+                                                    fontWeight: '700',
+                                                }}
+                                            >
+                                                ¿Confirmar punto de llegada?
+                                            </Text>
+                                        </View>
+
+                                        <Pressable
+                                            onPress={handleConfirmFinishPoint}
+                                            style={{
+                                                backgroundColor: COLORS.primary,
+                                                paddingVertical: 10,
+                                                borderRadius: 12,
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    color: '#111111',
+                                                    fontSize: 13,
+                                                    fontWeight: '800',
+                                                }}
+                                            >
+                                                Seleccionar
+                                            </Text>
+                                        </Pressable>
+                                    </View>
+                                )}
 
                                 {/* Historial desplegable */}
                                 {historyVisible && (
@@ -1221,7 +1665,42 @@ export default function LiveRunScreen() {
                             </View>
                         </View>
                     )}
+                    {(isSelectingFinishPoint || activeFinishPoint) && (
+                        <View
+                            style={{
+                                position: 'absolute',
+                                left: 70,
+                                right: 70,
+                                bottom: 16,
+                                alignSelf: 'center',
+                                backgroundColor: 'rgba(17,17,17,0.94)',
+                                borderWidth: 1,
+                                borderColor: COLORS.primary,
+                                paddingHorizontal: 14,
+                                paddingVertical: 10,
+                                borderRadius: 14,
+                                zIndex: 21,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: COLORS.textLight,
+                                    fontSize: 12,
+                                    fontWeight: '700',
+                                    textAlign: 'center',
+                                }}
+                            >
+                                {remainingRouteDistanceMeters != null
+                                    ? `Distancia restante: ${formatDistance(remainingRouteDistanceMeters)}`
+                                    : activeFinishPoint && currentPosition
+                                        ? `Distancia de llegada: ${getDistanceKm(currentPosition, activeFinishPoint)?.toFixed(2)} km`
+                                        : 'Selecciona un punto de llegada'}
+                            </Text>
+                        </View>
+                    )}
                 </View>
+
+
 
                 <View className="flex-row justify-between mt-2 mb-2">
                     <Pressable
@@ -2098,6 +2577,182 @@ export default function LiveRunScreen() {
                             >
                                 <Text style={{ color: '#FFB4B4', fontWeight: '700' }}>
                                     Salir
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                visible={confirmClearFinishVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={handleCloseClearFinishConfirm}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: 24,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 330,
+                            backgroundColor: '#101010',
+                            borderRadius: 22,
+                            borderWidth: 1,
+                            borderColor: COLORS.primary,
+                            padding: 18,
+                        }}
+                    >
+                        <View className="flex-row items-center justify-between" style={{ marginBottom: 10 }}>
+                            <Text
+                                style={{
+                                    color: '#fff',
+                                    fontSize: 17,
+                                    fontWeight: '700',
+                                    flex: 1,
+                                }}
+                            >
+                                ¿Quieres cancelar punto de llegada?
+                            </Text>
+
+                            <Pressable
+                                onPress={handleCloseClearFinishConfirm}
+                                style={{
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: 12,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: '#1f1f1f',
+                                }}
+                            >
+                                <Ionicons name="close" size={14} color={COLORS.textLight} />
+                            </Pressable>
+                        </View>
+
+                        <Pressable
+                            onPress={handleConfirmClearFinishPoint}
+                            style={{
+                                backgroundColor: COLORS.primary,
+                                paddingVertical: 12,
+                                borderRadius: 14,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginTop: 6,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: '#111111',
+                                    fontWeight: '800',
+                                    fontSize: 14,
+                                }}
+                            >
+                                Cancelar
+                            </Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal
+                visible={arrivalModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={handleArrivalContinue}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.65)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: 24,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 340,
+                            backgroundColor: '#101010',
+                            borderRadius: 22,
+                            borderWidth: 1,
+                            borderColor: COLORS.primary,
+                            padding: 18,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color: '#fff',
+                                fontSize: 20,
+                                fontWeight: '800',
+                                textAlign: 'center',
+                                marginBottom: 8,
+                            }}
+                        >
+                            ¡Has llegado con éxito!
+                        </Text>
+
+                        <Text
+                            style={{
+                                color: '#BDBDBD',
+                                fontSize: 13,
+                                textAlign: 'center',
+                                marginBottom: 16,
+                                lineHeight: 20,
+                            }}
+                        >
+                            Has alcanzado el punto de llegada seleccionado.
+                        </Text>
+
+                        <View className="flex-row" style={{ gap: 10 }}>
+                            <Pressable
+                                onPress={handleArrivalFinishSession}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: COLORS.primary,
+                                    paddingVertical: 13,
+                                    borderRadius: 14,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: '#111111',
+                                        fontWeight: '800',
+                                        fontSize: 13,
+                                    }}
+                                >
+                                    Terminar sesión
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                onPress={handleArrivalContinue}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: '#1b1b1b',
+                                    borderWidth: 1,
+                                    borderColor: '#333',
+                                    paddingVertical: 13,
+                                    borderRadius: 14,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: '#fff',
+                                        fontWeight: '700',
+                                        fontSize: 13,
+                                    }}
+                                >
+                                    Continuar
                                 </Text>
                             </Pressable>
                         </View>

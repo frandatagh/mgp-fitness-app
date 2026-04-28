@@ -194,9 +194,11 @@ export default function LoginScreen() {
                                     placeholder="Ingrese su contraseña"
                                     placeholderTextColor="#7BCED1"
                                     secureTextEntry
-                                    className="flex-1 text-sm"
+                                    className="flex-1 text-md"
                                     style={{
                                         borderWidth: 0,
+                                        color: '#222222',
+                                        borderStyle: 'solid',
                                     }}
                                 />
                             )}
@@ -262,7 +264,7 @@ export default function LoginScreen() {
             </View>
 
             {/* FOOTER ENLACES */}
-            <View className="pb-1 pt-2">
+            <View className="pb-12 pt-2">
                 <View className="flex-row justify-center flex-wrap">
                     <Pressable onPress={() => router.push('/support')} className="mx-2 my-1">
                         <Text

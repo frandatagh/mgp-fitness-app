@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["location"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -42,10 +45,14 @@
       ],
       "expo-secure-store",
       [
-       "expo-location",
-       {
-         "locationWhenInUsePermission": "Permitir que MGP Rutina Fitness use tu ubicación mientras entrenas."
-       }
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permitir que MGP Rutina Fitness use tu ubicación mientras entrenas.",
+          "locationAlwaysAndWhenInUsePermission": "Permitir que MGP Rutina Fitness use tu ubicación incluso en segundo plano mientras entrenas.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true
+        }
       ],
       "@maplibre/maplibre-react-native"
     ],

@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'expo-dev-client';
+import '../lib/backgroundLocationTask';
 
 // 👇 IMPORTAMOS AuthProvider *y* useAuth
 import { AuthProvider, useAuth } from '../context/AuthContext';

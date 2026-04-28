@@ -7,9 +7,10 @@ import {
     Text,
     View,
     Modal,
+    BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import * as Location from 'expo-location';
 import { COLORS } from '../constants/colors';
 import LiveRunMap from '../components/LiveRunMap';
@@ -34,6 +35,7 @@ import SharePhotoComposer from '../components/share/SharePhotoComposer';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { getWalkingRoute } from '../lib/routing';
+import { LIVE_RUN_LOCATION_TASK } from '../lib/backgroundLocationTask';
 
 type RunPoint = {
     latitude: number;
@@ -177,7 +179,7 @@ function SummaryRoutePreview({
     return (
         <View
             style={{
-                height: 180,
+                height: 240,
                 borderRadius: 18,
                 overflow: 'hidden',
                 borderWidth: 1,
@@ -414,6 +416,9 @@ export default function LiveRunScreen() {
     const arrivalHandledRef = useRef(false);
 
     const [routeGeometry, setRouteGeometry] = useState<any>(null);
+    const [exitConfirmVisible, setExitConfirmVisible] = useState(false);
+    const pauseStartedAtRef = useRef<number | null>(null);
+    const totalPausedMsRef = useRef(0);
 
     const getDistanceKm = (from: any, to: any) => {
         if (!from || !to) return null;
@@ -468,6 +473,25 @@ export default function LiveRunScreen() {
             setRemainingRouteDurationSeconds(null);
         }
     };
+
+    useFocusEffect(
+        React.useCallback(() => {
+            const onBackPress = () => {
+                if (isRunning) {
+                    setExitConfirmVisible(true);
+                    return true; // bloquea navegación
+                }
+                return false;
+            };
+
+            const subscription = BackHandler.addEventListener(
+                'hardwareBackPress',
+                onBackPress
+            );
+
+            return () => subscription.remove();
+        }, [isRunning])
+    );
 
     useEffect(() => {
         const loadProfileImage = async () => {
@@ -551,11 +575,17 @@ export default function LiveRunScreen() {
 
 
 
-    const startTimer = () => {
+    const startTimer = (baseStartTime?: number) => {
+        if (!baseStartTime) return;
         if (timerRef.current) return;
 
         timerRef.current = setInterval(() => {
-            setElapsedSeconds((prev) => prev + 1);
+            const now = Date.now();
+            const seconds = Math.floor(
+                (now - baseStartTime - totalPausedMsRef.current) / 1000
+            );
+
+            setElapsedSeconds(seconds);
         }, 1000);
     };
 
@@ -566,12 +596,64 @@ export default function LiveRunScreen() {
         }
     };
 
+    const startBackgroundRunTracking = async () => {
+        const foreground = await Location.requestForegroundPermissionsAsync();
+
+        if (foreground.status !== 'granted') {
+            Alert.alert('Permiso requerido', 'Necesitamos acceso a tu ubicación.');
+            return;
+        }
+
+        const background = await Location.requestBackgroundPermissionsAsync();
+
+        if (background.status !== 'granted') {
+            Alert.alert(
+                'Permiso requerido',
+                'Para seguir registrando la sesión con el teléfono bloqueado, activa la ubicación en segundo plano.'
+            );
+            return;
+        }
+
+        const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(
+            LIVE_RUN_LOCATION_TASK
+        );
+
+        if (alreadyStarted) return;
+
+        await Location.startLocationUpdatesAsync(LIVE_RUN_LOCATION_TASK, {
+            accuracy: Location.Accuracy.BestForNavigation,
+            timeInterval: 3000,
+            distanceInterval: 5,
+            pausesUpdatesAutomatically: false,
+            foregroundService: {
+                notificationTitle: 'MGP Rutina Fitness',
+                notificationBody: 'Sesión de running en curso',
+                notificationColor: '#C6FF00',
+            },
+        });
+    };
+
+    const stopBackgroundRunTracking = async () => {
+        const alreadyStarted = await Location.hasStartedLocationUpdatesAsync(
+            LIVE_RUN_LOCATION_TASK
+        );
+
+        if (alreadyStarted) {
+            await Location.stopLocationUpdatesAsync(LIVE_RUN_LOCATION_TASK);
+        }
+    };
     const start = async () => {
         try {
+            await startBackgroundRunTracking();
+
+            const startTime = startedAtMs ?? Date.now();
+
             if (!startedAtMs) {
-                setStartedAtMs(Date.now());
+                setStartedAtMs(startTime);
             }
-            setMaxSpeedMps(0);
+            if (!startedAtMs) {
+                setMaxSpeedMps(0);
+            }
 
             setIsRunning(true);
             setIsPaused(false);
@@ -581,7 +663,7 @@ export default function LiveRunScreen() {
                 setRoutePoints([currentPosition]);
             }
 
-            startTimer();
+            startTimer(startTime);
 
             watchRef.current?.remove();
 
@@ -633,8 +715,17 @@ export default function LiveRunScreen() {
         }
     };
 
+    useEffect(() => {
+        if (!isRunning || isPaused || !startedAtMs) return;
+
+        const seconds = Math.floor((Date.now() - startedAtMs) / 1000);
+        setElapsedSeconds(seconds);
+    }, [isRunning, isPaused, startedAtMs]);
+
     const pause = () => {
         setIsPaused(true);
+        pauseStartedAtRef.current = Date.now();
+
         setMapZoomLevel(15);
         stopTimer();
         watchRef.current?.remove();
@@ -642,11 +733,18 @@ export default function LiveRunScreen() {
     };
 
     const resume = async () => {
+        if (pauseStartedAtRef.current) {
+            totalPausedMsRef.current += Date.now() - pauseStartedAtRef.current;
+            pauseStartedAtRef.current = null;
+        }
+
         setMapZoomLevel(16.5);
         await start();
     };
 
-    const finish = async () => {
+    const finish = async (options?: { showSummary?: boolean; goHome?: boolean }) => {
+        await stopBackgroundRunTracking();
+
         stopTimer();
         watchRef.current?.remove();
         watchRef.current = null;
@@ -657,15 +755,23 @@ export default function LiveRunScreen() {
 
         const endedAtMs = Date.now();
 
+        const pausedMs =
+            totalPausedMsRef.current +
+            (pauseStartedAtRef.current ? Date.now() - pauseStartedAtRef.current : 0);
+
+        const finalElapsedSeconds = startedAtMs
+            ? Math.floor((Date.now() - startedAtMs - pausedMs) / 1000)
+            : elapsedSeconds;
+
         const avgPaceSecPerKm =
-            distanceMeters > 0 ? elapsedSeconds / (distanceMeters / 1000) : null;
+            distanceMeters > 0 ? finalElapsedSeconds / (distanceMeters / 1000) : null;
 
         try {
             if (startedAtMs) {
                 await createRunSession({
                     startedAt: new Date(startedAtMs).toISOString(),
                     endedAt: new Date(endedAtMs).toISOString(),
-                    durationSeconds: elapsedSeconds,
+                    durationSeconds: finalElapsedSeconds,
                     distanceMeters,
                     avgPaceSecPerKm,
                     maxSpeedMps: maxSpeedMps || null,
@@ -677,17 +783,30 @@ export default function LiveRunScreen() {
         }
 
         setLastSessionSummary({
-            durationSeconds: elapsedSeconds,
+            durationSeconds: finalElapsedSeconds,
             distanceMeters,
             avgPaceSecPerKm,
             maxSpeedMps: maxSpeedMps || null,
             routePoints,
         });
 
-        setSummaryVisible(true);
+        if (options?.goHome) {
+            router.replace('/home');
+            return;
+        }
+
+        if (options?.showSummary !== false) {
+            setSummaryVisible(true);
+        }
+
+        pauseStartedAtRef.current = null;
+        totalPausedMsRef.current = 0;
+        setStartedAtMs(null);
     };
 
     const resetSession = () => {
+        stopBackgroundRunTracking();
+
         stopTimer();
         watchRef.current?.remove();
         watchRef.current = null;
@@ -1195,6 +1314,19 @@ export default function LiveRunScreen() {
 
                             setSummaryVisible(false);
                             setLastSessionSummary(null);
+
+                            setElapsedSeconds(0);
+                            setDistanceMeters(0);
+                            setCurrentSpeedMps(null);
+                            setRoutePoints(currentPosition ? [currentPosition] : []);
+                            setStartedAtMs(null);
+                            setMaxSpeedMps(0);
+                            setMapZoomLevel(15);
+
+                            pauseStartedAtRef.current = null;
+                            totalPausedMsRef.current = 0;
+
+                            clearFinishGoalState();
                         } catch (error) {
                             console.error('Error borrando última sesión:', error);
                             Alert.alert('Error', 'No se pudo borrar la sesión.');
@@ -1704,7 +1836,14 @@ export default function LiveRunScreen() {
 
                 <View className="flex-row justify-between mt-2 mb-2">
                     <Pressable
-                        onPress={() => router.replace('/home')}
+                        onPress={() => {
+                            if (isRunning) {
+                                setExitConfirmVisible(true);
+                                return;
+                            }
+
+                            router.replace('/home');
+                        }}
                         className="flex-1 mr-2 px-4 py-3 rounded-xl items-center justify-center"
                         style={{ backgroundColor: '#444444' }}
                     >
@@ -1750,7 +1889,7 @@ export default function LiveRunScreen() {
                     )}
 
                     <Pressable
-                        onPress={finish}
+                        onPress={() => finish()}
                         className="flex-1 ml-2 px-4 py-3 rounded-xl items-center justify-center"
                         style={{ backgroundColor: '#444444' }}
                     >
@@ -1967,6 +2106,7 @@ export default function LiveRunScreen() {
                                     color: COLORS.textLight,
                                     fontSize: 19,
                                     fontWeight: '700',
+                                    textAlign: 'center',
                                 }}
                             >
                                 Detalle de sesión
@@ -2755,6 +2895,74 @@ export default function LiveRunScreen() {
                                     Continuar
                                 </Text>
                             </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            <Modal visible={exitConfirmVisible} transparent animationType="fade">
+                <View style={{
+                    flex: 1,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    justifyContent: 'center',
+                    alignItems: 'center'
+                }}>
+                    <View style={{
+                        backgroundColor: '#111',
+                        padding: 20,
+                        borderRadius: 16,
+                        width: '85%'
+                    }}>
+                        <Text style={{
+                            color: '#fff',
+                            fontSize: 16,
+                            fontWeight: '700',
+                            textAlign: 'center',
+                            marginBottom: 12
+                        }}>
+                            ¿Quieres salir de la sesión?
+                        </Text>
+
+                        <Text style={{
+                            color: '#aaa',
+                            fontSize: 13,
+                            textAlign: 'center',
+                            marginBottom: 16
+                        }}>
+                            La sesión terminará y se guardará en el historial.
+                        </Text>
+
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <Pressable
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: COLORS.primary,
+                                    padding: 12,
+                                    borderRadius: 12,
+                                    alignItems: 'center'
+                                }}
+                                onPress={async () => {
+                                    setExitConfirmVisible(false);
+                                    await finish({ showSummary: false, goHome: true });
+                                }}
+                            >
+                                <Text style={{ color: '#111', fontWeight: '700' }}>
+                                    Terminar sesión
+                                </Text>
+                            </Pressable>
+                            <Pressable
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: '#1b1b1b',
+                                    padding: 12,
+                                    borderRadius: 12,
+                                    alignItems: 'center'
+                                }}
+                                onPress={() => setExitConfirmVisible(false)}
+                            >
+                                <Text style={{ color: '#fff' }}>Continuar carrera</Text>
+                            </Pressable>
+
+
                         </View>
                     </View>
                 </View>

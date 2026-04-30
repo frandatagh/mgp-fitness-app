@@ -2524,6 +2524,7 @@ export default function LiveRunScreen() {
                                                 ? formatSpeed(selectedHistorySession.maxSpeedMps)
                                                 : '--'
                                         }
+                                        routePoints={pathGeoJsonToPoints(selectedHistorySession.pathGeoJson)}
                                         showSessionSticker={showSessionSticker}
                                         stickerTransform={stickerTransform}
                                         stickerStyleIndex={stickerStyleIndex}
@@ -3061,6 +3062,7 @@ export default function LiveRunScreen() {
                                     ? formatSpeed(selectedHistorySession.maxSpeedMps)
                                     : '--'
                             }
+                            routePoints={pathGeoJsonToPoints(selectedHistorySession.pathGeoJson)}
                             showSessionSticker={showSessionSticker}
                             stickerTransform={{
                                 x: stickerTransform.x * (1080 / PREVIEW_WIDTH),

@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
-import { ImageBackground, Text, View } from 'react-native';
+import React, { useEffect, useMemo } from 'react';
+import { Image, Text, View } from 'react-native';
+import Svg, { Line, Polyline } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
     runOnJS,
@@ -15,6 +16,11 @@ type StickerTransform = {
     rotation: number;
 };
 
+type RoutePoint = {
+    latitude: number;
+    longitude: number;
+};
+
 type Props = {
     photoUri: string;
     durationText: string;
@@ -22,15 +28,79 @@ type Props = {
     paceText: string;
     maxSpeedText: string;
     showSessionSticker: boolean;
-    mode?: 'preview' | 'export';
     stickerTransform: StickerTransform;
     stickerStyleIndex: 0 | 1 | 2;
-    onStickerTransformChange?: (next: StickerTransform) => void;
+    onStickerTransformChange?: (transform: StickerTransform) => void;
+    mode: 'preview' | 'export';
+    routePoints?: RoutePoint[];
 };
 
-function clamp(value: number, min: number, max: number) {
-    'worklet';
-    return Math.max(min, Math.min(value, max));
+function routePointsToSvgPoints(
+    routePoints: RoutePoint[],
+    width: number,
+    height: number,
+    padding = 18
+) {
+    if (!routePoints || routePoints.length < 2) return '';
+
+    const lats = routePoints.map((p) => p.latitude);
+    const lngs = routePoints.map((p) => p.longitude);
+
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+
+    const latRange = maxLat - minLat || 0.00001;
+    const lngRange = maxLng - minLng || 0.00001;
+
+    return routePoints
+        .map((p) => {
+            const x =
+                padding + ((p.longitude - minLng) / lngRange) * (width - padding * 2);
+
+            const y =
+                padding +
+                (1 - (p.latitude - minLat) / latRange) * (height - padding * 2);
+
+            return `${x},${y}`;
+        })
+        .join(' ');
+}
+
+function Metric({
+    label,
+    value,
+    isPreview,
+}: {
+    label: string;
+    value: string;
+    isPreview: boolean;
+}) {
+    return (
+        <View style={{ alignItems: 'center', flex: 1 }}>
+            <Text
+                style={{
+                    color: '#B8B8B8',
+                    fontSize: isPreview ? 12 : 38,
+                    fontWeight: '800',
+                }}
+            >
+                {label}
+            </Text>
+
+            <Text
+                style={{
+                    color: '#FFFFFF',
+                    fontSize: isPreview ? 11 : 34,
+                    fontWeight: '900',
+                    marginTop: isPreview ? 1 : 4,
+                }}
+            >
+                {value}
+            </Text>
+        </View>
+    );
 }
 
 export default function SharePhotoComposer({
@@ -40,49 +110,57 @@ export default function SharePhotoComposer({
     paceText,
     maxSpeedText,
     showSessionSticker,
-    mode = 'preview',
     stickerTransform,
     stickerStyleIndex,
     onStickerTransformChange,
+    mode,
+    routePoints = [],
 }: Props) {
     const isPreview = mode === 'preview';
 
-    const width = isPreview ? 320 : 1080;
-    const height = isPreview ? 570 : 1920;
+    const photoWidth = isPreview ? 320 : 1080;
+    const photoHeight = isPreview ? 570 : 1920;
 
-    const boxWidth = isPreview ? 250 : 860;
-    const boxHeight = isPreview ? 95 : 320;
+    const stickerWidth = isPreview ? 300 : 900;
+    const stickerPadding = isPreview ? 10 : 34;
+    const interactionPadding = isPreview ? 34 : 90;
 
-    const borderRadius = isPreview ? 18 : 30;
-    const titleSize = isPreview ? 16 : 42;
-    const labelSize = isPreview ? 10 : 24;
-    const valueSize = isPreview ? 12 : 28;
+    const logoWidth = isPreview ? 62 : 220;
+    const logoHeight = isPreview ? 42 : 145;
 
-    const stylePresets = [
-        {
-            backgroundColor: 'rgba(10,10,10,0.82)',
-            borderColor: COLORS.primary,
-            titleColor: '#FFFFFF',
-            labelColor: '#C7C7C7',
-            valueColor: '#FFFFFF',
-        },
-        {
-            backgroundColor: 'rgba(20,20,20,0.88)',
-            borderColor: '#FFFFFF',
-            titleColor: '#C6FF00',
-            labelColor: '#D1D5DB',
-            valueColor: '#FFFFFF',
-        },
-        {
-            backgroundColor: 'rgba(0,0,0,0.72)',
-            borderColor: '#65A30D',
-            titleColor: '#FFFFFF',
-            labelColor: '#BDBDBD',
-            valueColor: '#C6FF00',
-        },
-    ] as const;
+    const routeBoxWidth = stickerWidth - stickerPadding * 2;
+    const routeBoxHeight = isPreview ? 105 : 330;
 
-    const currentStyle = stylePresets[stickerStyleIndex];
+    const routeLineColor = '#FF2E35';
+
+    const svgRoutePoints = useMemo(
+        () =>
+            routePointsToSvgPoints(
+                routePoints,
+                routeBoxWidth,
+                routeBoxHeight,
+                isPreview ? 18 : 48
+            ),
+        [routePoints, routeBoxWidth, routeBoxHeight, isPreview]
+    );
+
+    const hasRoute = svgRoutePoints.length > 0;
+
+    const estimatedStickerHeight =
+        stickerStyleIndex === 0
+            ? isPreview
+                ? 96
+                : 285
+            : stickerStyleIndex === 1
+                ? isPreview
+                    ? 225
+                    : 690
+                : isPreview
+                    ? 220
+                    : 650;
+
+    const hitWidth = stickerWidth + interactionPadding * 2;
+    const hitHeight = estimatedStickerHeight + interactionPadding * 2;
 
     const translateX = useSharedValue(stickerTransform.x);
     const translateY = useSharedValue(stickerTransform.y);
@@ -104,22 +182,21 @@ export default function SharePhotoComposer({
         stickerTransform.y,
         stickerTransform.scale,
         stickerTransform.rotation,
-        translateX,
-        translateY,
-        scale,
-        rotation,
     ]);
 
-    const commitTransform = () => {
-        if (!onStickerTransformChange) return;
-
-        onStickerTransformChange({
-            x: translateX.value,
-            y: translateY.value,
-            scale: scale.value,
-            rotation: rotation.value,
+    const commitTransform = (x: number, y: number, s: number, r: number) => {
+        onStickerTransformChange?.({
+            x,
+            y,
+            scale: s,
+            rotation: r,
         });
     };
+
+    const minX = -interactionPadding;
+    const minY = -interactionPadding;
+    const maxX = photoWidth - hitWidth + interactionPadding;
+    const maxY = photoHeight - hitHeight + interactionPadding;
 
     const panGesture = Gesture.Pan()
         .onBegin(() => {
@@ -127,17 +204,19 @@ export default function SharePhotoComposer({
             startY.value = translateY.value;
         })
         .onUpdate((event) => {
-            const scaledWidth = boxWidth * scale.value;
-            const scaledHeight = boxHeight * scale.value;
+            const nextX = startX.value + event.translationX;
+            const nextY = startY.value + event.translationY;
 
-            const maxX = Math.max(0, width - scaledWidth);
-            const maxY = Math.max(0, height - scaledHeight);
-
-            translateX.value = clamp(startX.value + event.translationX, 0, maxX);
-            translateY.value = clamp(startY.value + event.translationY, 0, maxY);
+            translateX.value = Math.min(Math.max(nextX, minX), maxX);
+            translateY.value = Math.min(Math.max(nextY, minY), maxY);
         })
-        .onFinalize(() => {
-            runOnJS(commitTransform)();
+        .onEnd(() => {
+            runOnJS(commitTransform)(
+                translateX.value,
+                translateY.value,
+                scale.value,
+                rotation.value
+            );
         });
 
     const pinchGesture = Gesture.Pinch()
@@ -145,20 +224,16 @@ export default function SharePhotoComposer({
             startScale.value = scale.value;
         })
         .onUpdate((event) => {
-            const nextScale = clamp(startScale.value * event.scale, 0.6, 2.2);
-
-            const scaledWidth = (boxWidth + interactionPadding * 2) * nextScale;
-            const scaledHeight = (boxHeight + interactionPadding * 2) * nextScale;
-
-            const maxX = Math.max(0, width - scaledWidth);
-            const maxY = Math.max(0, height - scaledHeight);
-
-            scale.value = nextScale;
-            translateX.value = clamp(translateX.value, 0, maxX);
-            translateY.value = clamp(translateY.value, 0, maxY);
+            const nextScale = startScale.value * event.scale;
+            scale.value = Math.min(Math.max(nextScale, 0.55), 2.4);
         })
-        .onFinalize(() => {
-            runOnJS(commitTransform)();
+        .onEnd(() => {
+            runOnJS(commitTransform)(
+                translateX.value,
+                translateY.value,
+                scale.value,
+                rotation.value
+            );
         });
 
     const rotationGesture = Gesture.Rotation()
@@ -168,182 +243,234 @@ export default function SharePhotoComposer({
         .onUpdate((event) => {
             rotation.value = startRotation.value + event.rotation;
         })
-        .onFinalize(() => {
-            runOnJS(commitTransform)();
+        .onEnd(() => {
+            runOnJS(commitTransform)(
+                translateX.value,
+                translateY.value,
+                scale.value,
+                rotation.value
+            );
         });
 
-    const composedGesture = Gesture.Simultaneous(
+    const composedGesture = Gesture.Race(
         panGesture,
-        pinchGesture,
-        rotationGesture
+        Gesture.Simultaneous(pinchGesture, rotationGesture)
     );
 
-    const animatedStickerStyle = useAnimatedStyle(
-        () =>
-            ({
-                transform: [
-                    { translateX: translateX.value },
-                    { translateY: translateY.value },
-                    { scale: scale.value },
-                    { rotateZ: `${rotation.value}rad` },
-                ],
-            }) as any
-    );
+    const animatedStickerStyle = useAnimatedStyle(() => {
+        return {
+            transform: [
+                { translateX: translateX.value },
+                { translateY: translateY.value },
+                { scale: scale.value },
+                { rotate: `${rotation.value}rad` },
+            ],
+        } as any;
+    });
 
-    const interactionPadding = isPreview ? 28 : 60;
-
-    const stickerContent = (
-        <Animated.View
-            style={[
-                {
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    width: boxWidth + interactionPadding * 2,
-                    height: boxHeight + interactionPadding * 2,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    backgroundColor: 'transparent',
-                },
-                animatedStickerStyle,
-            ]}
+    const metricsRow = (
+        <View
+            style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                width: '100%',
+            }}
         >
+            <Metric label="Tiempo" value={durationText} isPreview={isPreview} />
+            <Metric label="Distancia" value={distanceText} isPreview={isPreview} />
+            <Metric label="Ritmo" value={paceText} isPreview={isPreview} />
+            <Metric label="Vel. Máxima" value={maxSpeedText} isPreview={isPreview} />
+        </View>
+    );
+
+    const logo = (
+        <Image
+            source={require('../../assets/img/icontwist.png')}
+            style={{
+                width: logoWidth,
+                height: logoHeight,
+                alignSelf: 'center',
+            }}
+            resizeMode="contain"
+        />
+    );
+
+    const routeOnly = (
+        <View
+            style={{
+                width: routeBoxWidth,
+                height: routeBoxHeight,
+                marginTop: isPreview ? 10 : 32,
+                alignItems: 'center',
+                justifyContent: 'center',
+            }}
+        >
+            <Svg width={routeBoxWidth} height={routeBoxHeight}>
+                {hasRoute && (
+                    <Polyline
+                        points={svgRoutePoints}
+                        fill="none"
+                        stroke={routeLineColor}
+                        strokeWidth={isPreview ? 5 : 15}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                )}
+            </Svg>
+        </View>
+    );
+
+    const routeWithMap = (
+        <View
+            style={{
+                width: routeBoxWidth,
+                height: routeBoxHeight,
+                marginTop: isPreview ? 10 : 32,
+                borderRadius: isPreview ? 12 : 34,
+                backgroundColor: '#55C9C7',
+                overflow: 'hidden',
+                alignItems: 'center',
+                justifyContent: 'center',
+            }}
+        >
+            <Svg width={routeBoxWidth} height={routeBoxHeight}>
+                <Line
+                    x1={routeBoxWidth * 0.05}
+                    y1={routeBoxHeight * 0.25}
+                    x2={routeBoxWidth * 0.95}
+                    y2={routeBoxHeight * 0.15}
+                    stroke="rgba(255,255,255,0.28)"
+                    strokeWidth={isPreview ? 2 : 5}
+                />
+                <Line
+                    x1={routeBoxWidth * 0.1}
+                    y1={routeBoxHeight * 0.78}
+                    x2={routeBoxWidth * 0.9}
+                    y2={routeBoxHeight * 0.62}
+                    stroke="rgba(255,255,255,0.22)"
+                    strokeWidth={isPreview ? 2 : 5}
+                />
+                <Line
+                    x1={routeBoxWidth * 0.28}
+                    y1={0}
+                    x2={routeBoxWidth * 0.2}
+                    y2={routeBoxHeight}
+                    stroke="rgba(255,255,255,0.20)"
+                    strokeWidth={isPreview ? 2 : 5}
+                />
+                <Line
+                    x1={routeBoxWidth * 0.72}
+                    y1={0}
+                    x2={routeBoxWidth * 0.82}
+                    y2={routeBoxHeight}
+                    stroke="rgba(255,255,255,0.20)"
+                    strokeWidth={isPreview ? 2 : 5}
+                />
+
+                {hasRoute && (
+                    <Polyline
+                        points={svgRoutePoints}
+                        fill="none"
+                        stroke={routeLineColor}
+                        strokeWidth={isPreview ? 5 : 15}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                )}
+            </Svg>
+        </View>
+    );
+
+    const stickerBody =
+        stickerStyleIndex === 0 ? (
             <View
                 style={{
-                    width: boxWidth,
-                    backgroundColor: currentStyle.backgroundColor,
-                    borderWidth: isPreview ? 1.5 : 2,
-                    borderColor: currentStyle.borderColor,
-                    borderRadius,
-                    paddingHorizontal: isPreview ? 14 : 30,
-                    paddingVertical: isPreview ? 14 : 26,
+                    width: stickerWidth,
+                    backgroundColor: 'transparent',
+                    alignItems: 'center',
                 }}
             >
-                <Text
-                    style={{
-                        color: currentStyle.titleColor,
-                        fontSize: titleSize,
-                        fontWeight: '800',
-                        marginBottom: isPreview ? 10 : 18,
-                    }}
-                >
-                    Sesión completada
-                </Text>
-
-                <View
-                    style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        gap: isPreview ? 6 : 10,
-                    }}
-                >
-                    <Metric
-                        label="Tiempo"
-                        value={durationText}
-                        labelSize={labelSize}
-                        valueSize={valueSize}
-                        labelColor={currentStyle.labelColor}
-                        valueColor={currentStyle.valueColor}
-                    />
-                    <Metric
-                        label="Distancia"
-                        value={distanceText}
-                        labelSize={labelSize}
-                        valueSize={valueSize}
-                        labelColor={currentStyle.labelColor}
-                        valueColor={currentStyle.valueColor}
-                    />
-                    <Metric
-                        label="Ritmo"
-                        value={paceText}
-                        labelSize={labelSize}
-                        valueSize={valueSize}
-                        labelColor={currentStyle.labelColor}
-                        valueColor={currentStyle.valueColor}
-                    />
-                    <Metric
-                        label="Vel. Máx."
-                        value={maxSpeedText}
-                        labelSize={labelSize}
-                        valueSize={valueSize}
-                        labelColor={currentStyle.labelColor}
-                        valueColor={currentStyle.valueColor}
-                    />
-                </View>
+                {metricsRow}
+                <View style={{ marginTop: isPreview ? 4 : 16 }}>{logo}</View>
             </View>
-        </Animated.View>
-    );
+        ) : stickerStyleIndex === 1 ? (
+            <View
+                style={{
+                    width: stickerWidth,
+                    backgroundColor: 'rgba(17,17,17,0.88)',
+                    borderWidth: isPreview ? 2 : 6,
+                    borderColor: COLORS.primary,
+                    borderRadius: isPreview ? 16 : 42,
+                    padding: stickerPadding,
+                    alignItems: 'center',
+                }}
+            >
+                {logo}
+                <View style={{ marginTop: isPreview ? 2 : 10, width: '100%' }}>
+                    {metricsRow}
+                </View>
+                {routeWithMap}
+            </View>
+        ) : (
+            <View
+                style={{
+                    width: stickerWidth,
+                    backgroundColor: 'transparent',
+                    alignItems: 'center',
+                }}
+            >
+                {logo}
+                <View style={{ marginTop: isPreview ? 2 : 12, width: '100%' }}>
+                    {metricsRow}
+                </View>
+                {routeOnly}
+            </View>
+        );
 
     return (
         <View
             style={{
-                width,
-                height,
+                width: photoWidth,
+                height: photoHeight,
                 borderRadius: isPreview ? 18 : 0,
                 overflow: 'hidden',
+                backgroundColor: '#111',
             }}
         >
-            <ImageBackground
+            <Image
                 source={{ uri: photoUri }}
+                style={{
+                    width: photoWidth,
+                    height: photoHeight,
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                }}
                 resizeMode="cover"
-                style={{
-                    width: '100%',
-                    height: '100%',
-                }}
-            >
-                {showSessionSticker &&
-                    (isPreview && onStickerTransformChange ? (
-                        <GestureDetector gesture={composedGesture}>
-                            {stickerContent}
-                        </GestureDetector>
-                    ) : (
-                        stickerContent
-                    ))}
-            </ImageBackground>
-        </View>
-    );
-}
+            />
 
-function Metric({
-    label,
-    value,
-    labelSize,
-    valueSize,
-    labelColor,
-    valueColor,
-}: {
-    label: string;
-    value: string;
-    labelSize: number;
-    valueSize: number;
-    labelColor: string;
-    valueColor: string;
-}) {
-    return (
-        <View style={{ flex: 1, alignItems: 'center' }}>
-            <Text
-                style={{
-                    color: labelColor,
-                    fontSize: labelSize,
-                    fontWeight: '700',
-                    marginBottom: 4,
-                    textAlign: 'center',
-                }}
-                numberOfLines={1}
-            >
-                {label}
-            </Text>
-            <Text
-                style={{
-                    color: valueColor,
-                    fontSize: valueSize,
-                    fontWeight: '800',
-                    textAlign: 'center',
-                }}
-                numberOfLines={1}
-            >
-                {value}
-            </Text>
+            {showSessionSticker && (
+                <GestureDetector gesture={composedGesture}>
+                    <Animated.View
+                        style={[
+                            {
+                                position: 'absolute',
+                                left: 0,
+                                top: 0,
+                                width: hitWidth,
+                                height: hitHeight,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: 'transparent',
+                            },
+                            animatedStickerStyle,
+                        ]}
+                    >
+                        {stickerBody}
+                    </Animated.View>
+                </GestureDetector>
+            )}
         </View>
     );
 }

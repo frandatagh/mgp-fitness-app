@@ -379,18 +379,12 @@ export default function HomeScreen() {
                         style={{ backgroundColor: '#444444' }}
                         onPress={() => router.push('/routine/new')}
                     >
-                        <View className="flex-row items-center justify-center">
+                        <View className="flex-center text-center items-center justify-center">
                             <Ionicons
                                 name="add"
-                                size={18}
+                                size={25}
                                 color={COLORS.textLight}
                             />
-                            <Text
-                                className="ml-2"
-                                style={{ color: COLORS.textLight }}
-                            >
-                                Crear rutina
-                            </Text>
                         </View>
                     </Pressable>
 
@@ -405,31 +399,25 @@ export default function HomeScreen() {
                         }}
                     >
                         <Text
-                            className="text-[15px] font-semibold"
+                            className="text-[14px] font-semibold text-center"
                             style={{ color: '#111111' }}
                         >
-                            RUN
+                            RUN ALIVE
                         </Text>
                     </Pressable>
 
-                    {/* Puntos cercanos */}
+                    {/* Tus estadísticas */}
                     <Pressable
-                        className="flex-1 ml-2 px-4 py-3 rounded-xl "
+                        className="flex-1 ml-2 px-4 py-3 rounded-xl"
                         style={{ backgroundColor: '#444444' }}
-                        onPress={() => router.push('/nearby')}
+                        onPress={() => router.push('/statistics')}
                     >
-                        <View className="flex-row items-center justify-center">
+                        <View className="flex-center text-center items-center justify-center">
                             <Ionicons
-                                name="location-outline"
-                                size={18}
+                                name="stats-chart-outline"
+                                size={20}
                                 color={COLORS.textLight}
                             />
-                            <Text
-                                className="ml-2"
-                                style={{ color: COLORS.textLight }}
-                            >
-                                Puntos cercanos
-                            </Text>
                         </View>
                     </Pressable>
                 </View>

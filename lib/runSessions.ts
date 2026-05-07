@@ -75,3 +75,21 @@ export async function deleteRunSession(sessionId: string) {
 
     return data as { message: string };
 }
+
+export async function rateRunSession(sessionId: string, rating: number) {
+    const res = await apiFetch(`/run-sessions/${sessionId}/rating`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rating }),
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+        throw new Error(data?.message || 'No se pudo guardar la valoración');
+    }
+
+    return data.item;
+}

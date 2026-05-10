@@ -73,9 +73,7 @@ export default function RoutineDetailScreen() {
     });
 
 
-    if (!isAuthenticated) {
-        return <Redirect href="/" />;
-    }
+
 
     useEffect(() => {
         let isMounted = true;
@@ -109,6 +107,10 @@ export default function RoutineDetailScreen() {
 
         setDoneMarked(isSameLocalDay(routine.lastDoneAt));
     }, [routine]);
+
+    if (!isAuthenticated) {
+        return <Redirect href="/" />;
+    }
 
     const handleBack = () => {
         // No dependemos del historial; siempre volvemos al home

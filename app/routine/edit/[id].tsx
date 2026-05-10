@@ -103,9 +103,7 @@ export default function EditRoutineScreen() {
         null
     );
 
-    if (!isAuthenticated) {
-        return <Redirect href="/" />;
-    }
+
 
     // ---------- Cargar la rutina actual ----------
     useEffect(() => {
@@ -156,6 +154,10 @@ export default function EditRoutineScreen() {
             isMounted = false;
         };
     }, [id]);
+
+    if (!isAuthenticated) {
+        return <Redirect href="/" />;
+    }
 
     // ---------- Helpers para ejercicios ----------
 

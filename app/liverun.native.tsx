@@ -8,6 +8,7 @@ import {
     View,
     Modal,
     BackHandler,
+    AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
@@ -37,6 +38,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { getWalkingRoute } from '../lib/routing';
 import { LIVE_RUN_LOCATION_TASK } from '../lib/backgroundLocationTask';
+import { formatAppShortDate, formatAppTime } from '../lib/date';
 
 type RunPoint = {
     latitude: number;
@@ -411,6 +413,10 @@ export default function LiveRunScreen() {
     const [remainingRouteDistanceMeters, setRemainingRouteDistanceMeters] = useState<number | null>(null);
     const [remainingRouteDurationSeconds, setRemainingRouteDurationSeconds] = useState<number | null>(null);
 
+    const [appStateLabel, setAppStateLabel] = useState(AppState.currentState);
+    const [lastPointTime, setLastPointTime] = useState<string>('sin datos');
+    const [summaryMapReady, setSummaryMapReady] = useState(false);
+
     const [arrivalModalVisible, setArrivalModalVisible] = useState(false);
 
     const lastRouteRefreshAtRef = useRef<number>(0);
@@ -717,7 +723,7 @@ export default function LiveRunScreen() {
                         speed: loc.coords.speed,
                         accuracy: loc.coords.accuracy,
                     };
-
+                    setLastPointTime(new Date(nextPoint.timestamp).toLocaleTimeString());
                     setCurrentPosition(nextPoint);
                     const safeSpeed =
                         loc.coords.speed != null && loc.coords.speed >= 0 && loc.coords.speed <= 6.5
@@ -757,6 +763,87 @@ export default function LiveRunScreen() {
         const seconds = Math.floor((Date.now() - startedAtMs) / 1000);
         setElapsedSeconds(seconds);
     }, [isRunning, isPaused, startedAtMs]);
+
+    useEffect(() => {
+        const subscription = AppState.addEventListener('change', async (nextAppState) => {
+            setAppStateLabel(nextAppState);
+
+            if (nextAppState !== 'active') return;
+
+            if (!isRunning || isPaused) return;
+
+            try {
+                console.log('App volvió al frente: reiniciando foreground GPS watch');
+
+                watchRef.current?.remove();
+                watchRef.current = null;
+
+                watchRef.current = await Location.watchPositionAsync(
+                    {
+                        accuracy: Location.Accuracy.BestForNavigation,
+                        timeInterval: 2500,
+                        distanceInterval: 4,
+                    },
+                    (loc) => {
+                        const nextPoint: RunPoint = {
+                            latitude: loc.coords.latitude,
+                            longitude: loc.coords.longitude,
+                            timestamp: loc.timestamp ?? Date.now(),
+                            speed: loc.coords.speed,
+                            accuracy: loc.coords.accuracy,
+                        };
+                        setLastPointTime(new Date(nextPoint.timestamp).toLocaleTimeString());
+                        setCurrentPosition(nextPoint);
+
+                        const safeSpeed =
+                            loc.coords.speed != null &&
+                                loc.coords.speed >= 0 &&
+                                loc.coords.speed <= 6.5
+                                ? loc.coords.speed
+                                : null;
+
+                        setCurrentSpeedMps(safeSpeed);
+
+                        const speed = safeSpeed ?? 0;
+                        setMaxSpeedMps((prev) => (speed > prev ? speed : prev));
+
+                        setRoutePoints((prev) => {
+                            const last = prev.length > 0 ? prev[prev.length - 1] : null;
+                            const decision = shouldAcceptPoint(last, nextPoint, true);
+
+                            if (!decision.accept) {
+                                console.log('Punto rechazado al volver foreground:', decision.reason);
+                                return prev;
+                            }
+
+                            if (last) {
+                                setDistanceMeters((old) => old + decision.distance);
+                            }
+
+                            return [...prev, nextPoint];
+                        });
+                    }
+                );
+            } catch (error) {
+                console.error('Error reiniciando GPS al volver a la app:', error);
+            }
+        });
+
+        return () => subscription.remove();
+    }, [isRunning, isPaused]);
+
+    useEffect(() => {
+        if (!summaryVisible) {
+            setSummaryMapReady(false);
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            setSummaryMapReady(true);
+        }, 600);
+
+        return () => clearTimeout(timer);
+    }, [summaryVisible]);
 
     const pause = () => {
         setIsPaused(true);
@@ -1790,7 +1877,7 @@ export default function LiveRunScreen() {
                                                             <View className="items-center flex-1">
                                                                 <Text style={{ color: '#6B7280', fontSize: 7 }}>FECHA</Text>
                                                                 <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
-                                                                    {formatSessionDate(session.startedAt)}
+                                                                    {formatAppShortDate(session.createdAt)}
                                                                 </Text>
                                                             </View>
 
@@ -1798,7 +1885,7 @@ export default function LiveRunScreen() {
                                                             <View className="items-center flex-1">
                                                                 <Text style={{ color: '#6B7280', fontSize: 7 }}>HORA</Text>
                                                                 <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
-                                                                    {formatSessionTime(session.startedAt)}
+                                                                    {formatAppTime(session.createdAt)}
                                                                 </Text>
                                                             </View>
 
@@ -1883,7 +1970,47 @@ export default function LiveRunScreen() {
                     )}
                 </View>
 
+                <View
+                    style={{
+                        backgroundColor: '#111',
+                        borderColor: '#333',
+                        borderWidth: 1,
+                        borderRadius: 12,
+                        padding: 10,
+                        marginVertical: 8,
+                    }}
+                >
+                    <Text style={{ color: '#C6FF00', fontWeight: '700' }}>GPS Debug Beta</Text>
 
+                    <Text style={{ color: '#FFF' }}>
+                        Puntos: {routePoints.length}
+                    </Text>
+
+                    <Text style={{ color: '#FFF' }}>
+                        Posición: {currentPosition
+                            ? `${currentPosition.latitude.toFixed(5)}, ${currentPosition.longitude.toFixed(5)}`
+                            : 'sin posición'}
+                    </Text>
+
+                    <Text style={{ color: '#FFF' }}>
+                        Distancia: {Math.round(distanceMeters)} m
+                    </Text>
+
+                    <Text style={{ color: '#FFF' }}>
+                        Error: {locationError ?? 'ninguno'}
+                    </Text>
+
+                    <Text style={{ color: '#AAAAAA', marginTop: 4 }}>
+                        Estado: {isRunning ? (isPaused ? 'pausado' : 'corriendo') : 'detenido'}
+                    </Text>
+
+                    <Text style={{ color: '#AAAAAA', marginTop: 4 }}>
+                        AppState: {appStateLabel}
+                    </Text>
+                    <Text style={{ color: '#FFFFFF' }}>
+                        Último punto: {lastPointTime}
+                    </Text>
+                </View>
 
                 <View className="flex-row justify-between mt-2 mb-2">
                     <Pressable
@@ -2048,7 +2175,28 @@ export default function LiveRunScreen() {
                                     </View>
                                 </View>
 
-                                <SummaryRoutePreview points={lastSessionSummary.routePoints} />
+                                {summaryMapReady && lastSessionSummary?.routePoints?.length >= 2 ? (
+                                    <SummaryRoutePreview
+                                        key={`summary-map-${lastSessionSummary.sessionId ?? Date.now()}`}
+                                        points={lastSessionSummary.routePoints}
+                                    />
+                                ) : (
+                                    <View
+                                        style={{
+                                            height: 220,
+                                            borderRadius: 24,
+                                            borderWidth: 1,
+                                            borderColor: COLORS.primary,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: '#111111',
+                                        }}
+                                    >
+                                        <Text style={{ color: '#A7F3D0', fontWeight: '700' }}>
+                                            Cargando mapa de la sesión...
+                                        </Text>
+                                    </View>
+                                )}
                             </>
                         )}
 

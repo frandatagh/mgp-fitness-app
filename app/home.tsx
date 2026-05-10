@@ -308,11 +308,35 @@ export default function HomeScreen() {
                                     className="py-1"
                                     onPress={() => {
                                         setSettingsOpen(false);
+                                        router.push('/statistics-history');
+                                    }}
+                                >
+                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
+                                        Historial de registros
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    className="py-1"
+                                    onPress={() => {
+                                        setSettingsOpen(false);
                                         router.push('/about');
                                     }}
                                 >
                                     <Text className="text-sm" style={{ color: COLORS.textLight }}>
                                         Acerca de nosotros
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    className="py-1"
+                                    onPress={() => {
+                                        setSettingsOpen(false);
+                                        router.push('/account');
+                                    }}
+                                >
+                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
+                                        Mi cuenta
                                     </Text>
                                 </Pressable>
 

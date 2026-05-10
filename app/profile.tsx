@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import { getMyProfile, updateMyProfile, type MyProfileResponse } from '../lib/profile';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadProfileImageToCloudinary } from '../lib/cloudinary';
+import { getMyStatistics, type MyStatisticsResponse } from '../lib/statistics';
 
 function formatCreatedAt(dateString?: string | null) {
     if (!dateString) return 'No disponible';
@@ -40,6 +41,22 @@ function formatPlanType(planType?: string | null) {
         default:
             return 'Estandar';
     }
+}
+
+function formatDistanceKm(meters?: number | null) {
+    if (meters == null) return 'No disponible';
+
+    if (meters < 1000) {
+        return `${Math.round(meters)} m`;
+    }
+
+    return `${(meters / 1000).toFixed(2)} km`;
+}
+
+function formatAverageEffort(value?: number | null) {
+    if (value == null) return 'No disponible';
+
+    return `${value.toFixed(1)} / 10`;
 }
 
 function shouldShowCompleteProfileNotice(profileData?: MyProfileResponse | null) {
@@ -67,6 +84,7 @@ export default function ProfileScreen() {
     const [screenError, setScreenError] = useState<string | null>(null);
 
     const [profileData, setProfileData] = useState<MyProfileResponse | null>(null);
+    const [statsData, setStatsData] = useState<MyStatisticsResponse | null>(null);
 
     const [goalText, setGoalText] = useState('');
     const [isEditingGoal, setIsEditingGoal] = useState(false);
@@ -87,8 +105,13 @@ export default function ProfileScreen() {
             setLoading(true);
             setScreenError(null);
 
-            const data = await getMyProfile();
+            const [data, stats] = await Promise.all([
+                getMyProfile(),
+                getMyStatistics(),
+            ]);
+
             setProfileData(data);
+            setStatsData(stats);
 
             setGoalText(data.profile.goal ?? '');
             setNameInput(data.user.name ?? '');
@@ -132,10 +155,9 @@ export default function ProfileScreen() {
             ? `${profileData.profile.heightCm} cm`
             : 'No disponible';
 
-    const displayWeeklyKm =
-        typeof profileData?.profile.weeklyKmGoal === 'number'
-            ? `${profileData.profile.weeklyKmGoal} km`
-            : 'Próximamente disponible';
+    const displayWeeklyKm = formatDistanceKm(statsData?.running.weeklyDistanceMeters);
+
+    const displayAverageEffort = formatAverageEffort(statsData?.summary.avgEffort);
 
     const initials = useMemo(() => {
         return (
@@ -611,19 +633,39 @@ export default function ProfileScreen() {
                                     </View>
                                 </View>
 
-                                {/* Kilómetros */}
+                                {/* Kilómetros reales */}
                                 <View>
                                     <Text
                                         className="text-[12px] font-semibold"
                                         style={{ color: COLORS.textMuted }}
                                     >
-                                        Total kilómetros recorridos por semana
+                                        Kilómetros recorridos esta semana
                                     </Text>
+
                                     <Text
-                                        className="text-[14px] mt-1"
+                                        className="text-[16px] font-semibold mt-1"
                                         style={{ color: COLORS.textLight }}
                                     >
                                         {displayWeeklyKm}
+                                    </Text>
+
+                                    <View
+                                        className="h-px my-3"
+                                        style={{ backgroundColor: '#2F2F2F' }}
+                                    />
+
+                                    <Text
+                                        className="text-[12px] font-semibold"
+                                        style={{ color: COLORS.textMuted }}
+                                    >
+                                        Esfuerzo promedio histórico
+                                    </Text>
+
+                                    <Text
+                                        className="text-[16px] font-semibold mt-1"
+                                        style={{ color: COLORS.textLight }}
+                                    >
+                                        {displayAverageEffort}
                                     </Text>
                                 </View>
                             </View>
@@ -642,12 +684,7 @@ export default function ProfileScreen() {
                                 className="rounded-2xl px-2 py-2"
                                 style={{ backgroundColor: '#111111' }}
                             >
-                                <Text
-                                    className="text-[13px] mb-2"
-                                    style={{ color: COLORS.textMuted }}
-                                >
-                                    Escribe aquí tus objetivos actuales de entrenamiento.
-                                </Text>
+
 
                                 <TextInput
                                     value={goalText}

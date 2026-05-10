@@ -204,20 +204,6 @@ export default function StatisticsScreen() {
         loadStats();
     }, []);
 
-    if (!isAuthenticated) {
-        return (
-            <SafeAreaView
-                className="flex-1 items-center justify-center"
-                style={{ backgroundColor: COLORS.background }}
-            >
-                <Text style={{ color: COLORS.textLight }}>
-                    Redirigiendo al inicio de sesión...
-                </Text>
-            </SafeAreaView>
-        );
-    }
-
-
 
     useEffect(() => {
         const loadStats = async () => {
@@ -239,6 +225,22 @@ export default function StatisticsScreen() {
 
         loadStats();
     }, [isAuthenticated]);
+
+    if (!isAuthenticated) {
+        return (
+            <SafeAreaView
+                className="flex-1 items-center justify-center"
+                style={{ backgroundColor: COLORS.background }}
+            >
+                <Text style={{ color: COLORS.textLight }}>
+                    Redirigiendo al inicio de sesión...
+                </Text>
+            </SafeAreaView>
+        );
+    }
+
+
+
 
     const openInfoModal = (title: string, text: string) => {
         setInfoModalTitle(title);

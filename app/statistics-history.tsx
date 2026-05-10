@@ -12,6 +12,10 @@ import {
     type StatisticsHistoryRecord,
     type StatisticsArchivedHistoryItem,
 } from '../lib/statisticsHistory';
+import {
+    getAppDateKey,
+    formatAppHistoryDayLabel,
+} from '../lib/date';
 
 type HistoryRecord = {
     id: string;
@@ -26,6 +30,34 @@ type HistoryDay = {
     label: string;
     records: HistoryRecord[];
 };
+
+function normalizeHistoryDaysByAppTimeZone(
+    days: StatisticsHistoryDay[]
+): StatisticsHistoryDay[] {
+    const grouped: Record<string, StatisticsHistoryDay> = {};
+
+    for (const day of days) {
+        for (const record of day.records) {
+            const dateKey = getAppDateKey(record.createdAt);
+
+            if (!grouped[dateKey]) {
+                grouped[dateKey] = {
+                    date: dateKey,
+                    label: formatAppHistoryDayLabel(record.createdAt),
+                    records: [],
+                };
+            }
+
+            grouped[dateKey].records.push(record);
+        }
+    }
+
+    return Object.values(grouped).sort((a, b) => {
+        if (a.date < b.date) return 1;
+        if (a.date > b.date) return -1;
+        return 0;
+    });
+}
 
 
 function getRecordIcon(type: HistoryRecord['type']) {
@@ -69,7 +101,10 @@ export default function StatisticsHistoryScreen() {
                 setHistoryError(null);
 
                 const data = await getStatisticsHistory();
-                setHistoryItems(data.items ?? []);
+
+                const normalizedItems = normalizeHistoryDaysByAppTimeZone(data.items ?? []);
+
+                setHistoryItems(normalizedItems);
                 setArchivedItems(data.archivedItems ?? []);
             } catch (error) {
                 console.error('Error cargando historial:', error);
@@ -523,7 +558,7 @@ export default function StatisticsHistoryScreen() {
                     >
                         <Text className="text-[14px] font-normal"
                             style={{ color: COLORS.textLight }}>
-                            Volver
+                            Estadísticas
                         </Text>
                     </Pressable>
 

@@ -17,6 +17,7 @@ import { getMyProfile, updateMyProfile, type MyProfileResponse } from '../lib/pr
 import * as ImagePicker from 'expo-image-picker';
 import { uploadProfileImageToCloudinary } from '../lib/cloudinary';
 import { getMyStatistics, type MyStatisticsResponse } from '../lib/statistics';
+import AppHeader from '../components/AppHeader';
 
 function formatCreatedAt(dateString?: string | null) {
     if (!dateString) return 'No disponible';
@@ -399,13 +400,7 @@ export default function ProfileScreen() {
                 className="flex-1 px-4 pt-1 pb-2"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
-                {/* LOGO SUPERIOR */}
-                <View className="items-center mb-2">
-                    <Image
-                        source={require('../assets/img/icontwist.png')}
-                        style={{ width: 85, height: 85, resizeMode: 'contain' }}
-                    />
-                </View>
+                <AppHeader showProfile={false} />
 
                 {/* TÍTULO */}
                 <View className="self-start px-4 mb-3">

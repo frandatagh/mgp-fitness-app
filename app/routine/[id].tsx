@@ -23,6 +23,7 @@ import {
     saveExerciseCheckinWithOfflineSupport,
     saveRoutineCheckinWithOfflineSupport,
 } from '../../lib/offlineActions';
+import AppHeader from '../../components/AppHeader';
 
 
 // Columnas alineadas para la “tabla”
@@ -514,7 +515,7 @@ export default function RoutineDetailScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
 
-            <View className="flex-1 px-4 pt-1"
+            <View className="flex-1 px-4"
                 style={{
                     maxWidth: 800,
                     alignSelf: 'center',
@@ -522,26 +523,11 @@ export default function RoutineDetailScreen() {
                     minHeight: 0,
                 }}>
                 {/* Encabezado superior */}
-                {/* LOGO + TÍTULO SUPERIOR */}
-                <View className="mb-1">
-                    {/* Logo centrado */}
-                    <View className="items-center">
-                        <Image
-                            source={require('../../assets/img/icontwist.png')}
-                            style={{
-                                width: 180,        // ajustá a gusto
-                                height: 90,
-                            }}
-                            resizeMode="contain"
-                        />
-                    </View>
-
-
-                </View>
+                <AppHeader showProfile={false} />
 
                 {/* Contenedor principal de la tarjeta */}
                 <View
-                    className="flex-1 rounded-3xl py-3"
+                    className="flex-1 rounded-3xl mt-3 py-3"
                     style={{
                         borderWidth: 2,
                         borderColor: COLORS.primary,

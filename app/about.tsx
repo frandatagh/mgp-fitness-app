@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
+import AppHeader from '../components/AppHeader';
 
 export default function AboutScreen() {
     const { isAuthenticated } = useAuth();
@@ -43,20 +44,14 @@ export default function AboutScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
             <View
-                className="flex-1 px-4 pt-1 pb-2"
+                className="flex-1 px-4  pb-2"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
-                {/* LOGO SUPERIOR */}
-                <View className="items-center mb-2">
-                    <Image
-                        source={require('../assets/img/icontwist.png')}
-                        style={{ width: 85, height: 85, resizeMode: 'contain' }}
-                    />
-                </View>
+                <AppHeader showProfile={false} />
 
                 {/* PANEL PRINCIPAL */}
                 <View
-                    className="flex-1 rounded-3xl px-3 py-4"
+                    className="flex-1 rounded-3xl mt-3 px-3 py-4"
                     style={{ borderWidth: 2, borderColor: COLORS.primary }}
                 >
                     <ScrollView

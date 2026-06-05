@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { Ionicons } from '@expo/vector-icons';
-
+import AppHeader from '../components/AppHeader';
 import { COLORS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
 
@@ -140,16 +140,11 @@ export default function ContactScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             >
                 <View
-                    className="flex-1 px-4 pt-1"
+                    className="flex-1 px-4 "
                     style={{ maxWidth: 800, alignSelf: 'center' }}
                 >
                     {/* LOGO */}
-                    <View className="items-center">
-                        <Image
-                            source={require('../assets/img/iconmgp.png')}
-                            style={{ width: 85, height: 85, resizeMode: 'contain' }}
-                        />
-                    </View>
+                    <AppHeader showProfile={false} />
 
                     {/* TÍTULO */}
                     <View className="mb-2 px-4">

@@ -193,7 +193,7 @@ const LiveRunMap = forwardRef<LiveRunMapHandle, Props>(
                 style={{ flex: 1 }}
                 mapStyle={MAP_STYLE}
                 logoEnabled={false}
-                compassEnabled
+                compassEnabled={false}
                 rotateEnabled
                 scrollEnabled
                 zoomEnabled

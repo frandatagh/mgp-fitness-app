@@ -16,6 +16,7 @@ import {
     getAppDateKey,
     formatAppHistoryDayLabel,
 } from '../lib/date';
+import AppHeader from '../components/AppHeader';
 
 type HistoryRecord = {
     id: string;
@@ -198,16 +199,10 @@ export default function StatisticsHistoryScreen() {
     return (
         <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
             <View
-                className="flex-1 w-full px-4 pt-1"
+                className="flex-1 w-full px-4"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
-                <View className="items-center mb-1">
-                    <Image
-                        source={require('../assets/img/icontwist.png')}
-                        style={{ width: 170, height: 88 }}
-                        resizeMode="contain"
-                    />
-                </View>
+                <AppHeader />
 
                 <View className="self-start px-1 mb-2">
                     <Text className='ml-2  text-md text-gray-500'>

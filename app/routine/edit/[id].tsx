@@ -16,7 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
-
+import AppHeader from '../../../components/AppHeader';
 import { COLORS } from "../../../constants/colors";
 import { useAuth } from "../../../context/AuthContext";
 import {
@@ -333,13 +333,7 @@ export default function EditRoutineScreen() {
                 >
                     {/* HEADER FIJO: LOGO + TÍTULO */}
                     <View className="mb-2">
-                        <View className="items-center">
-                            <Image
-                                source={require("../../../assets/img/iconmgp.png")}
-                                style={{ width: 130, height: 80 }}
-                                resizeMode="contain"
-                            />
-                        </View>
+                        <AppHeader showProfile={false} />
 
                         <View style={{ alignItems: "flex-start" }}>
                             <Text

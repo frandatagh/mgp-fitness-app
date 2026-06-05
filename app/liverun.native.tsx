@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -158,8 +158,10 @@ function buildPathGeoJson(points: {
 
 function SummaryRoutePreview({
     points,
+    profileImageUrl,
 }: {
     points: { latitude: number; longitude: number }[];
+    profileImageUrl?: string | null;
 }) {
     if (!points || points.length < 2) {
         return (
@@ -245,12 +247,99 @@ function pathGeoJsonToPoints(pathGeoJson: any) {
         }));
 }
 
+function extractRouteCoordinates(pathGeoJson: any): [number, number][] {
+    if (!pathGeoJson) return [];
+
+    try {
+        const parsed =
+            typeof pathGeoJson === 'string'
+                ? JSON.parse(pathGeoJson)
+                : pathGeoJson;
+
+        if (parsed?.type === 'Feature' && parsed?.geometry?.type === 'LineString') {
+            return parsed.geometry.coordinates ?? [];
+        }
+
+        if (parsed?.type === 'LineString') {
+            return parsed.coordinates ?? [];
+        }
+
+        if (parsed?.type === 'FeatureCollection') {
+            const line = parsed.features?.find(
+                (f: any) => f?.geometry?.type === 'LineString'
+            );
+            return line?.geometry?.coordinates ?? [];
+        }
+
+        return [];
+    } catch {
+        return [];
+    }
+}
+
+function getRouteBounds(coords: [number, number][]) {
+    if (!coords.length) return null;
+
+    let minLng = coords[0][0];
+    let maxLng = coords[0][0];
+    let minLat = coords[0][1];
+    let maxLat = coords[0][1];
+
+    coords.forEach(([lng, lat]) => {
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+    });
+
+    const lngSpan = maxLng - minLng;
+    const latSpan = maxLat - minLat;
+
+    const lngPadding = Math.max(lngSpan * 0.18, 0.0012);
+    const latPadding = Math.max(latSpan * 0.18, 0.0012);
+
+    return {
+        ne: [maxLng + lngPadding, maxLat + latPadding] as [number, number],
+        sw: [minLng - lngPadding, minLat - latPadding] as [number, number],
+    };
+}
+
 function HistorySessionMapPreview({
     session,
+    profileImageUrl,
 }: {
     session: RunSession;
+    profileImageUrl?: string | null;
 }) {
+    const mapPreviewRef = useRef<any>(null);
+
     const routePoints = pathGeoJsonToPoints(session.pathGeoJson);
+
+    const routeCoords = useMemo(
+        () => extractRouteCoordinates(session?.pathGeoJson),
+        [session?.pathGeoJson]
+    );
+
+    const routeBounds = useMemo(
+        () => getRouteBounds(routeCoords),
+        [routeCoords]
+    );
+
+    useEffect(() => {
+        if (!routeBounds) return;
+        if (!mapPreviewRef.current?.fitBounds) return;
+
+        const timer = setTimeout(() => {
+            mapPreviewRef.current.fitBounds(
+                routeBounds.ne,
+                routeBounds.sw,
+                45,
+                600
+            );
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [routeBounds]);
 
     if (routePoints.length < 2) {
         return (
@@ -281,16 +370,19 @@ function HistorySessionMapPreview({
             }}
         >
             <LiveRunMap
+                ref={mapPreviewRef}
                 currentPosition={routePoints[routePoints.length - 1]}
                 routePoints={routePoints}
                 shouldFollowUser={false}
-                zoomLevel={15}
-                profileImageUrl={null}
+                zoomLevel={13}
+                profileImageUrl={profileImageUrl}
                 recenterTick={0}
             />
         </View>
     );
 }
+
+
 
 export default function LiveRunScreen() {
     const [loading, setLoading] = useState(true);
@@ -347,6 +439,10 @@ export default function LiveRunScreen() {
     const horizontalShareRef = useRef<any>(null);
     const photoComposerRef = useRef<any>(null);
 
+    const historyMapShotRef = useRef<any>(null);
+    const stickerMapShotRef = useRef<any>(null);
+    const [shareMapSnapshotUri, setShareMapSnapshotUri] = useState<string | null>(null);
+
     const [shareMainVisible, setShareMainVisible] = useState(false);
     const [sharePhotoModeVisible, setSharePhotoModeVisible] = useState(false);
 
@@ -358,24 +454,16 @@ export default function LiveRunScreen() {
     const [showSessionSticker, setShowSessionSticker] = useState(true);
     const [confirmCloseComposerVisible, setConfirmCloseComposerVisible] = useState(false);
 
-    const PREVIEW_WIDTH = 320;
-    const PREVIEW_HEIGHT = 570;
-    const PREVIEW_STICKER_WIDTH = 250;
-    const PREVIEW_STICKER_HEIGHT = 95;
-    const PREVIEW_STICKER_INTERACTION_PADDING = 28;
 
-    const PREVIEW_STICKER_TOTAL_WIDTH =
-        PREVIEW_STICKER_WIDTH + PREVIEW_STICKER_INTERACTION_PADDING * 2;
-
-    const PREVIEW_STICKER_TOTAL_HEIGHT =
-        PREVIEW_STICKER_HEIGHT + PREVIEW_STICKER_INTERACTION_PADDING * 2;
 
     const centeredSticker = {
-        x: (PREVIEW_WIDTH - PREVIEW_STICKER_TOTAL_WIDTH) / 2,
-        y: (PREVIEW_HEIGHT - PREVIEW_STICKER_TOTAL_HEIGHT) / 2,
+        centerX: 0.5,
+        centerY: 0.68,
         scale: 1,
         rotation: 0,
     };
+
+
 
     const [stickerTransform, setStickerTransform] = useState(centeredSticker);
     const stickerTransformRef = useRef(centeredSticker);
@@ -609,7 +697,7 @@ export default function LiveRunScreen() {
     const openShareImage = async (uri: string) => {
         await Share.open({
             url: uri.startsWith('file://') ? uri : `file://${uri}`,
-            type: 'image/png',
+            type: 'image/jpeg',
             failOnCancel: false,
             title: 'Compartir sesión',
         });
@@ -986,6 +1074,7 @@ export default function LiveRunScreen() {
 
     const openHistorySessionDetail = (session: RunSession) => {
         setSelectedHistorySession(session);
+        setShareMapSnapshotUri(null);
         setHistoryDetailVisible(true);
     };
 
@@ -1175,8 +1264,26 @@ export default function LiveRunScreen() {
     };
 
 
-    const handleShareSession = () => {
+    const handleShareSession = async () => {
         if (!selectedHistorySession) return;
+
+        try {
+            if (!shareMapSnapshotUri && stickerMapShotRef.current) {
+                await new Promise((resolve) => setTimeout(resolve, 900));
+
+                const uri = await captureRef(stickerMapShotRef, {
+                    format: 'jpg',
+                    quality: 0.9,
+                    result: 'tmpfile',
+                });
+
+                setShareMapSnapshotUri(uri);
+            }
+        } catch (error) {
+            console.log('No se pudo capturar el mapa para el sticker:', error);
+            setShareMapSnapshotUri(null);
+        }
+
         setShareMainVisible(true);
     };
 
@@ -1225,8 +1332,6 @@ export default function LiveRunScreen() {
 
             if (result.canceled || !result.assets?.[0]?.uri) return;
 
-            const initialPosition = { x: 16, y: 24 };
-
             setCustomPhotoUri(result.assets[0].uri);
             setShowSessionSticker(true);
             setStickerTransform(centeredSticker);
@@ -1256,8 +1361,6 @@ export default function LiveRunScreen() {
             });
 
             if (result.canceled || !result.assets?.[0]?.uri) return;
-
-            const initialPosition = { x: 16, y: 24 };
 
             setCustomPhotoUri(result.assets[0].uri);
             setShowSessionSticker(true);
@@ -1329,8 +1432,8 @@ export default function LiveRunScreen() {
             setSharingInProgress(true);
 
             const uri = await captureRef(photoComposerRef, {
-                format: 'png',
-                quality: 1,
+                format: 'jpg',
+                quality: 0.88,
                 result: 'tmpfile',
             });
 
@@ -1655,6 +1758,56 @@ export default function LiveRunScreen() {
                                 <Ionicons name="locate" size={22} color={COLORS.textLight} />
                             </Pressable>
 
+                            {__DEV__ && (
+                                <View
+                                    pointerEvents="none"
+                                    style={{
+                                        position: 'absolute',
+                                        left: 12,
+                                        right: 90,
+                                        bottom: 12,
+                                        backgroundColor: 'rgba(17,17,17,0.72)',
+                                        borderColor: 'rgba(198,255,0,0.55)',
+                                        borderWidth: 1,
+                                        borderRadius: 14,
+                                        paddingVertical: 8,
+                                        paddingHorizontal: 10,
+                                        zIndex: 18,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color: COLORS.primary,
+                                            fontWeight: '800',
+                                            fontSize: 12,
+                                            marginBottom: 2,
+                                        }}
+                                    >
+                                        GPS Debug Beta
+                                    </Text>
+
+                                    <Text style={{ color: '#FFFFFF', fontSize: 11 }}>
+                                        Puntos: {routePoints.length} · Distancia: {Math.round(distanceMeters)} m
+                                    </Text>
+
+                                    <Text style={{ color: '#FFFFFF', fontSize: 11 }}>
+                                        Posición:{' '}
+                                        {currentPosition
+                                            ? `${currentPosition.latitude.toFixed(5)}, ${currentPosition.longitude.toFixed(5)}`
+                                            : 'sin posición'}
+                                    </Text>
+
+                                    <Text style={{ color: '#D1D5DB', fontSize: 10, marginTop: 2 }}>
+                                        Estado: {isRunning ? (isPaused ? 'pausado' : 'corriendo') : 'detenido'} · AppState:{' '}
+                                        {appStateLabel}
+                                    </Text>
+
+                                    <Text style={{ color: '#D1D5DB', fontSize: 10 }}>
+                                        Último punto: {lastPointTime} · Error: {locationError ?? 'ninguno'}
+                                    </Text>
+                                </View>
+                            )}
+
                             <View
                                 className="absolute left-3 right-3 top-3"
                                 style={{ zIndex: 20 }}
@@ -1970,47 +2123,7 @@ export default function LiveRunScreen() {
                     )}
                 </View>
 
-                <View
-                    style={{
-                        backgroundColor: '#111',
-                        borderColor: '#333',
-                        borderWidth: 1,
-                        borderRadius: 12,
-                        padding: 10,
-                        marginVertical: 8,
-                    }}
-                >
-                    <Text style={{ color: '#C6FF00', fontWeight: '700' }}>GPS Debug Beta</Text>
 
-                    <Text style={{ color: '#FFF' }}>
-                        Puntos: {routePoints.length}
-                    </Text>
-
-                    <Text style={{ color: '#FFF' }}>
-                        Posición: {currentPosition
-                            ? `${currentPosition.latitude.toFixed(5)}, ${currentPosition.longitude.toFixed(5)}`
-                            : 'sin posición'}
-                    </Text>
-
-                    <Text style={{ color: '#FFF' }}>
-                        Distancia: {Math.round(distanceMeters)} m
-                    </Text>
-
-                    <Text style={{ color: '#FFF' }}>
-                        Error: {locationError ?? 'ninguno'}
-                    </Text>
-
-                    <Text style={{ color: '#AAAAAA', marginTop: 4 }}>
-                        Estado: {isRunning ? (isPaused ? 'pausado' : 'corriendo') : 'detenido'}
-                    </Text>
-
-                    <Text style={{ color: '#AAAAAA', marginTop: 4 }}>
-                        AppState: {appStateLabel}
-                    </Text>
-                    <Text style={{ color: '#FFFFFF' }}>
-                        Último punto: {lastPointTime}
-                    </Text>
-                </View>
 
                 <View className="flex-row justify-between mt-2 mb-2">
                     <Pressable
@@ -2179,6 +2292,7 @@ export default function LiveRunScreen() {
                                     <SummaryRoutePreview
                                         key={`summary-map-${lastSessionSummary.sessionId ?? Date.now()}`}
                                         points={lastSessionSummary.routePoints}
+                                        profileImageUrl={profileImageUrl}
                                     />
                                 ) : (
                                     <View
@@ -2513,7 +2627,10 @@ export default function LiveRunScreen() {
                                     </View>
                                 </View>
 
-                                <HistorySessionMapPreview session={selectedHistorySession} />
+                                <HistorySessionMapPreview
+                                    session={selectedHistorySession}
+                                    profileImageUrl={profileImageUrl}
+                                />
 
                                 <View style={{ marginTop: 16 }}>
                                     {/* fila de 2 botones */}
@@ -2850,6 +2967,7 @@ export default function LiveRunScreen() {
                                                 : '--'
                                         }
                                         routePoints={pathGeoJsonToPoints(selectedHistorySession.pathGeoJson)}
+                                        mapSnapshotUri={shareMapSnapshotUri}
                                         showSessionSticker={showSessionSticker}
                                         stickerTransform={stickerTransform}
                                         stickerStyleIndex={stickerStyleIndex}
@@ -3297,6 +3415,33 @@ export default function LiveRunScreen() {
                 pointerEvents="none"
                 style={{
                     position: 'absolute',
+                    top: -6000,
+                    left: -6000,
+                    width: 360,
+                    height: 240,
+                    opacity: 1,
+                }}
+            >
+                {selectedHistorySession && (
+                    <ViewShot
+                        ref={stickerMapShotRef}
+                        options={{
+                            format: 'jpg',
+                            quality: 0.9,
+                            result: 'tmpfile',
+                        }}
+                    >
+                        <HistorySessionMapPreview
+                            session={selectedHistorySession}
+                            profileImageUrl={profileImageUrl}
+                        />
+                    </ViewShot>
+                )}
+            </View>
+            <View
+                pointerEvents="none"
+                style={{
+                    position: 'absolute',
                     top: -4000,
                     left: -4000,
                     opacity: 1,
@@ -3365,8 +3510,8 @@ export default function LiveRunScreen() {
                     <ViewShot
                         ref={photoComposerRef}
                         options={{
-                            format: 'png',
-                            quality: 1,
+                            format: 'jpg',
+                            quality: 0.88,
                             result: 'tmpfile',
                         }}
                     >
@@ -3388,13 +3533,9 @@ export default function LiveRunScreen() {
                                     : '--'
                             }
                             routePoints={pathGeoJsonToPoints(selectedHistorySession.pathGeoJson)}
+                            mapSnapshotUri={shareMapSnapshotUri}
                             showSessionSticker={showSessionSticker}
-                            stickerTransform={{
-                                x: stickerTransform.x * (1080 / PREVIEW_WIDTH),
-                                y: stickerTransform.y * (1920 / PREVIEW_HEIGHT),
-                                scale: stickerTransform.scale,
-                                rotation: stickerTransform.rotation,
-                            }}
+                            stickerTransform={stickerTransform}
                             stickerStyleIndex={stickerStyleIndex}
                             mode="export"
                         />

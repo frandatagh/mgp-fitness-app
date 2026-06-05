@@ -1,13 +1,17 @@
 // app/home.tsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, Pressable, ScrollView, Image, Modal } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
 import { RoutineCard } from '../components/RoutineCard';
 import { router } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { getRoutines, Routine, deleteRoutine } from '../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
+import { getMyProfile } from '../lib/profile';
+import AppHeader from '../components/AppHeader';
+import AppLoading from '../components/AppLoading';
+import { SlideInLeft } from 'react-native-reanimated';
 
 function getLastActivityTime(routine: Routine): number {
     const dateStr =
@@ -19,6 +23,72 @@ function getLastActivityTime(routine: Routine): number {
     return dateStr ? new Date(dateStr).getTime() : 0;
 }
 
+function getInitials(nameOrEmail: string) {
+    const clean = nameOrEmail.trim();
+
+    if (!clean) return 'U';
+
+    if (clean.includes('@')) {
+        return clean.charAt(0).toUpperCase();
+    }
+
+    const parts = clean.split(' ').filter(Boolean);
+
+    if (parts.length === 1) {
+        return parts[0].charAt(0).toUpperCase();
+    }
+
+    return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+}
+
+function MenuItem({
+    icon,
+    label,
+    onPress,
+    danger = false,
+}: {
+    icon: keyof typeof Ionicons.glyphMap;
+    label: string;
+    onPress: () => void;
+    danger?: boolean;
+}) {
+    return (
+        <Pressable
+            onPress={onPress}
+            style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 11,
+                paddingHorizontal: 10,
+                borderRadius: 14,
+                backgroundColor: pressed
+                    ? danger
+                        ? 'rgba(255,120,120,0.10)'
+                        : 'rgba(198,255,0,0.08)'
+                    : 'transparent',
+                marginBottom: 2,
+            })}
+        >
+            <Ionicons
+                name={icon}
+                size={20}
+                color={danger ? '#FFBABA' : COLORS.textMuted}
+                style={{ marginRight: 11 }}
+            />
+
+            <Text
+                style={{
+                    color: danger ? '#FFBABA' : COLORS.textLight,
+                    fontSize: 14,
+                    fontWeight: danger ? '800' : '700',
+                }}
+            >
+                {label}
+            </Text>
+        </Pressable>
+    );
+}
+
 
 export default function HomeScreen() {
     const { user, isAuthenticated, logout } = useAuth();
@@ -28,7 +98,35 @@ export default function HomeScreen() {
     const [loadingRoutines, setLoadingRoutines] = useState(true);
     const [routinesError, setRoutinesError] = useState<string | null>(null);
 
-    const displayName = user?.name ?? user?.email ?? 'usuario';
+    const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+    const [profileDisplayName, setProfileDisplayName] = useState<string | null>(null);
+
+    const displayName =
+        profileDisplayName ??
+        user?.name ??
+        user?.email ??
+        'usuario';
+
+    const userInitials = getInitials(displayName);
+
+    useEffect(() => {
+        const loadProfileImage = async () => {
+            try {
+                if (!isAuthenticated) return;
+
+                const data = await getMyProfile();
+
+                setProfileImageUrl(data.profile.profileImageUrl);
+                setProfileDisplayName(data.user.name ?? data.user.email);
+            } catch (error) {
+                console.log('Error cargando imagen de perfil en Home:', error);
+            }
+        };
+
+        loadProfileImage();
+    }, [isAuthenticated]);
+
+    const insets = useSafeAreaInsets();
 
     // 👉 Redirigir a login si NO está autenticado (pero desde un efecto)
     useEffect(() => {
@@ -69,6 +167,8 @@ export default function HomeScreen() {
 
         load();
     }, [isAuthenticated]);
+
+
 
     const handleLogout = async () => {
         setSettingsOpen(false);
@@ -132,20 +232,11 @@ export default function HomeScreen() {
             <View className="flex-1 w-full px-4"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
-                {/* LOGO SUPERIOR */}
-                <View className="items-center">
-                    <Image
-                        source={require('../assets/img/iconhome.png')}
-                        style={{ width: 110, height: 110 }}
-                        resizeMode="contain"
-                    />
-                </View>
+                <AppHeader />
 
-                {/* SALUDO IZQUIERDO */}
-                <View className="self-start px-3">
-                    <Text
-                        className="text-md text-gray-500"
-                    >
+                {/* SALUDO */}
+                <View className="self-start px-3 mb-1">
+                    <Text className="text-md text-gray-500">
                         Hola, {displayName}
                     </Text>
                 </View>
@@ -160,34 +251,25 @@ export default function HomeScreen() {
                         />
                     </View>
 
-                    <Pressable className="items-center" onPress={() => router.push("/suggestions")}>
+                    <Pressable
+                        className="items-center"
+                        onPress={() => router.push('/suggestions')}
+                    >
                         <Text style={{ color: COLORS.textMuted }}>Sugerencias</Text>
-                    </Pressable>
-
-
-                    <Pressable className="items-center" onPress={() => router.push("/profile")}>
-
-                        <Text style={{ color: COLORS.textMuted }}>Perfil</Text>
                     </Pressable>
 
                     <Pressable
                         className="items-center"
-                        onPress={() => setSettingsOpen(prev => !prev)}
+                        onPress={() => router.push('/statistics')}
                     >
-                        <Text
-                            style={{
-                                color: settingsOpen ? COLORS.accent : COLORS.textMuted,
-                            }}
-                        >
-                            Ajustes
-                        </Text>
+                        <Text style={{ color: COLORS.textMuted }}>Estadísticas</Text>
+                    </Pressable>
 
-                        {settingsOpen && (
-                            <View
-                                className="mt-1 h-1 w-8 rounded-full"
-                                style={{ backgroundColor: COLORS.primary }}
-                            />
-                        )}
+                    <Pressable
+                        className="items-center"
+                        onPress={() => router.push('/statistics-history')}
+                    >
+                        <Text style={{ color: COLORS.textMuted }}>Historial</Text>
                     </Pressable>
                 </View>
 
@@ -271,128 +353,7 @@ export default function HomeScreen() {
 
                     </ScrollView>
 
-                    {/* MENÚ AJUSTES */}
-                    {settingsOpen && (
-                        <>
-                            {/* Fondo táctil para cerrar al tocar fuera */}
-                            <Pressable
-                                className="absolute inset-0"
-                                onPress={() => setSettingsOpen(false)}
-                                style={{ backgroundColor: 'transparent' }}
-                            />
 
-                            {/* Tarjeta del menú */}
-                            <View
-                                className="absolute rounded-2xl p-3"
-                                style={{
-                                    top: 10,
-                                    right: 10,
-                                    backgroundColor: '#111111',
-                                    borderWidth: 1,
-                                    borderColor: COLORS.primary,
-                                }}
-                            >
-                                <Pressable
-                                    className="py-1"
-                                    onPress={() => {
-                                        setSettingsOpen(false);
-                                        router.push('/info');
-                                    }}
-                                >
-                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
-                                        Información
-                                    </Text>
-                                </Pressable>
-
-                                <Pressable
-                                    className="py-1"
-                                    onPress={() => {
-                                        setSettingsOpen(false);
-                                        router.push('/statistics-history');
-                                    }}
-                                >
-                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
-                                        Historial de registros
-                                    </Text>
-                                </Pressable>
-
-                                <Pressable
-                                    className="py-1"
-                                    onPress={() => {
-                                        setSettingsOpen(false);
-                                        router.push('/about');
-                                    }}
-                                >
-                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
-                                        Acerca de nosotros
-                                    </Text>
-                                </Pressable>
-
-                                <Pressable
-                                    className="py-1"
-                                    onPress={() => {
-                                        setSettingsOpen(false);
-                                        router.push('/account');
-                                    }}
-                                >
-                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
-                                        Mi cuenta
-                                    </Text>
-                                </Pressable>
-
-                                <Pressable
-                                    className="py-1"
-                                    onPress={() => {
-                                        setSettingsOpen(false);
-                                        router.push('/support');
-                                    }}
-
-                                >
-                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
-                                        Soporte & Ayuda
-                                    </Text>
-                                </Pressable>
-
-                                <Pressable
-                                    className="py-1"
-                                    onPress={() => {
-                                        setSettingsOpen(false);
-                                        router.push('/contact');
-                                    }}
-                                >
-                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
-                                        Contacto
-                                    </Text>
-                                </Pressable>
-
-                                <Pressable
-                                    className="py-1"
-                                    onPress={() => {
-                                        setSettingsOpen(false);
-                                        router.push('/terms');
-                                    }}
-                                >
-                                    <Text className="text-sm" style={{ color: COLORS.textLight }}>
-                                        Términos y condiciones
-                                    </Text>
-                                </Pressable>
-
-                                <View
-                                    className="h-px my-2"
-                                    style={{ backgroundColor: COLORS.textMuted }}
-                                />
-
-                                <Pressable className="py-1" onPress={handleLogout}>
-                                    <Text
-                                        className="text-sm font-semibold"
-                                        style={{ color: '#FFBABA' }}
-                                    >
-                                        Cerrar sesión
-                                    </Text>
-                                </Pressable>
-                            </View>
-                        </>
-                    )}
                 </View>
 
                 {/* BOTONES INFERIORES */}
@@ -449,6 +410,7 @@ export default function HomeScreen() {
 
 
             </View >
+
         </SafeAreaView >
     );
 }

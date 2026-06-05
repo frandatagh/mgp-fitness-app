@@ -112,7 +112,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const value: AuthContextValue = {
         user,
         token,
-        isAuthenticated: !!token,
+        isAuthenticated: !!token && !!user,
         isLoading,
         login,
         logout,

@@ -7,6 +7,7 @@ import { COLORS } from "../constants/colors";
 import { useAuth } from "../context/AuthContext";
 import { Routine, getSuggestedRoutines } from "../lib/routines";
 import { RoutineCard } from "../components/RoutineCard";
+import AppHeader from '../components/AppHeader';
 
 export default function SuggestionsScreen() {
     const { isAuthenticated, user } = useAuth();
@@ -41,16 +42,10 @@ export default function SuggestionsScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
             <View
-                className="flex-1 px-4 pt-1 pb-2  w-full"
+                className="flex-1 px-4  pb-2  w-full"
                 style={{ maxWidth: 800, alignSelf: "center" }}
             >
-                {/* Logo */}
-                <View className="items-center">
-                    <Image
-                        source={require("../assets/img/iconmgp.png")}
-                        style={{ width: 85, height: 85, resizeMode: "contain" }}
-                    />
-                </View>
+                <AppHeader showProfile={false} />
 
                 {/* Título */}
                 <View className="self-start px-3 mb-1">

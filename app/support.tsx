@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
+import AppHeader from '../components/AppHeader';
 
 // Habilita animaciones en Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -155,13 +156,7 @@ export default function SupportScreen() {
                 className="flex-1 px-4 pt-1 pb-2"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
-                {/* Logo */}
-                <View className="items-center">
-                    <Image
-                        source={require('../assets/img/icontwist.png')}
-                        style={{ width: 85, height: 85, resizeMode: 'contain' }}
-                    />
-                </View>
+                <AppHeader showProfile={false} />
 
                 {/* Título */}
                 <View className="self-start px-3 mb-1">

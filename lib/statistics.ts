@@ -68,3 +68,23 @@ export async function getMyStatistics() {
 
     return data as MyStatisticsResponse;
 }
+
+export type AdviceItem = {
+    id: string;
+    title: string;
+    description: string;
+    type: 'running' | 'training' | 'recovery' | 'nutrition' | 'habit';
+    priority: number;
+};
+
+export async function getMyAdvice() {
+    const res = await apiFetch('/statistics/advice');
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+        throw new Error(data?.message || 'No se pudieron cargar los consejos');
+    }
+
+    return data as { items: AdviceItem[] };
+}

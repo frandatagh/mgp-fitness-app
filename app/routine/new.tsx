@@ -12,7 +12,7 @@ import {
     Image,
     KeyboardAvoidingView,
 } from 'react-native';
-
+import AppHeader from '../../components/AppHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, Redirect } from 'expo-router';
 import { COLORS } from '../../constants/colors';
@@ -232,13 +232,7 @@ export default function NewRoutineScreen() {
                 >
                     {/* HEADER FIJO: LOGO + TÍTULO */}
                     <View>
-                        <View className="items-center">
-                            <Image
-                                source={require('../../assets/img/icontwist.png')}
-                                style={{ width: 180, height: 100 }}
-                                resizeMode="contain"
-                            />
-                        </View>
+                        <AppHeader />
 
                         <View style={{ alignItems: 'flex-start' }}>
                             <Text

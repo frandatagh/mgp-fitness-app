@@ -10,8 +10,8 @@ import Animated, {
 import { COLORS } from '../../constants/colors';
 
 type StickerTransform = {
-    x: number;
-    y: number;
+    centerX: number;
+    centerY: number;
     scale: number;
     rotation: number;
 };
@@ -33,6 +33,7 @@ type Props = {
     onStickerTransformChange?: (transform: StickerTransform) => void;
     mode: 'preview' | 'export';
     routePoints?: RoutePoint[];
+    mapSnapshotUri?: string | null;
 };
 
 function routePointsToSvgPoints(
@@ -43,25 +44,59 @@ function routePointsToSvgPoints(
 ) {
     if (!routePoints || routePoints.length < 2) return '';
 
-    const lats = routePoints.map((p) => p.latitude);
-    const lngs = routePoints.map((p) => p.longitude);
+    const validPoints = routePoints.filter(
+        (p) =>
+            Number.isFinite(p.latitude) &&
+            Number.isFinite(p.longitude)
+    );
+
+    if (validPoints.length < 2) return '';
+
+    const lats = validPoints.map((p) => p.latitude);
+    const lngs = validPoints.map((p) => p.longitude);
 
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs);
     const maxLng = Math.max(...lngs);
 
-    const latRange = maxLat - minLat || 0.00001;
-    const lngRange = maxLng - minLng || 0.00001;
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLng = (minLng + maxLng) / 2;
 
-    return routePoints
+    const latToMeters = 111_320;
+    const lngToMeters = 111_320 * Math.cos((centerLat * Math.PI) / 180);
+
+    const projectedPoints = validPoints.map((p) => ({
+        x: (p.longitude - centerLng) * lngToMeters,
+        y: (centerLat - p.latitude) * latToMeters,
+    }));
+
+    const xs = projectedPoints.map((p) => p.x);
+    const ys = projectedPoints.map((p) => p.y);
+
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    const routeWidth = maxX - minX || 1;
+    const routeHeight = maxY - minY || 1;
+
+    const availableWidth = width - padding * 2;
+    const availableHeight = height - padding * 2;
+
+    const scale = Math.min(
+        availableWidth / routeWidth,
+        availableHeight / routeHeight
+    );
+
+    const offsetX = padding + (availableWidth - routeWidth * scale) / 2;
+    const offsetY = padding + (availableHeight - routeHeight * scale) / 2;
+
+    return projectedPoints
         .map((p) => {
-            const x =
-                padding + ((p.longitude - minLng) / lngRange) * (width - padding * 2);
-
-            const y =
-                padding +
-                (1 - (p.latitude - minLat) / latRange) * (height - padding * 2);
+            const x = offsetX + (p.x - minX) * scale;
+            const y = offsetY + (p.y - minY) * scale;
 
             return `${x},${y}`;
         })
@@ -78,23 +113,33 @@ function Metric({
     isPreview: boolean;
 }) {
     return (
-        <View style={{ alignItems: 'center', flex: 1 }}>
+        <View style={{ alignItems: 'center', flex: 1, minWidth: 0 }}>
             <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
                 style={{
                     color: '#B8B8B8',
                     fontSize: isPreview ? 12 : 38,
                     fontWeight: '800',
+                    textAlign: 'center',
+                    includeFontPadding: false,
                 }}
             >
                 {label}
             </Text>
 
             <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
                 style={{
                     color: '#FFFFFF',
                     fontSize: isPreview ? 11 : 34,
                     fontWeight: '900',
                     marginTop: isPreview ? 1 : 4,
+                    textAlign: 'center',
+                    includeFontPadding: false,
                 }}
             >
                 {value}
@@ -115,15 +160,21 @@ export default function SharePhotoComposer({
     onStickerTransformChange,
     mode,
     routePoints = [],
+    mapSnapshotUri,
 }: Props) {
     const isPreview = mode === 'preview';
 
-    const photoWidth = isPreview ? 320 : 1080;
-    const photoHeight = isPreview ? 570 : 1920;
+    const PREVIEW_WIDTH = 320;
+    const PREVIEW_HEIGHT = 570;
 
-    const stickerWidth = isPreview ? 300 : 900;
+    const EXPORT_WIDTH = 1080;
+    const EXPORT_HEIGHT = 1920;
+
+    const photoWidth = isPreview ? PREVIEW_WIDTH : EXPORT_WIDTH;
+    const photoHeight = isPreview ? PREVIEW_HEIGHT : EXPORT_HEIGHT;
+
+    const stickerWidth = isPreview ? 280 : 840;
     const stickerPadding = isPreview ? 10 : 34;
-    const interactionPadding = isPreview ? 34 : 90;
 
     const logoWidth = isPreview ? 62 : 220;
     const logoHeight = isPreview ? 42 : 145;
@@ -146,57 +197,83 @@ export default function SharePhotoComposer({
 
     const hasRoute = svgRoutePoints.length > 0;
 
-    const estimatedStickerHeight =
+    const stickerHeight =
         stickerStyleIndex === 0
             ? isPreview
                 ? 96
-                : 285
+                : 288
             : stickerStyleIndex === 1
                 ? isPreview
-                    ? 225
-                    : 690
+                    ? 175
+                    : 615
                 : isPreview
-                    ? 220
-                    : 650;
+                    ? 230
+                    : 690;
 
-    const hitWidth = stickerWidth + interactionPadding * 2;
-    const hitHeight = estimatedStickerHeight + interactionPadding * 2;
+    const visualStickerWidth = stickerWidth;
+    const visualStickerHeight = stickerHeight;
 
-    const translateX = useSharedValue(stickerTransform.x);
-    const translateY = useSharedValue(stickerTransform.y);
+    const clamp = (value: number, min: number, max: number) => {
+        return Math.max(min, Math.min(max, value));
+    };
+
+    const safeCenterX = clamp(
+        stickerTransform.centerX ?? 0.5,
+        visualStickerWidth / 2 / photoWidth,
+        1 - visualStickerWidth / 2 / photoWidth
+    );
+
+    const safeCenterY = clamp(
+        stickerTransform.centerY ?? 0.68,
+        visualStickerHeight / 2 / photoHeight,
+        1 - visualStickerHeight / 2 / photoHeight
+    );
+
+    const initialTranslateX = safeCenterX * photoWidth - visualStickerWidth / 2;
+    const initialTranslateY = safeCenterY * photoHeight - visualStickerHeight / 2;
+
+
+
+
+    const translateX = useSharedValue(initialTranslateX);
+    const translateY = useSharedValue(initialTranslateY);
+
     const scale = useSharedValue(stickerTransform.scale);
     const rotation = useSharedValue(stickerTransform.rotation);
 
-    const startX = useSharedValue(stickerTransform.x);
-    const startY = useSharedValue(stickerTransform.y);
+    const startX = useSharedValue(initialTranslateX);
+    const startY = useSharedValue(initialTranslateY);
+
     const startScale = useSharedValue(stickerTransform.scale);
     const startRotation = useSharedValue(stickerTransform.rotation);
 
     useEffect(() => {
-        translateX.value = stickerTransform.x;
-        translateY.value = stickerTransform.y;
+        translateX.value = initialTranslateX;
+        translateY.value = initialTranslateY;
         scale.value = stickerTransform.scale;
         rotation.value = stickerTransform.rotation;
     }, [
-        stickerTransform.x,
-        stickerTransform.y,
+        initialTranslateX,
+        initialTranslateY,
         stickerTransform.scale,
         stickerTransform.rotation,
     ]);
 
     const commitTransform = (x: number, y: number, s: number, r: number) => {
+        if (!isPreview) return;
+
+        const centerX = (x + visualStickerWidth / 2) / photoWidth;
+        const centerY = (y + visualStickerHeight / 2) / photoHeight;
+
         onStickerTransformChange?.({
-            x,
-            y,
+            centerX: clamp(centerX, 0, 1),
+            centerY: clamp(centerY, 0, 1),
             scale: s,
             rotation: r,
         });
     };
 
-    const minX = -interactionPadding;
-    const minY = -interactionPadding;
-    const maxX = photoWidth - hitWidth + interactionPadding;
-    const maxY = photoHeight - hitHeight + interactionPadding;
+
 
     const panGesture = Gesture.Pan()
         .onBegin(() => {
@@ -207,10 +284,23 @@ export default function SharePhotoComposer({
             const nextX = startX.value + event.translationX;
             const nextY = startY.value + event.translationY;
 
-            translateX.value = Math.min(Math.max(nextX, minX), maxX);
-            translateY.value = Math.min(Math.max(nextY, minY), maxY);
+            const horizontalOverflow = visualStickerWidth * 0.28;
+            const verticalOverflow = visualStickerHeight * 0.10;
+
+            translateX.value = Math.max(
+                -horizontalOverflow,
+                Math.min(photoWidth - visualStickerWidth + horizontalOverflow, nextX)
+            );
+
+            translateY.value = Math.max(
+                -verticalOverflow,
+                Math.min(photoHeight - visualStickerHeight + verticalOverflow, nextY)
+            );
         })
         .onEnd(() => {
+            startX.value = translateX.value;
+            startY.value = translateY.value;
+
             runOnJS(commitTransform)(
                 translateX.value,
                 translateY.value,
@@ -252,9 +342,10 @@ export default function SharePhotoComposer({
             );
         });
 
-    const composedGesture = Gesture.Race(
+    const composedGesture = Gesture.Simultaneous(
         panGesture,
-        Gesture.Simultaneous(pinchGesture, rotationGesture)
+        pinchGesture,
+        rotationGesture
     );
 
     const animatedStickerStyle = useAnimatedStyle(() => {
@@ -262,8 +353,8 @@ export default function SharePhotoComposer({
             transform: [
                 { translateX: translateX.value },
                 { translateY: translateY.value },
-                { scale: scale.value },
                 { rotate: `${rotation.value}rad` },
+                { scale: scale.value },
             ],
         } as any;
     });
@@ -280,13 +371,15 @@ export default function SharePhotoComposer({
             <Metric label="Tiempo" value={durationText} isPreview={isPreview} />
             <Metric label="Distancia" value={distanceText} isPreview={isPreview} />
             <Metric label="Ritmo" value={paceText} isPreview={isPreview} />
-            <Metric label="Vel. Máxima" value={maxSpeedText} isPreview={isPreview} />
+            <Metric label="Vel. Máx" value={maxSpeedText} isPreview={isPreview} />
         </View>
     );
 
+    const logoSource = require('../../assets/img/icontwist.png');
+
     const logo = (
         <Image
-            source={require('../../assets/img/icontwist.png')}
+            source={logoSource}
             style={{
                 width: logoWidth,
                 height: logoHeight,
@@ -306,12 +399,17 @@ export default function SharePhotoComposer({
                 justifyContent: 'center',
             }}
         >
-            <Svg width={routeBoxWidth} height={routeBoxHeight}>
+            <Svg
+                width={routeBoxWidth}
+                height={routeBoxHeight}
+                viewBox={`0 0 ${routeBoxWidth} ${routeBoxHeight}`}
+                preserveAspectRatio="xMidYMid meet"
+            >
                 {hasRoute && (
                     <Polyline
                         points={svgRoutePoints}
                         fill="none"
-                        stroke={routeLineColor}
+                        stroke={COLORS.primary}
                         strokeWidth={isPreview ? 5 : 15}
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -328,57 +426,84 @@ export default function SharePhotoComposer({
                 height: routeBoxHeight,
                 marginTop: isPreview ? 10 : 32,
                 borderRadius: isPreview ? 12 : 34,
-                backgroundColor: '#55C9C7',
+                backgroundColor: '#111111',
                 overflow: 'hidden',
                 alignItems: 'center',
                 justifyContent: 'center',
             }}
         >
-            <Svg width={routeBoxWidth} height={routeBoxHeight}>
-                <Line
-                    x1={routeBoxWidth * 0.05}
-                    y1={routeBoxHeight * 0.25}
-                    x2={routeBoxWidth * 0.95}
-                    y2={routeBoxHeight * 0.15}
-                    stroke="rgba(255,255,255,0.28)"
-                    strokeWidth={isPreview ? 2 : 5}
+            {mapSnapshotUri ? (
+                <Image
+                    source={{ uri: mapSnapshotUri }}
+                    style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        width: routeBoxWidth,
+                        height: routeBoxHeight,
+                    }}
+                    resizeMode="cover"
                 />
-                <Line
-                    x1={routeBoxWidth * 0.1}
-                    y1={routeBoxHeight * 0.78}
-                    x2={routeBoxWidth * 0.9}
-                    y2={routeBoxHeight * 0.62}
-                    stroke="rgba(255,255,255,0.22)"
-                    strokeWidth={isPreview ? 2 : 5}
+            ) : (
+                <View
+                    style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        width: routeBoxWidth,
+                        height: routeBoxHeight,
+                        backgroundColor: '#55C9C7',
+                    }}
                 />
-                <Line
-                    x1={routeBoxWidth * 0.28}
-                    y1={0}
-                    x2={routeBoxWidth * 0.2}
-                    y2={routeBoxHeight}
-                    stroke="rgba(255,255,255,0.20)"
-                    strokeWidth={isPreview ? 2 : 5}
-                />
-                <Line
-                    x1={routeBoxWidth * 0.72}
-                    y1={0}
-                    x2={routeBoxWidth * 0.82}
-                    y2={routeBoxHeight}
-                    stroke="rgba(255,255,255,0.20)"
-                    strokeWidth={isPreview ? 2 : 5}
-                />
+            )}
 
-                {hasRoute && (
-                    <Polyline
-                        points={svgRoutePoints}
-                        fill="none"
-                        stroke={routeLineColor}
-                        strokeWidth={isPreview ? 5 : 15}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                )}
-            </Svg>
+            {!mapSnapshotUri && hasRoute && (
+                <View
+                    style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        width: routeBoxWidth,
+                        height: routeBoxHeight,
+                    }}
+                >
+                    <Svg
+                        width={routeBoxWidth}
+                        height={routeBoxHeight}
+                        viewBox={`0 0 ${routeBoxWidth} ${routeBoxHeight}`}
+                        preserveAspectRatio="xMidYMid meet"
+                    >
+                        <Polyline
+                            points={svgRoutePoints}
+                            fill="none"
+                            stroke={routeLineColor}
+                            strokeWidth={isPreview ? 5 : 15}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                    </Svg>
+                </View>
+            )}
+
+            <View
+                style={{
+                    position: 'absolute',
+                    right: isPreview ? 6 : 18,
+                    bottom: isPreview ? 6 : 18,
+                    backgroundColor: 'rgba(0,0,0,0.28)',
+                    borderRadius: isPreview ? 8 : 18,
+                    padding: isPreview ? 3 : 8,
+                }}
+            >
+                <Image
+                    source={logoSource}
+                    style={{
+                        width: isPreview ? 32 : 96,
+                        height: isPreview ? 24 : 72,
+                    }}
+                    resizeMode="contain"
+                />
+            </View>
         </View>
     );
 
@@ -387,8 +512,10 @@ export default function SharePhotoComposer({
             <View
                 style={{
                     width: stickerWidth,
+                    height: stickerHeight,
                     backgroundColor: 'transparent',
                     alignItems: 'center',
+                    justifyContent: 'center',
                 }}
             >
                 {metricsRow}
@@ -398,15 +525,16 @@ export default function SharePhotoComposer({
             <View
                 style={{
                     width: stickerWidth,
+                    height: stickerHeight,
                     backgroundColor: 'rgba(17,17,17,0.88)',
                     borderWidth: isPreview ? 2 : 6,
                     borderColor: COLORS.primary,
                     borderRadius: isPreview ? 16 : 42,
                     padding: stickerPadding,
                     alignItems: 'center',
+                    justifyContent: 'center',
                 }}
             >
-                {logo}
                 <View style={{ marginTop: isPreview ? 2 : 10, width: '100%' }}>
                     {metricsRow}
                 </View>
@@ -416,11 +544,13 @@ export default function SharePhotoComposer({
             <View
                 style={{
                     width: stickerWidth,
+                    height: stickerHeight,
                     backgroundColor: 'transparent',
                     alignItems: 'center',
+                    justifyContent: 'center',
                 }}
             >
-                {logo}
+
                 <View style={{ marginTop: isPreview ? 2 : 12, width: '100%' }}>
                     {metricsRow}
                 </View>
@@ -451,15 +581,35 @@ export default function SharePhotoComposer({
             />
 
             {showSessionSticker && (
-                <GestureDetector gesture={composedGesture}>
+                isPreview ? (
+                    <GestureDetector gesture={composedGesture}>
+                        <Animated.View
+                            style={[
+                                {
+                                    position: 'absolute',
+                                    left: 0,
+                                    top: 0,
+                                    width: visualStickerWidth,
+                                    height: visualStickerHeight,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: 'transparent',
+                                },
+                                animatedStickerStyle,
+                            ]}
+                        >
+                            {stickerBody}
+                        </Animated.View>
+                    </GestureDetector>
+                ) : (
                     <Animated.View
                         style={[
                             {
                                 position: 'absolute',
                                 left: 0,
                                 top: 0,
-                                width: hitWidth,
-                                height: hitHeight,
+                                width: visualStickerWidth,
+                                height: visualStickerHeight,
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 backgroundColor: 'transparent',
@@ -469,7 +619,7 @@ export default function SharePhotoComposer({
                     >
                         {stickerBody}
                     </Animated.View>
-                </GestureDetector>
+                )
             )}
         </View>
     );

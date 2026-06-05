@@ -1,5 +1,5 @@
-import React, { useContext, useEffect } from 'react';
-import { Image, Pressable, ScrollView, Text, View, Dimensions, ActivityIndicator, Modal } from 'react-native';
+import React, { useEffect } from 'react';
+import { Image, Pressable, ScrollView, Text, View, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
@@ -8,8 +8,22 @@ import { LineChart } from 'react-native-chart-kit';
 import { useAuth } from '../context/AuthContext';
 import {
     getMyStatistics,
+    getMyAdvice,
     type MyStatisticsResponse,
+    type AdviceItem,
 } from '../lib/statistics';
+import {
+    getMyRunSessions,
+    type RunSession,
+} from '../lib/runSessions';
+import {
+    getStatisticsHistory,
+    type StatisticsHistoryDay,
+} from '../lib/statisticsHistory';
+import { useRouter } from 'expo-router';
+import AppHeader from '../components/AppHeader';
+
+
 
 function StatCard({
     icon,
@@ -163,11 +177,224 @@ function InfoButton({ onPress }: { onPress: () => void }) {
     );
 }
 
-export default function StatisticsScreen() {
+function ChartTouchOverlay<T>({
+    width,
+    height,
+    items,
+    onSelect,
+}: {
+    width: number;
+    height: number;
+    items: T[];
+    onSelect: (item: T) => void;
+}) {
+    if (!width || items.length === 0) return null;
 
-    const chartWidth = Math.min(Dimensions.get('window').width - 64, 720);
-    const [ratingChartWidth, setRatingChartWidth] = React.useState(0);
-    const { isAuthenticated, user } = useAuth();
+    const leftPadding = 42;
+    const rightPadding = 22;
+    const plotWidth = Math.max(width - leftPadding - rightPadding, 1);
+
+    return (
+        <View
+            pointerEvents="box-none"
+            style={{
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                width,
+                height,
+                zIndex: 50,
+            }}
+        >
+            {items.map((item, index) => {
+                const x =
+                    items.length === 1
+                        ? leftPadding + plotWidth / 2
+                        : leftPadding + (plotWidth * index) / (items.length - 1);
+
+                return (
+                    <Pressable
+                        key={`chart-touch-${index}`}
+                        onPress={() => onSelect(item)}
+                        style={[
+                            {
+                                position: 'absolute',
+                                left: x - 22,
+                                top: 8,
+                                width: 44,
+                                height: height - 34,
+                                borderRadius: 22,
+                                backgroundColor: 'transparent',
+                            },
+                            {
+                                cursor: 'pointer',
+                            } as any,
+                        ]}
+                    />
+                );
+            })}
+        </View>
+    );
+}
+
+function AdviceCard({
+    title,
+    description,
+    type,
+}: {
+    title: string;
+    description: string;
+    type: 'running' | 'training' | 'recovery' | 'nutrition' | 'habit';
+}) {
+    const config = {
+        running: {
+            icon: 'person-running' as const,
+            color: COLORS.primary,
+            badge: 'Running',
+        },
+        training: {
+            icon: 'dumbbell' as const,
+            color: '#78DCE8',
+            badge: 'Rutinas',
+        },
+        recovery: {
+            icon: 'bed' as const,
+            color: '#FACC15',
+            badge: 'Descanso',
+        },
+        nutrition: {
+            icon: 'apple-whole' as const,
+            color: '#FB923C',
+            badge: 'Hábitos',
+        },
+        habit: {
+            icon: 'clipboard-check' as const,
+            color: '#A78BFA',
+            badge: 'Hábito',
+        },
+    }[type];
+
+    return (
+        <View
+            style={{
+                backgroundColor: 'rgba(255,255,255,0.045)',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.10)',
+                borderRadius: 18,
+                padding: 14,
+                marginBottom: 10,
+            }}
+        >
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <FontAwesome6
+                    name={config.icon}
+                    size={18}
+                    color={config.color}
+                    style={{ marginRight: 10, marginTop: 2 }}
+                />
+
+                <View style={{ flex: 1 }}>
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            marginBottom: 5,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color: COLORS.textLight,
+                                fontSize: 14,
+                                fontWeight: '900',
+                                flex: 1,
+                                paddingRight: 8,
+                            }}
+                        >
+                            {title}
+                        </Text>
+
+                        <View
+                            style={{
+                                backgroundColor: 'rgba(255,255,255,0.08)',
+                                borderRadius: 999,
+                                paddingHorizontal: 8,
+                                paddingVertical: 3,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: config.color,
+                                    fontSize: 9,
+                                    fontWeight: '900',
+                                }}
+                            >
+                                {config.badge}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <Text
+                        style={{
+                            color: COLORS.textMuted,
+                            fontSize: 12,
+                            lineHeight: 18,
+                        }}
+                    >
+                        {description}
+                    </Text>
+                </View>
+            </View>
+        </View>
+    );
+}
+
+export default function StatisticsScreen() {
+    const { isAuthenticated, isLoading } = useAuth();
+    const router = useRouter();
+
+    React.useEffect(() => {
+        if (!isLoading && !isAuthenticated) {
+            router.replace('/');
+        }
+    }, [isLoading, isAuthenticated, router]);
+
+    const [runningChartWidth, setRunningChartWidth] = React.useState(0);
+
+    const [runSessions, setRunSessions] = React.useState<RunSession[]>([]);
+    const [runningPeriod, setRunningPeriod] = React.useState<
+        'latest' | 'weekly' | 'monthly' | 'yearly'
+    >('latest');
+
+    const [selectedRunSession, setSelectedRunSession] = React.useState<RunSession | null>(null);
+    const [runDetailVisible, setRunDetailVisible] = React.useState(false);
+
+    const [historyDays, setHistoryDays] = React.useState<StatisticsHistoryDay[]>([]);
+    const [routineChartWidth, setRoutineChartWidth] = React.useState(0);
+
+    const [routinePeriod, setRoutinePeriod] = React.useState<
+        'latest' | 'weekly' | 'monthly' | 'yearly'
+    >('latest');
+
+    const [adviceItems, setAdviceItems] = React.useState<AdviceItem[]>([]);
+    const [adviceError, setAdviceError] = React.useState<string | null>(null);
+
+    type RoutinePerformancePoint = {
+        id: string;
+        date: string;
+        label: string;
+        value: number;
+        source: 'routine-rating' | 'exercise-average';
+        routineName?: string;
+        ratedExercisesCount?: number;
+    };
+
+    const [selectedRoutinePoint, setSelectedRoutinePoint] =
+        React.useState<RoutinePerformancePoint | null>(null);
+
+    const [routineDetailVisible, setRoutineDetailVisible] = React.useState(false);
+
+
 
     const [stats, setStats] = React.useState<MyStatisticsResponse | null>(null);
     const [loadingStats, setLoadingStats] = React.useState(true);
@@ -185,25 +412,6 @@ export default function StatisticsScreen() {
         }
     }, [isAuthenticated]);
 
-    useEffect(() => {
-        const loadStats = async () => {
-            try {
-                setLoadingStats(true);
-                setStatsError(null);
-
-                const data = await getMyStatistics();
-                setStats(data);
-            } catch (error) {
-                console.error('Error cargando estadísticas:', error);
-                setStatsError('No se pudieron cargar tus estadísticas.');
-            } finally {
-                setLoadingStats(false);
-            }
-        };
-
-        loadStats();
-    }, []);
-
 
     useEffect(() => {
         const loadStats = async () => {
@@ -213,8 +421,40 @@ export default function StatisticsScreen() {
                 setLoadingStats(true);
                 setStatsError(null);
 
-                const data = await getMyStatistics();
-                setStats(data);
+                const [statsResult, sessionsResult, historyResult, adviceResult] =
+                    await Promise.allSettled([
+                        getMyStatistics(),
+                        getMyRunSessions(),
+                        getStatisticsHistory(),
+                        getMyAdvice(),
+                    ]);
+
+                if (statsResult.status === 'rejected') {
+                    throw new Error('No se pudieron cargar tus estadísticas.');
+                }
+
+                if (sessionsResult.status === 'rejected') {
+                    throw new Error('No se pudieron cargar tus sesiones de running.');
+                }
+
+                if (historyResult.status === 'rejected') {
+                    throw new Error('No se pudo cargar tu historial de registros.');
+                }
+
+                setStats(statsResult.value);
+                setRunSessions(sessionsResult.value.items ?? []);
+                setHistoryDays(historyResult.value.items ?? []);
+
+                if (adviceResult.status === 'fulfilled') {
+                    setAdviceItems(adviceResult.value.items ?? []);
+                    setAdviceError(null);
+                } else {
+                    console.log('Error cargando consejos:', adviceResult.reason);
+                    setAdviceItems([]);
+                    setAdviceError(
+                        'No pudimos cargar los consejos en este momento. Tus estadísticas siguen disponibles.'
+                    );
+                }
             } catch (error) {
                 console.error('Error cargando estadísticas:', error);
                 setStatsError('No se pudieron cargar tus estadísticas.');
@@ -226,18 +466,7 @@ export default function StatisticsScreen() {
         loadStats();
     }, [isAuthenticated]);
 
-    if (!isAuthenticated) {
-        return (
-            <SafeAreaView
-                className="flex-1 items-center justify-center"
-                style={{ backgroundColor: COLORS.background }}
-            >
-                <Text style={{ color: COLORS.textLight }}>
-                    Redirigiendo al inicio de sesión...
-                </Text>
-            </SafeAreaView>
-        );
-    }
+
 
 
 
@@ -288,17 +517,452 @@ export default function StatisticsScreen() {
         return `${Math.min(100, Math.max(0, Math.round(value * 10)))}%` as `${number}%`;
     };
 
-    const chartLabels = stats?.performance.chart.labels?.length
-        ? stats.performance.chart.labels
-        : ['1', '2', '3', '4', '5', '6'];
+    const getSessionDate = (session: RunSession) => {
+        return new Date(session.startedAt ?? session.createdAt);
+    };
 
-    const gymChartData = stats?.performance.chart.gym?.length
-        ? stats.performance.chart.gym
+    const getRunSessionRating = (session: RunSession) => {
+        const rating =
+            (session as any).rating ??
+            (session as any).valuation ??
+            (session as any).effort ??
+            null;
+
+        if (rating == null) return null;
+
+        const value = Number(rating);
+
+        return Number.isNaN(value) ? null : value;
+    };
+
+    const filteredRunningSessions = React.useMemo(() => {
+        const sorted = [...runSessions]
+            .filter((session) => getRunSessionRating(session) != null)
+            .sort(
+                (a, b) => getSessionDate(b).getTime() - getSessionDate(a).getTime()
+            );
+
+        const now = new Date();
+
+        if (runningPeriod === 'latest') {
+            return sorted.slice(0, 8).reverse();
+        }
+
+        const filtered = sorted.filter((session) => {
+            const date = getSessionDate(session);
+            const diffDays =
+                (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
+
+            if (runningPeriod === 'weekly') {
+                return diffDays <= 7;
+            }
+
+            if (runningPeriod === 'monthly') {
+                return (
+                    date.getMonth() === now.getMonth() &&
+                    date.getFullYear() === now.getFullYear()
+                );
+            }
+
+            if (runningPeriod === 'yearly') {
+                return date.getFullYear() === now.getFullYear();
+            }
+
+            return true;
+        });
+
+        return filtered.reverse();
+    }, [runSessions, runningPeriod]);
+
+    const runningChartLabels = filteredRunningSessions.length
+        ? filteredRunningSessions.map((session, index) => {
+            const date = getSessionDate(session);
+
+            if (runningPeriod === 'latest') {
+                return String(index + 1);
+            }
+
+            return `${date.getDate()}/${date.getMonth() + 1}`;
+        })
+        : ['1'];
+
+    const runningOnlyChartData = filteredRunningSessions.length
+        ? filteredRunningSessions.map((session) => getRunSessionRating(session) ?? 0)
         : [0];
 
-    const runningChartData = stats?.performance.chart.running?.length
-        ? stats.performance.chart.running
+    const openRunSessionDetail = (session: RunSession) => {
+        setSelectedRunSession(session);
+        setRunDetailVisible(true);
+    };
+
+
+    const routinePerformancePoints = React.useMemo<RoutinePerformancePoint[]>(() => {
+        const points: RoutinePerformancePoint[] = [];
+
+        historyDays.forEach((day) => {
+            const routineRecords = day.records.filter(
+                (record) => record.type === 'routine' && record.rating != null
+            );
+
+            const exerciseRecords = day.records.filter(
+                (record) => record.type === 'exercise' && record.rating != null
+            );
+
+            if (routineRecords.length > 0) {
+                routineRecords.forEach((record) => {
+                    points.push({
+                        id: record.id,
+                        date: day.date,
+                        label: day.label,
+                        value: Number(record.rating),
+                        source: 'routine-rating',
+                        routineName: record.title,
+                    });
+                });
+
+                return;
+            }
+
+            if (exerciseRecords.length > 0) {
+                const ratings = exerciseRecords
+                    .map((record) => Number(record.rating))
+                    .filter((value) => !Number.isNaN(value));
+
+                if (ratings.length === 0) return;
+
+                const avg =
+                    ratings.reduce((sum, value) => sum + value, 0) / ratings.length;
+
+                points.push({
+                    id: `exercise-average-${day.date}`,
+                    date: day.date,
+                    label: day.label,
+                    value: Number(avg.toFixed(1)),
+                    source: 'exercise-average',
+                    ratedExercisesCount: ratings.length,
+                });
+            }
+        });
+
+        return points.sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+    }, [historyDays]);
+
+    const filteredRoutinePoints = React.useMemo(() => {
+        const sorted = [...routinePerformancePoints].sort(
+            (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+
+        const now = new Date();
+
+        if (routinePeriod === 'latest') {
+            return sorted.slice(0, 8).reverse();
+        }
+
+        const filtered = sorted.filter((point) => {
+            const date = new Date(point.date);
+            const diffDays =
+                (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
+
+            if (routinePeriod === 'weekly') {
+                return diffDays <= 7;
+            }
+
+            if (routinePeriod === 'monthly') {
+                return (
+                    date.getMonth() === now.getMonth() &&
+                    date.getFullYear() === now.getFullYear()
+                );
+            }
+
+            if (routinePeriod === 'yearly') {
+                return date.getFullYear() === now.getFullYear();
+            }
+
+            return true;
+        });
+
+        return filtered.reverse();
+    }, [routinePerformancePoints, routinePeriod]);
+
+    const routineChartLabels = filteredRoutinePoints.length
+        ? filteredRoutinePoints.map((point, index) => {
+            const date = new Date(point.date);
+
+            if (routinePeriod === 'latest') {
+                return String(index + 1);
+            }
+
+            return `${date.getDate()}/${date.getMonth() + 1}`;
+        })
+        : ['1'];
+
+    const routineChartData = filteredRoutinePoints.length
+        ? filteredRoutinePoints.map((point) => point.value)
         : [0];
+
+    const openRoutinePointDetail = (point: RoutinePerformancePoint) => {
+        setSelectedRoutinePoint(point);
+        setRoutineDetailVisible(true);
+    };
+
+    const getRunningAverageByDays = (days: number) => {
+        const now = new Date();
+
+        const ratedSessions = runSessions
+            .filter((session) => {
+                const rating = getRunSessionRating(session);
+                if (rating == null) return false;
+
+                const date = getSessionDate(session);
+                const diffDays =
+                    (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
+
+                return diffDays <= days;
+            })
+            .map((session) => getRunSessionRating(session))
+            .filter((rating): rating is number => rating != null);
+
+        if (ratedSessions.length === 0) return null;
+
+        const avg =
+            ratedSessions.reduce((sum, rating) => sum + rating, 0) /
+            ratedSessions.length;
+
+        return Number(avg.toFixed(1));
+    };
+
+    const runningWeeklyAverage = React.useMemo(
+        () => getRunningAverageByDays(7),
+        [runSessions]
+    );
+
+    const runningMonthlyAverage = React.useMemo(
+        () => getRunningAverageByDays(30),
+        [runSessions]
+    );
+
+    const runningYearlyAverage = React.useMemo(
+        () => getRunningAverageByDays(365),
+        [runSessions]
+    );
+
+    const totalHistoricalSessions = React.useMemo(() => {
+        const runningCount = runSessions.length;
+        const routineCount = routinePerformancePoints.length;
+
+        return runningCount + routineCount;
+    }, [runSessions, routinePerformancePoints]);
+
+    const historicalEffortAverage = React.useMemo(() => {
+        const runningRatings = runSessions
+            .map((session) => getRunSessionRating(session))
+            .filter((rating): rating is number => rating != null);
+
+        const routineRatings = routinePerformancePoints
+            .map((point) => point.value)
+            .filter((value) => value != null && !Number.isNaN(value));
+
+        const allRatings = [...runningRatings, ...routineRatings];
+
+        if (allRatings.length === 0) return null;
+
+        const avg =
+            allRatings.reduce((sum, value) => sum + value, 0) / allRatings.length;
+
+        return Number(avg.toFixed(1));
+    }, [runSessions, routinePerformancePoints]);
+
+    const totalHistoricalDistanceMeters =
+        stats?.summary.totalDistanceMeters ?? 0;
+
+
+    const runningTotalDurationSeconds = React.useMemo(() => {
+        return runSessions.reduce((sum, session) => {
+            return sum + (session.durationSeconds ?? 0);
+        }, 0);
+    }, [runSessions]);
+
+    const runningAverageMaxSpeedMps = React.useMemo(() => {
+        const speeds = runSessions
+            .map((session) => session.maxSpeedMps)
+            .filter((value): value is number => value != null && !Number.isNaN(value));
+
+        if (speeds.length === 0) return null;
+
+        const avg = speeds.reduce((sum, value) => sum + value, 0) / speeds.length;
+
+        return avg;
+    }, [runSessions]);
+
+    const runningHistoricalAvgPaceSecPerKm = React.useMemo(() => {
+        const totalDistanceMeters = runSessions.reduce((sum, session) => {
+            return sum + (session.distanceMeters ?? 0);
+        }, 0);
+
+        const totalDurationSeconds = runSessions.reduce((sum, session) => {
+            return sum + (session.durationSeconds ?? 0);
+        }, 0);
+
+        if (totalDistanceMeters <= 0 || totalDurationSeconds <= 0) return null;
+
+        return totalDurationSeconds / (totalDistanceMeters / 1000);
+    }, [runSessions]);
+
+    const runningYearlyDistanceMeters = React.useMemo(() => {
+        const now = new Date();
+
+        return runSessions.reduce((sum, session) => {
+            const date = getSessionDate(session);
+            const diffDays =
+                (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24);
+
+            if (diffDays <= 365) {
+                return sum + (session.distanceMeters ?? 0);
+            }
+
+            return sum;
+        }, 0);
+    }, [runSessions]);
+
+    function getInsightStyle(type: 'positive' | 'warning' | 'neutral') {
+        if (type === 'positive') {
+            return {
+                icon: 'checkmark-circle-outline' as const,
+                iconColor: COLORS.primary,
+                borderColor: 'rgba(198,255,0,0.35)',
+                backgroundColor: 'rgba(198,255,0,0.08)',
+                badgeText: 'Positivo',
+            };
+        }
+
+        if (type === 'warning') {
+            return {
+                icon: 'alert-circle-outline' as const,
+                iconColor: '#FACC15',
+                borderColor: 'rgba(250,204,21,0.35)',
+                backgroundColor: 'rgba(250,204,21,0.08)',
+                badgeText: 'Atención',
+            };
+        }
+
+        return {
+            icon: 'information-circle-outline' as const,
+            iconColor: '#78DCE8',
+            borderColor: 'rgba(120,220,232,0.35)',
+            backgroundColor: 'rgba(120,220,232,0.08)',
+            badgeText: 'Dato',
+        };
+    }
+
+    function InsightCard({
+        title,
+        description,
+        type,
+    }: {
+        title: string;
+        description: string;
+        type: 'positive' | 'warning' | 'neutral';
+    }) {
+        const style = getInsightStyle(type);
+
+        return (
+            <View
+                style={{
+                    backgroundColor: style.backgroundColor,
+                    borderWidth: 1,
+                    borderColor: style.borderColor,
+                    borderRadius: 18,
+                    padding: 14,
+                    marginBottom: 10,
+                }}
+            >
+                <View
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'flex-start',
+                    }}
+                >
+                    <Ionicons
+                        name={style.icon}
+                        size={22}
+                        color={style.iconColor}
+                        style={{ marginRight: 10, marginTop: 1 }}
+                    />
+
+                    <View style={{ flex: 1 }}>
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: 4,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: COLORS.textLight,
+                                    fontSize: 14,
+                                    fontWeight: '900',
+                                    flex: 1,
+                                    paddingRight: 8,
+                                }}
+                            >
+                                {title}
+                            </Text>
+
+                            <View
+                                style={{
+                                    backgroundColor: 'rgba(255,255,255,0.08)',
+                                    borderRadius: 999,
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 3,
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: style.iconColor,
+                                        fontSize: 9,
+                                        fontWeight: '900',
+                                    }}
+                                >
+                                    {style.badgeText}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <Text
+                            style={{
+                                color: COLORS.textMuted,
+                                fontSize: 12,
+                                lineHeight: 18,
+                            }}
+                        >
+                            {description}
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <SafeAreaView
+                className="flex-1 items-center justify-center"
+                style={{ backgroundColor: COLORS.background }}
+            >
+                <Text style={{ color: COLORS.textLight }}>
+                    Redirigiendo al inicio de sesión...
+                </Text>
+            </SafeAreaView>
+        );
+    }
+
+    if (!isLoading && !isAuthenticated) {
+        return null;
+    }
 
     return (
         <SafeAreaView
@@ -308,14 +972,10 @@ export default function StatisticsScreen() {
             <View className="flex-1 w-full px-2"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
-
-                <View className="items-center mt-1" style={{ marginBottom: -10 }}>
-                    <Image
-                        source={require('../assets/img/iconrun.png')}
-                        style={{ width: 170, height: 90 }}
-                        resizeMode="contain"
-                    />
+                <View className='px-2'>
+                    <AppHeader showProfile={false} />
                 </View>
+
 
                 <Text
                     className="ml-5 pl-1 pb-1 text-md text-gray-500"
@@ -371,293 +1031,576 @@ export default function StatisticsScreen() {
 
 
                                 <Section>
-                                    <View className='flex-row m-2 pb-2 items-center justify-between'>
-                                        <View className='flex-row items-center'>
-                                            <Ionicons className='mr-2' name="star" size={18} color={COLORS.primary} />
-                                            <Text className='text-md font-bold' style={{ color: '#fff' }}>
-                                                Resumen General
-                                            </Text>
-                                        </View>
-
-                                        <InfoButton
-                                            onPress={() =>
-                                                openInfoModal(
-                                                    'Resumen general',
-                                                    'Sesiones: cantidad de entrenamientos registrados esta semana.\n\nDistancia total: suma total de kilómetros registrados en tus sesiones de running.\n\nEsfuerzo promedio: promedio de valoraciones registradas en tus entrenamientos. Mientras más registros cargues, más precisa será esta métrica.'
-                                                )
-                                            }
-                                        />
-
-
-                                    </View>
-                                    <View className="flex-row " style={{ gap: 10 }}>
+                                    <Text className="ml-2 mb-2 text-md font-bold" style={{ color: '#fff' }}>
+                                        Resumen general
+                                    </Text>
+                                    <View className="flex-row" style={{ gap: 10 }}>
                                         <StatCard
-                                            icon={<Ionicons name="calendar-outline" size={17} color={COLORS.primary} />}
-                                            label="Sesiones"
-                                            value={String(stats?.summary.weeklySessions ?? 0)}
-                                            sub="esta semana"
+                                            icon={<Ionicons name="fitness-outline" size={17} color={COLORS.primary} />}
+                                            label="Total histórico"
+                                            value={String(totalHistoricalSessions)}
+                                            sub="running, rutinas y ejercicios"
                                         />
+
                                         <StatCard
                                             icon={<Ionicons name="walk-outline" size={17} color="#78DCE8" />}
-                                            label="Distancia"
-                                            value={formatStatDistance(stats?.summary.totalDistanceMeters)}
-                                            sub="total"
+                                            label="Km recorridos"
+                                            value={formatStatDistance(totalHistoricalDistanceMeters)}
+                                            sub="total histórico running"
                                         />
                                     </View>
 
                                     <View style={{ marginTop: 10 }}>
                                         <StatCard
-                                            icon={<FontAwesome6 name="fire-flame-curved" size={16} color={COLORS.primary} />}
-                                            label="Esfuerzo promedio"
-                                            value={formatRating(stats?.summary.avgEffort)}
-                                            sub="últimos entrenamientos"
+                                            icon={<Ionicons name="star-outline" size={17} color={COLORS.primary} />}
+                                            label="Promedio histórico de esfuerzo"
+                                            value={formatRating(historicalEffortAverage)}
+                                            sub="promedio general de running y rutinas"
                                         />
                                     </View>
                                 </Section>
 
                                 <Section>
-                                    <View className='flex-row m-2 pb-2 items-center justify-between'>
-                                        <View className='flex-row items-center'>
-                                            <Ionicons className='mr-2' name="bulb-outline" size={18} color={COLORS.primary} />
-                                            <Text className='text-md font-bold' style={{ color: '#fff' }}>
-                                                Insights
-                                            </Text>
+                                    <View
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            marginHorizontal: 10,
+                                            marginTop: 6,
+                                            marginBottom: 15,
+                                        }}
+                                    >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                            <Ionicons
+                                                name="bulb-outline"
+                                                size={21}
+                                                color={COLORS.primary}
+                                                style={{ marginRight: 10 }}
+                                            />
+
+                                            <View style={{ flex: 1 }}>
+                                                <Text
+                                                    className="text-md font-bold" style={{ color: '#fff' }}
+                                                >
+                                                    Insights
+                                                </Text>
+
+                                                <Text
+                                                    style={{
+                                                        color: COLORS.textMuted,
+                                                        fontSize: 11,
+                                                        marginTop: 2,
+                                                    }}
+                                                >
+                                                    Lectura automática de tus datos recientes
+                                                </Text>
+                                            </View>
                                         </View>
 
                                         <InfoButton
                                             onPress={() =>
                                                 openInfoModal(
                                                     'Insights',
-                                                    'Los insights son observaciones automáticas creadas a partir de tus registros.\n\nLa app compara tus sesiones, valoraciones y rendimiento para mostrarte tendencias simples, como mejoras de ritmo, constancia semanal o esfuerzo alto acumulado.'
+                                                    'Los insights son observaciones automáticas basadas en tus datos de entrenamiento.\n\nNo son consejos todavía: primero muestran qué está pasando con tu actividad, esfuerzo, running y rutinas.\n\nMás adelante, la sección de consejos usará estos datos para darte recomendaciones prácticas.'
                                                 )
                                             }
                                         />
                                     </View>
-                                    <View className="p-1">
-                                        {(stats?.insights?.length ? stats.insights : []).map((insight) => (
-                                            <View key={insight.id} style={{ marginBottom: 10 }}>
-                                                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700', marginBottom: 5 }}>
-                                                    {insight.title}
-                                                </Text>
-                                                <Text style={{ color: '#BDBDBD', fontSize: 13, lineHeight: 19 }}>
-                                                    {insight.description}
-                                                </Text>
-                                            </View>
-                                        ))}
-                                    </View>
+
+                                    {stats?.insights?.length ? (
+                                        <View>
+                                            {stats.insights.map((insight) => (
+                                                <InsightCard
+                                                    key={insight.id}
+                                                    title={insight.title}
+                                                    description={insight.description}
+                                                    type={insight.type}
+                                                />
+                                            ))}
+                                        </View>
+                                    ) : (
+                                        <View
+                                            style={{
+                                                backgroundColor: 'rgba(255,255,255,0.04)',
+                                                borderWidth: 1,
+                                                borderColor: 'rgba(255,255,255,0.08)',
+                                                borderRadius: 18,
+                                                padding: 16,
+                                                alignItems: 'center',
+                                            }}
+                                        >
+                                            <Ionicons
+                                                name="analytics-outline"
+                                                size={28}
+                                                color={COLORS.textMuted}
+                                            />
+
+                                            <Text
+                                                style={{
+                                                    color: COLORS.textLight,
+                                                    fontSize: 14,
+                                                    fontWeight: '800',
+                                                    textAlign: 'center',
+                                                    marginTop: 10,
+                                                }}
+                                            >
+                                                Todavía no hay insights suficientes
+                                            </Text>
+
+                                            <Text
+                                                style={{
+                                                    color: COLORS.textMuted,
+                                                    fontSize: 12,
+                                                    lineHeight: 18,
+                                                    textAlign: 'center',
+                                                    marginTop: 6,
+                                                }}
+                                            >
+                                                A medida que registres sesiones, rutinas y valoraciones, la app podrá detectar patrones en tu entrenamiento.
+                                            </Text>
+                                        </View>
+                                    )}
                                 </Section>
 
                                 <Section>
-                                    <View
-                                        className="flex-row m-2 pb-2 items-center justify-between"
-                                    >
+                                    <View className="flex-row m-2 pb-2 items-center justify-between">
                                         <View className="flex-row items-center">
-                                            <Ionicons
+                                            <FontAwesome6
                                                 className="mr-2"
-                                                name="analytics-outline"
+                                                name="chart-simple"
                                                 size={18}
                                                 color={COLORS.primary}
                                             />
 
-                                            <Text
-                                                className="text-md font-bold"
-                                                style={{ color: '#fff' }}
-                                            >
-                                                Rendimiento
+                                            <Text className="text-md font-bold" style={{ color: '#fff' }}>
+                                                Rendimiento de tus sesiones
                                             </Text>
                                         </View>
 
                                         <InfoButton
                                             onPress={() =>
                                                 openInfoModal(
-                                                    'Rendimiento',
-                                                    'Promedio semanal: valoración promedio de tus entrenamientos durante la semana.\n\nMejor día: día con mejor promedio de valoración.\n\nPeor día: día con menor promedio de valoración.\n\nGráfico: compara la evolución de tus valoraciones de gimnasio y running.\n\nLa línea azul representa entrenamientos de gimnasio y la línea verde representa sesiones de running.'
+                                                    'Rendimiento Running',
+                                                    'Este gráfico muestra solamente tus sesiones de running.\n\nCada punto representa una sesión y su valoración registrada de 1 a 10.\n\nPodés cambiar el período entre últimas sesiones, semana, mes o año.'
                                                 )
                                             }
                                         />
                                     </View>
-                                    <View className='overflow-hidden'>
-                                        <Text
-                                            style={{
-                                                color: COLORS.textMuted,
-                                                fontSize: 12,
-                                                marginBottom: 4,
-                                                marginLeft: 10,
-                                            }}
-                                        >
-                                            Gráfico de evolución por sesión
-                                        </Text>
-                                        <View className='px-18'>
-                                            <View
-                                                style={{ marginTop: 14, width: '100%' }}
-                                                onLayout={(event) => {
-                                                    const width = event.nativeEvent.layout.width;
-                                                    setRatingChartWidth(width);
-                                                }}
-                                            >
+                                    <View
+                                        style={{
+                                            flexDirection: 'row',
+                                            flexWrap: 'wrap',
+                                            justifyContent: 'center',
+                                            gap: 4,
+                                            marginBottom: 12,
+                                            paddingHorizontal: 6,
+                                        }}
+                                    >
+                                        {[
+                                            { key: 'latest', label: 'Últimas' },
+                                            { key: 'weekly', label: 'Semanal' },
+                                            { key: 'monthly', label: 'Mensual' },
+                                            { key: 'yearly', label: 'Anual' },
+                                        ].map((item) => {
+                                            const active = runningPeriod === item.key;
 
-
-                                                {ratingChartWidth > 0 && (
-                                                    <LineChart
-                                                        data={{
-                                                            labels: chartLabels,
-                                                            datasets: [
-                                                                {
-                                                                    data: gymChartData,
-                                                                    color: () => '#78DCE8',
-                                                                    strokeWidth: 3,
-                                                                },
-                                                                {
-                                                                    data: runningChartData,
-                                                                    color: () => COLORS.primary,
-                                                                    strokeWidth: 3,
-                                                                },
-                                                            ]
-                                                        }}
-                                                        width={ratingChartWidth}
-                                                        height={170}
-                                                        fromZero
-                                                        yAxisInterval={0.9}
-                                                        chartConfig={{
-                                                            backgroundGradientFrom: '#151515',
-                                                            backgroundGradientTo: '#151515',
-                                                            decimalPlaces: 1,
-                                                            color: (opacity = 1) => `rgba(255,255,255,${opacity})`,
-                                                            labelColor: (opacity = 1) => `rgba(189,189,189,${opacity})`,
-                                                            propsForDots: {
-                                                                r: '4',
-                                                                strokeWidth: '1',
-                                                                stroke: '#111',
-                                                            },
-                                                            propsForBackgroundLines: {
-                                                                stroke: 'rgba(255,255,255,0.08)',
-                                                            },
-                                                        }}
-                                                        bezier
+                                            return (
+                                                <Pressable
+                                                    key={item.key}
+                                                    onPress={() => setRunningPeriod(item.key as any)}
+                                                    style={{
+                                                        paddingVertical: 3,
+                                                        paddingHorizontal: 12,
+                                                        borderRadius: 10,
+                                                        backgroundColor: active ? COLORS.primary : '#1b1b1b',
+                                                        borderWidth: 1,
+                                                        borderColor: active ? COLORS.primary : '#333333',
+                                                    }}
+                                                >
+                                                    <Text
                                                         style={{
-                                                            borderRadius: 18,
-                                                            marginLeft: -12,
+                                                            color: active ? '#111111' : COLORS.textLight,
+                                                            fontSize: 10,
+                                                            fontWeight: '700',
                                                         }}
-                                                    />
-                                                )}
-                                            </View>
+                                                    >
+                                                        {item.label}
+                                                    </Text>
+                                                </Pressable>
+                                            );
+                                        })}
+                                    </View>
 
-                                            <View
+                                    <View
+                                        style={{ marginTop: 6, width: '100%', position: 'relative' }}
+                                        onLayout={(event) => {
+                                            const width = event.nativeEvent.layout.width;
+                                            setRunningChartWidth(width);
+                                        }}
+                                    >
+                                        {runningChartWidth > 0 && filteredRunningSessions.length > 0 && (
+                                            <LineChart
+                                                data={{
+                                                    labels: runningChartLabels,
+                                                    datasets: [
+                                                        {
+                                                            data: runningOnlyChartData,
+                                                            color: () => COLORS.primary,
+                                                            strokeWidth: 3,
+                                                        },
+                                                    ],
+                                                }}
+                                                width={runningChartWidth}
+                                                height={180}
+                                                fromZero
+                                                yAxisInterval={1}
+                                                chartConfig={{
+                                                    backgroundGradientFrom: '#151515',
+                                                    backgroundGradientTo: '#151515',
+                                                    decimalPlaces: 1,
+                                                    color: (opacity = 1) => `rgba(255,255,255,${opacity})`,
+                                                    labelColor: (opacity = 1) => `rgba(189,189,189,${opacity})`,
+                                                    propsForDots: {
+                                                        r: '5',
+                                                        strokeWidth: '2',
+                                                        stroke: '#111',
+                                                    },
+                                                    propsForBackgroundLines: {
+                                                        stroke: 'rgba(255,255,255,0.08)',
+                                                    },
+                                                }}
+                                                bezier
+                                                onDataPointClick={({ index }) => {
+                                                    const session = filteredRunningSessions[index];
+
+                                                    if (session) {
+                                                        openRunSessionDetail(session);
+                                                    }
+                                                }}
+
                                                 style={{
-                                                    flexDirection: 'row',
-                                                    justifyContent: 'center',
-                                                    gap: 16,
-                                                    marginTop: 8,
-                                                    marginBottom: 15,
+                                                    borderRadius: 18,
+                                                    marginLeft: -8,
+                                                }}
+                                            />
+                                        )}
+                                        {runningChartWidth > 0 && filteredRunningSessions.length > 0 && (
+                                            <ChartTouchOverlay
+                                                width={runningChartWidth}
+                                                height={180}
+                                                items={filteredRunningSessions}
+                                                onSelect={openRunSessionDetail}
+                                            />
+                                        )}
+                                        {filteredRunningSessions.length === 0 && (
+                                            <Text
+                                                style={{
+                                                    color: COLORS.textMuted,
+                                                    fontSize: 12,
+                                                    textAlign: 'center',
+                                                    marginTop: 12,
                                                 }}
                                             >
-                                                <Text style={{ color: '#78DCE8', fontSize: 12, fontWeight: '700' }}>
-                                                    ● Gimnasio
-                                                </Text>
-                                                <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: '700' }}>
-                                                    ● Running
+                                                Aún no hay sesiones de running valoradas para mostrar.
+                                            </Text>
+                                        )}
+                                    </View>
+                                    <View style={{ marginTop: 12 }}>
+                                        <View className="flex-row" style={{ gap: 10 }}>
+                                            <StatCard
+                                                icon={<Ionicons name="calendar-outline" size={17} color={COLORS.primary} />}
+                                                label="Prom. semanal"
+                                                value={formatRating(runningWeeklyAverage)}
+                                                sub="últimos 7 días"
+                                            />
+
+                                            <StatCard
+                                                icon={<Ionicons name="calendar-number-outline" size={17} color="#78DCE8" />}
+                                                label="Prom. mensual"
+                                                value={formatRating(runningMonthlyAverage)}
+                                                sub="últimos 30 días"
+                                            />
+                                        </View>
+
+                                        <View style={{ marginTop: 10 }}>
+                                            <StatCard
+                                                icon={<Ionicons name="stats-chart-outline" size={17} color={COLORS.primary} />}
+                                                label="Promedio anual"
+                                                value={formatRating(runningYearlyAverage)}
+                                                sub="últimos 365 días"
+                                            />
+                                        </View>
+                                    </View>
+                                </Section>
+                                <Section>
+                                    <View
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            marginVertical: 8,
+                                            marginHorizontal: 6,
+                                            paddingBottom: 8,
+                                        }}
+                                    >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                            <FontAwesome6
+                                                name="person-running"
+                                                size={20}
+                                                color={COLORS.primary}
+                                                style={{ marginRight: 10 }}
+                                            />
+
+                                            <View style={{ flex: 1 }}>
+                                                <Text
+                                                    className="text-md font-bold" style={{ color: '#fff' }}
+                                                >
+                                                    Detalles de Running
                                                 </Text>
                                             </View>
                                         </View>
-                                    </View>
-                                    <View className='mb-3'>
-                                        <StatCard
-                                            icon={<Ionicons name="analytics-outline" size={17} color={COLORS.primary} />}
-                                            label="Promedio semanal"
-                                            value={formatRating(stats?.performance.weeklyAverage)}
-                                            sub="promedio de tus sesiones de esta semana"
-                                        />
-                                    </View>
-                                    <View className="flex-row" style={{ gap: 10 }}>
-                                        <StatCard
-                                            icon={<Ionicons name="alert-circle-outline" size={17} color="#FACC15" />}
-                                            label="Peor día"
-                                            value={stats?.performance.worstDay ?? '--'}
-                                        />
-                                        <StatCard
-                                            icon={<Ionicons name="checkmark-circle-outline" size={17} color="#78DCE8" />}
-                                            label="Mejor día"
-                                            value={stats?.performance.bestDay ?? '--'}
-                                        />
-                                    </View>
 
-
-                                </Section>
-                                <Section >
-                                    <View className='flex-row m-2 pb-2 items-center justify-between'>
-                                        <View className='flex-row items-center'>
-                                            <FontAwesome6 className='mr-2' name="person-running" size={18} color={COLORS.primary} />
-                                            <Text className='text-md font-bold' style={{ color: '#fff' }}>
-                                                Running
-                                            </Text>
-                                        </View>
                                         <InfoButton
                                             onPress={() =>
                                                 openInfoModal(
                                                     'Running',
-                                                    'Tiempo semanal: suma del tiempo corrido durante la semana actual.\n\nTiempo mensual: suma del tiempo corrido durante el mes actual.\n\nRitmo semanal: promedio de minutos por kilómetro de tus sesiones semanales.\n\nRitmo mensual: promedio de minutos por kilómetro de tus sesiones mensuales.\n\nDistancia semanal y mensual: kilómetros acumulados en cada período.\n\nVelocidad máxima promedio: promedio de las velocidades máximas registradas en tus sesiones.'
+                                                    'Esta tarjeta resume tus tiempos, velocidad, ritmo y distancias de running.\n\nEl ritmo indica cuánto tardás en recorrer 1 km. Por ejemplo, 06:20 /km significa 6 minutos y 20 segundos por kilómetro.\n\nEn ritmo, cuanto menor es el número, mejor es el rendimiento.'
                                                 )
                                             }
-                                        />
-                                    </View>
-                                    <View className='flex-row mb-4 justify-around'>
-                                        <View className='flex-col items-center'>
-                                            <Ionicons className='mb-2' name="stopwatch-outline" size={40} color={'#78DCE8'} />
-                                            <Text className='mb-1' style={{ color: '#fff', fontSize: 14, fontWeight: '500' }}>
-                                                Tiempo semanal
-                                            </Text>
-                                            <Text style={{ color: '#BDBDBD', fontSize: 18, fontWeight: '900' }}>
-                                                {formatStatDuration(stats?.running.weeklyDurationSeconds)}
-                                            </Text>
-                                        </View>
-                                        <View className='flex-col items-center'>
-                                            <Ionicons className='mb-2' name="calendar-outline" size={40} color={'#78DCE8'} />
-                                            <Text className='mb-1' style={{ color: '#fff', fontSize: 14, fontWeight: '500' }}>
-                                                Tiempo mensual
-                                            </Text>
-                                            <Text style={{ color: '#BDBDBD', fontSize: 18, fontWeight: '900' }}>
-                                                {formatStatDuration(stats?.running.monthlyDurationSeconds)}
-                                            </Text>
-                                        </View>
-
-
-                                    </View>
-                                    <View style={{ marginBottom: 10 }}>
-                                        <StatCard
-                                            icon={<Ionicons name="flash-outline" size={17} color={COLORS.primary} />}
-                                            label="Velocidad máxima promedio"
-                                            value={formatStatSpeed(stats?.running.avgMaxSpeedMps)}
-                                        />
-                                    </View>
-                                    <View className="flex-row" style={{ gap: 10, marginBottom: 10 }}>
-                                        <StatCard
-                                            icon={<Ionicons name="speedometer-outline" size={17} color={COLORS.primary} />}
-                                            label="Ritmo semanal"
-                                            value={formatStatPace(stats?.running.weeklyAvgPaceSecPerKm)}
-                                            sub="min/km"
-                                        />
-                                        <StatCard
-                                            icon={<Ionicons name="speedometer" size={17} color="#78DCE8" />}
-                                            label="Ritmo mensual"
-                                            value={formatStatPace(stats?.running.monthlyAvgPaceSecPerKm)}
-                                            sub="min/km"
                                         />
                                     </View>
 
                                     <View className="flex-row" style={{ gap: 10 }}>
                                         <StatCard
-                                            icon={<Ionicons name="map-outline" size={17} color={COLORS.primary} />}
-                                            label="Distancia Semanal"
-                                            value={formatStatDistance(stats?.running.weeklyDistanceMeters)}
+                                            icon={<Ionicons name="time-outline" size={17} color={COLORS.primary} />}
+                                            label="Tiempo semanal"
+                                            value={formatStatDuration(stats?.running.weeklyDurationSeconds ?? 0)}
+                                            sub="últimos 7 días"
                                         />
+
                                         <StatCard
-                                            icon={<Ionicons name="trending-up-outline" size={17} color="#78DCE8" />}
-                                            label="Distancia Mensual"
-                                            value={formatStatDistance(stats?.running.monthlyDistanceMeters)}
+                                            icon={<Ionicons name="calendar-outline" size={17} color="#78DCE8" />}
+                                            label="Tiempo mensual"
+                                            value={formatStatDuration(stats?.running.monthlyDurationSeconds ?? 0)}
+                                            sub="últimos 30 días"
+                                        />
+                                    </View>
+
+                                    <View style={{ marginTop: 10 }}>
+                                        <StatCard
+                                            icon={<Ionicons name="timer-outline" size={17} color={COLORS.primary} />}
+                                            label="Tiempo total"
+                                            value={formatStatDuration(runningTotalDurationSeconds)}
+                                            sub="histórico de running"
+                                        />
+                                    </View>
+
+                                    <View className="flex-row mt-3" style={{ gap: 10 }}>
+                                        <StatCard
+                                            icon={<Ionicons name="flash-outline" size={17} color="#78DCE8" />}
+                                            label="Vel. máxima"
+                                            value={formatStatSpeed(runningAverageMaxSpeedMps)}
+                                            sub="promedio histórico"
+                                        />
+
+                                        <StatCard
+                                            icon={<Ionicons name="speedometer-outline" size={17} color={COLORS.primary} />}
+                                            label="Ritmo promedio"
+                                            value={
+                                                runningHistoricalAvgPaceSecPerKm != null
+                                                    ? `${formatStatPace(runningHistoricalAvgPaceSecPerKm)} /km`
+                                                    : '--'
+                                            }
+                                            sub="promedio histórico"
+                                        />
+                                    </View>
+
+                                    <View className="flex-row mt-3" style={{ gap: 10 }}>
+                                        <StatCard
+                                            icon={<Ionicons name="walk-outline" size={17} color={COLORS.primary} />}
+                                            label="Distancia semanal"
+                                            value={formatStatDistance(stats?.running.weeklyDistanceMeters ?? 0)}
+                                            sub="últimos 7 días"
+                                        />
+
+                                        <StatCard
+                                            icon={<Ionicons name="map-outline" size={17} color="#78DCE8" />}
+                                            label="Distancia mensual"
+                                            value={formatStatDistance(stats?.running.monthlyDistanceMeters ?? 0)}
+                                            sub="últimos 30 días"
+                                        />
+                                    </View>
+
+                                    <View style={{ marginTop: 10 }}>
+                                        <StatCard
+                                            icon={<Ionicons name="earth-outline" size={17} color={COLORS.primary} />}
+                                            label="Distancia anual"
+                                            value={formatStatDistance(runningYearlyDistanceMeters)}
+                                            sub="últimos 365 días"
+                                        />
+                                    </View>
+                                </Section>
+
+                                <Section>
+                                    <View className="flex-row m-2 pb-2 items-center justify-between">
+                                        <View className="flex-row items-center">
+                                            <FontAwesome6
+                                                className="mr-2"
+                                                name="chart-simple"
+                                                size={18}
+                                                color={COLORS.primary}
+                                            />
+
+                                            <Text className="text-md font-bold" style={{ color: '#fff' }}>
+                                                Evolución de rutinas
+                                            </Text>
+                                        </View>
+
+                                        <InfoButton
+                                            onPress={() =>
+                                                openInfoModal(
+                                                    'Rendimiento de rutinas',
+                                                    'Este gráfico muestra la evolución de tus entrenamientos de gimnasio.\n\nSi valoraste una rutina completa, se usa esa valoración.\n\nSi no valoraste la rutina pero sí los ejercicios, se usa el promedio de los ejercicios valorados.\n\nLos entrenamientos sin valoración no aparecen en el gráfico.'
+                                                )
+                                            }
                                         />
                                     </View>
 
 
+
+                                    <View
+                                        style={{
+                                            flexDirection: 'row',
+                                            flexWrap: 'wrap',
+                                            justifyContent: 'center',
+                                            gap: 4,
+                                            marginBottom: 12,
+                                            paddingHorizontal: 6,
+                                        }}
+                                    >
+                                        {[
+                                            { key: 'latest', label: 'Últimas' },
+                                            { key: 'weekly', label: 'Semanal' },
+                                            { key: 'monthly', label: 'Mensual' },
+                                            { key: 'yearly', label: 'Anual' },
+                                        ].map((item) => {
+                                            const active = routinePeriod === item.key;
+
+                                            return (
+                                                <Pressable
+                                                    key={item.key}
+                                                    onPress={() => setRoutinePeriod(item.key as any)}
+                                                    style={{
+                                                        paddingVertical: 3,
+                                                        paddingHorizontal: 12,
+                                                        borderRadius: 10,
+                                                        backgroundColor: active ? COLORS.primary : '#1b1b1b',
+                                                        borderWidth: 1,
+                                                        borderColor: active ? COLORS.primary : '#333333',
+                                                    }}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            color: active ? '#111111' : COLORS.textLight,
+                                                            fontSize: 10,
+                                                            fontWeight: '700',
+                                                        }}
+                                                    >
+                                                        {item.label}
+                                                    </Text>
+                                                </Pressable>
+                                            );
+                                        })}
+                                    </View>
+
+                                    <View
+                                        style={{ marginTop: 6, width: '100%', position: 'relative' }}
+                                        onLayout={(event) => {
+                                            const width = event.nativeEvent.layout.width;
+                                            setRoutineChartWidth(width);
+                                        }}
+                                    >
+                                        {routineChartWidth > 0 && filteredRoutinePoints.length > 0 && (
+                                            <LineChart
+                                                data={{
+                                                    labels: routineChartLabels,
+                                                    datasets: [
+                                                        {
+                                                            data: routineChartData,
+                                                            color: () => '#78DCE8',
+                                                            strokeWidth: 3,
+                                                        },
+                                                    ],
+                                                }}
+                                                width={routineChartWidth}
+                                                height={180}
+                                                fromZero
+                                                yAxisInterval={1}
+                                                chartConfig={{
+                                                    backgroundGradientFrom: '#151515',
+                                                    backgroundGradientTo: '#151515',
+                                                    decimalPlaces: 1,
+                                                    color: (opacity = 1) => `rgba(255,255,255,${opacity})`,
+                                                    labelColor: (opacity = 1) => `rgba(189,189,189,${opacity})`,
+                                                    propsForDots: {
+                                                        r: '5',
+                                                        strokeWidth: '2',
+                                                        stroke: '#111',
+                                                    },
+                                                    propsForBackgroundLines: {
+                                                        stroke: 'rgba(255,255,255,0.08)',
+                                                    },
+                                                }}
+                                                bezier
+                                                onDataPointClick={({ index }) => {
+                                                    const point = filteredRoutinePoints[index];
+
+                                                    if (point) {
+                                                        openRoutinePointDetail(point);
+                                                    }
+                                                }}
+
+                                                style={{
+                                                    borderRadius: 18,
+                                                    marginLeft: -8,
+                                                }}
+                                            />
+                                        )}
+                                        {routineChartWidth > 0 && filteredRoutinePoints.length > 0 && (
+                                            <ChartTouchOverlay
+                                                width={routineChartWidth}
+                                                height={180}
+                                                items={filteredRoutinePoints}
+                                                onSelect={openRoutinePointDetail}
+                                            />
+                                        )}
+                                        {filteredRoutinePoints.length === 0 && (
+                                            <Text
+                                                style={{
+                                                    color: COLORS.textMuted,
+                                                    fontSize: 12,
+                                                    textAlign: 'center',
+                                                    marginTop: 12,
+                                                }}
+                                            >
+                                                Aún no hay valoraciones de rutinas o ejercicios para mostrar.
+                                            </Text>
+                                        )}
+                                    </View>
+
+
+
+
+
+                                    <View style={{ marginTop: 12 }}>
+                                        <StatCard
+                                            icon={<Ionicons name="checkmark-done-outline" size={17} color={COLORS.primary} />}
+                                            label="Entrenamientos valorados"
+                                            value={String(filteredRoutinePoints.length)}
+                                            sub="rutinas o promedios de ejercicios con valoración"
+                                        />
+                                    </View>
                                 </Section>
 
                                 <Section >
@@ -665,7 +1608,7 @@ export default function StatisticsScreen() {
                                         <View className='flex-row items-center'>
                                             <FontAwesome6 className='mr-2' name="dumbbell" size={18} color={COLORS.primary} />
                                             <Text className='text-md font-bold' style={{ color: '#fff' }}>
-                                                Esfuerzo
+                                                Esfuerzo en general
                                             </Text>
                                         </View>
                                         <InfoButton
@@ -727,6 +1670,130 @@ export default function StatisticsScreen() {
                                         )}
                                     </View>
 
+                                </Section>
+                                <Section>
+                                    <View
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            marginHorizontal: 10,
+                                            marginTop: 6,
+                                            marginBottom: 15,
+                                        }}
+                                    >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                            <Ionicons
+                                                name="compass-outline"
+                                                size={21}
+                                                color={COLORS.primary}
+                                                style={{ marginRight: 10 }}
+                                            />
+
+                                            <View style={{ flex: 1 }}>
+                                                <Text
+                                                    className="text-md font-bold" style={{ color: '#fff' }}
+                                                >
+                                                    Consejos
+                                                </Text>
+
+                                                <Text
+                                                    style={{
+                                                        color: COLORS.textMuted,
+                                                        fontSize: 11,
+                                                        marginTop: 2,
+                                                    }}
+                                                >
+                                                    Recomendaciones según tus registros
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        <InfoButton
+                                            onPress={() =>
+                                                openInfoModal(
+                                                    'Consejos',
+                                                    'Los consejos se generan a partir de tus registros recientes de running, rutinas y valoraciones.\n\nA diferencia de los insights, que describen qué está pasando, esta sección intenta sugerir acciones prácticas.\n\nNo reemplaza la opinión de un profesional de la salud o entrenamiento.'
+                                                )
+                                            }
+                                        />
+                                    </View>
+
+                                    {adviceError ? (
+                                        <View
+                                            style={{
+                                                backgroundColor: 'rgba(250,204,21,0.08)',
+                                                borderWidth: 1,
+                                                borderColor: 'rgba(250,204,21,0.30)',
+                                                borderRadius: 18,
+                                                padding: 14,
+                                            }}
+                                        >
+                                            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                                                <Ionicons
+                                                    name="alert-circle-outline"
+                                                    size={20}
+                                                    color="#FACC15"
+                                                    style={{ marginRight: 10, marginTop: 1 }}
+                                                />
+
+                                                <Text
+                                                    style={{
+                                                        flex: 1,
+                                                        color: COLORS.textMuted,
+                                                        fontSize: 12,
+                                                        lineHeight: 18,
+                                                        fontWeight: '700',
+                                                    }}
+                                                >
+                                                    {adviceError}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    ) : adviceItems.length > 0 ? (
+                                        adviceItems.map((item) => (
+                                            <AdviceCard
+                                                key={item.id}
+                                                title={item.title}
+                                                description={item.description}
+                                                type={item.type}
+                                            />
+                                        ))
+                                    ) : (
+                                        <View
+                                            style={{
+                                                backgroundColor: 'rgba(255,255,255,0.04)',
+                                                borderWidth: 1,
+                                                borderColor: 'rgba(255,255,255,0.08)',
+                                                borderRadius: 18,
+                                                padding: 14,
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    color: COLORS.textMuted,
+                                                    fontSize: 12,
+                                                    lineHeight: 18,
+                                                    textAlign: 'center',
+                                                }}
+                                            >
+                                                Todavía no hay consejos disponibles. Registrá más entrenamientos para recibir recomendaciones.
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    <Text
+                                        style={{
+                                            color: COLORS.textMuted,
+                                            fontSize: 10,
+                                            lineHeight: 16,
+                                            textAlign: 'center',
+                                            marginTop: 4,
+                                            marginHorizontal: 12,
+                                        }}
+                                    >
+                                        Estos consejos son orientativos y se ajustan a medida que registrás tus nuevos entrenamientos.
+                                    </Text>
                                 </Section>
                             </>
                         )}
@@ -841,6 +1908,217 @@ export default function StatisticsScreen() {
                                 Entendido
                             </Text>
                         </Pressable>
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                visible={runDetailVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setRunDetailVisible(false)}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.68)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: 24,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 340,
+                            backgroundColor: '#101010',
+                            borderRadius: 22,
+                            borderWidth: 1,
+                            borderColor: COLORS.primary,
+                            padding: 18,
+                        }}
+                    >
+                        <View className="flex-row items-center justify-between mb-3">
+                            <Text
+                                style={{
+                                    color: COLORS.textLight,
+                                    fontSize: 18,
+                                    fontWeight: '800',
+                                }}
+                            >
+                                Detalle de sesión
+                            </Text>
+
+                            <Pressable
+                                onPress={() => setRunDetailVisible(false)}
+                                style={{
+                                    width: 30,
+                                    height: 30,
+                                    borderRadius: 15,
+                                    backgroundColor: '#1b1b1b',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <Ionicons name="close" size={18} color={COLORS.textLight} />
+                            </Pressable>
+                        </View>
+
+                        {selectedRunSession && (
+                            <>
+                                <Text style={{ color: '#9CA3AF', fontSize: 12 }}>
+                                    Fecha
+                                </Text>
+                                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 10 }}>
+                                    {getSessionDate(selectedRunSession).toLocaleDateString('es-AR')}
+                                </Text>
+
+                                <View className="flex-row" style={{ gap: 10, marginBottom: 10 }}>
+                                    <StatCard
+                                        icon={<Ionicons name="walk-outline" size={16} color={COLORS.primary} />}
+                                        label="Distancia"
+                                        value={formatStatDistance(selectedRunSession.distanceMeters)}
+                                    />
+
+                                    <StatCard
+                                        icon={<Ionicons name="stopwatch-outline" size={16} color="#78DCE8" />}
+                                        label="Tiempo"
+                                        value={formatStatDuration(selectedRunSession.durationSeconds)}
+                                    />
+                                </View>
+
+                                <View className="flex-row" style={{ gap: 10, marginBottom: 10 }}>
+                                    <StatCard
+                                        icon={<Ionicons name="speedometer-outline" size={16} color="#78DCE8" />}
+                                        label="Ritmo"
+                                        value={
+                                            selectedRunSession.avgPaceSecPerKm != null
+                                                ? `${formatStatPace(selectedRunSession.avgPaceSecPerKm)} /km`
+                                                : '--'
+                                        }
+                                    />
+
+                                    <StatCard
+                                        icon={<Ionicons name="flash-outline" size={16} color={COLORS.primary} />}
+                                        label="Vel. Máx"
+                                        value={formatStatSpeed(selectedRunSession.maxSpeedMps)}
+                                    />
+                                </View>
+
+                                <StatCard
+                                    icon={<Ionicons name="star-outline" size={16} color={COLORS.primary} />}
+                                    label="Valoración"
+                                    value={formatRating(getRunSessionRating(selectedRunSession))}
+                                />
+                            </>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                visible={routineDetailVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setRoutineDetailVisible(false)}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.68)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: 24,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 340,
+                            backgroundColor: '#101010',
+                            borderRadius: 22,
+                            borderWidth: 1,
+                            borderColor: COLORS.primary,
+                            padding: 18,
+                        }}
+                    >
+                        <View className="flex-row items-center justify-between mb-3">
+                            <Text
+                                style={{
+                                    color: COLORS.textLight,
+                                    fontSize: 18,
+                                    fontWeight: '800',
+                                }}
+                            >
+                                Detalle de rutina
+                            </Text>
+
+                            <Pressable
+                                onPress={() => setRoutineDetailVisible(false)}
+                                style={{
+                                    width: 30,
+                                    height: 30,
+                                    borderRadius: 15,
+                                    backgroundColor: '#1b1b1b',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <Ionicons name="close" size={18} color={COLORS.textLight} />
+                            </Pressable>
+                        </View>
+
+                        {selectedRoutinePoint && (
+                            <>
+                                <Text style={{ color: '#9CA3AF', fontSize: 12 }}>
+                                    Fecha
+                                </Text>
+                                <Text
+                                    style={{
+                                        color: '#fff',
+                                        fontSize: 15,
+                                        fontWeight: '700',
+                                        marginBottom: 10,
+                                    }}
+                                >
+                                    {new Date(selectedRoutinePoint.date).toLocaleDateString('es-AR')}
+                                </Text>
+
+                                {selectedRoutinePoint.routineName && (
+                                    <>
+                                        <Text style={{ color: '#9CA3AF', fontSize: 12 }}>
+                                            Rutina
+                                        </Text>
+                                        <Text
+                                            style={{
+                                                color: '#fff',
+                                                fontSize: 15,
+                                                fontWeight: '700',
+                                                marginBottom: 10,
+                                            }}
+                                        >
+                                            {selectedRoutinePoint.routineName}
+                                        </Text>
+                                    </>
+                                )}
+
+                                <StatCard
+                                    icon={<Ionicons name="star-outline" size={16} color={COLORS.primary} />}
+                                    label="Valoración"
+                                    value={formatRating(selectedRoutinePoint.value)}
+                                />
+
+                                <View style={{ marginTop: 10 }}>
+                                    <StatCard
+                                        icon={<Ionicons name="information-circle-outline" size={16} color="#78DCE8" />}
+                                        label="Cálculo"
+                                        value={
+                                            selectedRoutinePoint.source === 'routine-rating'
+                                                ? 'Rutina completa'
+                                                : `Promedio de ${selectedRoutinePoint.ratedExercisesCount ?? 0} ejercicios`
+                                        }
+                                    />
+                                </View>
+                            </>
+                        )}
                     </View>
                 </View>
             </Modal>

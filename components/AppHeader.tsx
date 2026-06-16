@@ -77,6 +77,7 @@ function MenuItem({
     );
 }
 
+
 export default function AppHeader({ showProfile = true }: AppHeaderProps) {
     const insets = useSafeAreaInsets();
     const { user, logout, isAuthenticated } = useAuth();
@@ -97,10 +98,16 @@ export default function AppHeader({ showProfile = true }: AppHeaderProps) {
 
     const userInitials = getInitials(displayName);
 
+
+
     useEffect(() => {
         const loadProfileImage = async () => {
             try {
-                if (!isAuthenticated) return;
+                if (!isAuthenticated) {
+                    setProfileImageUrl(null);
+                    setProfileDisplayName(null);
+                    return;
+                }
 
                 const data = await getMyProfile();
 
@@ -205,13 +212,13 @@ export default function AppHeader({ showProfile = true }: AppHeaderProps) {
 
                 {/* Perfil opcional */}
                 <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                    {showProfile ? (
+                    {showProfile && isAuthenticated ? (
                         <Pressable
                             onPress={() => router.push('/profile')}
                             style={{
                                 width: 55,
                                 height: 55,
-                                top: 15,
+                                top: 10,
                                 borderRadius: 100,
                                 backgroundColor: '#1b1b1b',
                                 borderWidth: 3,
@@ -320,90 +327,136 @@ export default function AppHeader({ showProfile = true }: AppHeaderProps) {
                             showsVerticalScrollIndicator={false}
                             contentContainerStyle={{ paddingBottom: 20 }}
                         >
-                            <Text
-                                style={{
-                                    color: COLORS.textMuted,
-                                    fontSize: 11,
-                                    fontWeight: '900',
-                                    marginBottom: 8,
-                                    marginLeft: 4,
-                                    textTransform: 'uppercase',
-                                    letterSpacing: 0.8,
-                                }}
-                            >
-                                Principal
-                            </Text>
+                            {isAuthenticated ? (
+                                <>
+                                    <Text
+                                        style={{
+                                            color: COLORS.textMuted,
+                                            fontSize: 11,
+                                            fontWeight: '900',
+                                            marginBottom: 8,
+                                            marginLeft: 4,
+                                            textTransform: 'uppercase',
+                                            letterSpacing: 0.8,
+                                        }}
+                                    >
+                                        Principal
+                                    </Text>
 
-                            <MenuItem
-                                icon="home-outline"
-                                label="Home"
-                                onPress={() => {
-                                    closeDrawer();
-                                    router.push('/home');
-                                }}
-                            />
+                                    <MenuItem
+                                        icon="home-outline"
+                                        label="Home"
+                                        onPress={() => {
+                                            closeDrawer();
+                                            router.push('/home');
+                                        }}
+                                    />
 
-                            <MenuItem
-                                icon="person-circle-outline"
-                                label="Tu perfil"
-                                onPress={() => {
-                                    closeDrawer();
-                                    router.push('/profile');
-                                }}
-                            />
+                                    <MenuItem
+                                        icon="person-circle-outline"
+                                        label="Tu perfil"
+                                        onPress={() => {
+                                            closeDrawer();
+                                            router.push('/profile');
+                                        }}
+                                    />
 
-                            <MenuItem
-                                icon="walk-outline"
-                                label="Running en vivo"
-                                onPress={() => {
-                                    closeDrawer();
-                                    router.push('/liverun');
-                                }}
-                            />
+                                    <MenuItem
+                                        icon="walk-outline"
+                                        label="Running en vivo"
+                                        onPress={() => {
+                                            closeDrawer();
+                                            router.push('/liverun');
+                                        }}
+                                    />
 
-                            <MenuItem
-                                icon="stats-chart-outline"
-                                label="Estadísticas"
-                                onPress={() => {
-                                    closeDrawer();
-                                    router.push('/statistics');
-                                }}
-                            />
+                                    <MenuItem
+                                        icon="stats-chart-outline"
+                                        label="Estadísticas"
+                                        onPress={() => {
+                                            closeDrawer();
+                                            router.push('/statistics');
+                                        }}
+                                    />
 
-                            <MenuItem
-                                icon="bulb-outline"
-                                label="Sugerencias"
-                                onPress={() => {
-                                    closeDrawer();
-                                    router.push('/suggestions');
-                                }}
-                            />
+                                    <MenuItem
+                                        icon="bulb-outline"
+                                        label="Sugerencias"
+                                        onPress={() => {
+                                            closeDrawer();
+                                            router.push('/suggestions');
+                                        }}
+                                    />
 
-                            <MenuItem
-                                icon="time-outline"
-                                label="Historial"
-                                onPress={() => {
-                                    closeDrawer();
-                                    router.push('/statistics-history');
-                                }}
-                            />
+                                    <MenuItem
+                                        icon="time-outline"
+                                        label="Historial"
+                                        onPress={() => {
+                                            closeDrawer();
+                                            router.push('/statistics-history');
+                                        }}
+                                    />
 
-                            <MenuItem
-                                icon="settings-outline"
-                                label="Tu cuenta"
-                                onPress={() => {
-                                    closeDrawer();
-                                    router.push('/account');
-                                }}
-                            />
+                                    <MenuItem
+                                        icon="settings-outline"
+                                        label="Tu cuenta"
+                                        onPress={() => {
+                                            closeDrawer();
+                                            router.push('/account');
+                                        }}
+                                    />
 
-                            <View
-                                style={{
-                                    height: 1,
-                                    backgroundColor: '#2a2a2a',
-                                    marginVertical: 12,
-                                }}
-                            />
+                                    <View
+                                        style={{
+                                            height: 1,
+                                            backgroundColor: '#2a2a2a',
+                                            marginVertical: 12,
+                                        }}
+                                    />
+                                </>
+                            ) : (
+                                <>
+                                    <Text
+                                        style={{
+                                            color: COLORS.textMuted,
+                                            fontSize: 11,
+                                            fontWeight: '900',
+                                            marginBottom: 8,
+                                            marginLeft: 4,
+                                            textTransform: 'uppercase',
+                                            letterSpacing: 0.8,
+                                        }}
+                                    >
+                                        Acceso
+                                    </Text>
+
+                                    <MenuItem
+                                        icon="log-in-outline"
+                                        label="Iniciar sesión"
+                                        onPress={() => {
+                                            closeDrawer();
+                                            router.push('/');
+                                        }}
+                                    />
+
+                                    <MenuItem
+                                        icon="person-add-outline"
+                                        label="Registrarse"
+                                        onPress={() => {
+                                            closeDrawer();
+                                            router.push('/register');
+                                        }}
+                                    />
+
+                                    <View
+                                        style={{
+                                            height: 1,
+                                            backgroundColor: '#2a2a2a',
+                                            marginVertical: 12,
+                                        }}
+                                    />
+                                </>
+                            )}
 
                             <Text
                                 style={{
@@ -464,20 +517,24 @@ export default function AppHeader({ showProfile = true }: AppHeaderProps) {
                                 }}
                             />
 
-                            <View
-                                style={{
-                                    height: 1,
-                                    backgroundColor: '#2a2a2a',
-                                    marginVertical: 12,
-                                }}
-                            />
+                            {isAuthenticated && (
+                                <>
+                                    <View
+                                        style={{
+                                            height: 1,
+                                            backgroundColor: '#2a2a2a',
+                                            marginVertical: 12,
+                                        }}
+                                    />
 
-                            <MenuItem
-                                icon="log-out-outline"
-                                label="Cerrar sesión"
-                                danger
-                                onPress={handleLogout}
-                            />
+                                    <MenuItem
+                                        icon="log-out-outline"
+                                        label="Cerrar sesión"
+                                        danger
+                                        onPress={handleLogout}
+                                    />
+                                </>
+                            )}
                         </ScrollView>
                     </Animated.View>
                     <Animated.View

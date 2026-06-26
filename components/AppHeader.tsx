@@ -9,6 +9,7 @@ import { getMyProfile } from '../lib/profile';
 
 type AppHeaderProps = {
     showProfile?: boolean;
+    profileGreeting?: string | null;
 };
 
 function getInitials(nameOrEmail: string) {
@@ -78,7 +79,7 @@ function MenuItem({
 }
 
 
-export default function AppHeader({ showProfile = true }: AppHeaderProps) {
+export default function AppHeader({ showProfile = true, profileGreeting = null }: AppHeaderProps) {
     const insets = useSafeAreaInsets();
     const { user, logout, isAuthenticated } = useAuth();
 
@@ -186,11 +187,12 @@ export default function AppHeader({ showProfile = true }: AppHeaderProps) {
                         style={{
                             width: 44,
                             height: 44,
+                            top: 5,
                             alignItems: 'center',
                             justifyContent: 'center',
                         }}
                     >
-                        <Ionicons name="menu" size={32} color={COLORS.textLight} />
+                        <Ionicons name="menu" size={40} color={COLORS.textLight} />
                     </Pressable>
                 </View>
 
@@ -211,47 +213,88 @@ export default function AppHeader({ showProfile = true }: AppHeaderProps) {
                 </View>
 
                 {/* Perfil opcional */}
-                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <View
+                    style={{
+                        flex: 1,
+                        alignItems: 'flex-end',
+                        justifyContent: 'center',
+                    }}
+                >
                     {showProfile && isAuthenticated ? (
                         <Pressable
                             onPress={() => router.push('/profile')}
                             style={{
-                                width: 55,
-                                height: 55,
-                                top: 10,
-                                borderRadius: 100,
-                                backgroundColor: '#1b1b1b',
-                                borderWidth: 3,
-                                borderColor: '#333333',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                overflow: 'hidden',
                             }}
                         >
-                            {profileImageUrl ? (
-                                <Image
-                                    source={{ uri: profileImageUrl }}
+                            <View
+                                style={{
+                                    marginTop: 23,
+                                    right: -5,
+                                    width: 60,
+                                    height: 60,
+                                    borderRadius: 100,
+                                    backgroundColor: '#1b1b1b',
+                                    borderWidth: 3,
+                                    borderColor: 'rgba(255,255,255,0.35)',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    overflow: 'hidden',
+                                }}
+                            >
+                                {profileImageUrl ? (
+                                    <Image
+                                        source={{ uri: profileImageUrl }}
+                                        style={{
+                                            width: 60,
+                                            height: 60,
+                                            borderRadius: 100,
+                                        }}
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <Text
+                                        style={{
+                                            color: COLORS.primary,
+                                            fontSize: 15,
+                                            fontWeight: '900',
+                                        }}
+                                    >
+                                        {userInitials}
+                                    </Text>
+                                )}
+                            </View>
+
+                            {profileGreeting ? (
+                                <View
                                     style={{
-                                        width: 55,
-                                        height: 55,
-                                        borderRadius: 22,
-                                    }}
-                                    resizeMode="cover"
-                                />
-                            ) : (
-                                <Text
-                                    style={{
-                                        color: COLORS.primary,
-                                        fontSize: 14,
-                                        fontWeight: '900',
+                                        marginTop: -5,
+                                        right: -5,
+                                        backgroundColor: COLORS.primary,
+                                        borderRadius: 999,
+                                        borderWidth: 2,
+                                        borderColor: '#444444',
+                                        paddingHorizontal: 7,
+                                        paddingVertical: 2,
+                                        maxWidth: 95,
                                     }}
                                 >
-                                    {userInitials}
-                                </Text>
-                            )}
+                                    <Text
+                                        numberOfLines={1}
+                                        style={{
+                                            color: '#111111',
+                                            fontSize: 12,
+                                            fontWeight: '600',
+                                        }}
+                                    >
+                                        {profileGreeting}
+                                    </Text>
+                                </View>
+                            ) : null}
                         </Pressable>
                     ) : (
-                        <View style={{ width: 44, height: 44 }} />
+                        <View style={{ width: 50, height: 50 }} />
                     )}
                 </View>
             </View >

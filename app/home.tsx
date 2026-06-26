@@ -1,6 +1,6 @@
 // app/home.tsx
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Image, Modal } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, View, Text, Pressable, ScrollView, Image, Modal } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
 import { RoutineCard } from '../components/RoutineCard';
@@ -8,10 +8,12 @@ import { router } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { getRoutines, Routine, deleteRoutine } from '../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
-import { getMyProfile } from '../lib/profile';
+import { getMyProfile, type MyProfileResponse, type UserProfile } from '../lib/profile';
+import { getMyStatistics, type MyStatisticsResponse } from '../lib/statistics';
 import AppHeader from '../components/AppHeader';
 import AppLoading from '../components/AppLoading';
 import { SlideInLeft } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 
 function getLastActivityTime(routine: Routine): number {
     const dateStr =
@@ -90,18 +92,60 @@ function MenuItem({
 }
 
 function WeeklyProgressCard({
-    weeklyDistanceKm,
-    goalKm,
+    currentLabel,
     progressPercent,
     onPress,
 }: {
-    weeklyDistanceKm: number;
-    goalKm: number;
+    currentLabel: string;
     progressPercent: number;
     onPress: () => void;
 }) {
-    const cardBg = 'rgb(26, 26, 26)';
-    const borderColor = 'rgba(255,255,255,0.22)';
+    const animatedProgress = useRef(new Animated.Value(0)).current;
+    const [displayPercent, setDisplayPercent] = useState(0);
+
+    const safePercent = Math.max(0, Math.min(progressPercent, 100));
+
+    useEffect(() => {
+        animatedProgress.setValue(0);
+        setDisplayPercent(0);
+
+        const listenerId = animatedProgress.addListener(({ value }) => {
+            setDisplayPercent(Math.round(value));
+        });
+
+        Animated.timing(animatedProgress, {
+            toValue: safePercent,
+            duration: 3000,
+            useNativeDriver: false,
+        }).start();
+
+        return () => {
+            animatedProgress.removeListener(listenerId);
+        };
+    }, [safePercent, animatedProgress]);
+
+    const animatedBarWidth = animatedProgress.interpolate({
+        inputRange: [0, 100],
+        outputRange: ['0%', '100%'],
+    });
+
+    const animatedProgressColor = animatedProgress.interpolate({
+        inputRange: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        outputRange: [
+            '#DC2626', // 0% rojo fuerte
+            '#E11D48', // 10% rojo/rosado
+            '#EA580C', // 20% naranja oscuro
+            '#F97316', // 30% naranja
+            '#F59E0B', // 40% ámbar
+            '#FACC15', // 50% amarillo
+            '#D9F99D', // 60% amarillo lima
+            '#BEF264', // 70% lima suave
+            '#A3E635', // 80% lima
+            '#84CC16', // 90% verde lima
+            '#9DFF00', // 100% verde app
+        ],
+        extrapolate: 'clamp',
+    });
 
     return (
         <Pressable
@@ -111,141 +155,282 @@ function WeeklyProgressCard({
                 left: 10,
                 right: 10,
                 bottom: 12,
-                backgroundColor: cardBg,
-                borderRadius: 18,
-                borderTopLeftRadius: 0,
-                paddingHorizontal: 14,
-                paddingTop: 15,
-                paddingBottom: 12,
+                minHeight: 104,
+                backgroundColor: 'rgb(26, 26, 26)',
+                borderRadius: 20,
+                borderWidth: 3,
+                borderColor: 'rgb(68, 68, 68)',
+                paddingLeft: 14,
+                paddingRight: 104,
+                paddingTop: 10,
+                paddingBottom: 10,
                 zIndex: 30,
                 elevation: 30,
-                borderWidth: 1,
-                borderColor,
+                overflow: 'hidden',
             }}
         >
-            {/* Pestaña superior */}
-            <View
-                style={{
-                    position: 'absolute',
-                    top: -24,
-                    left: -1,
-                    height: 25,
-                    backgroundColor: cardBg,
-                    borderTopLeftRadius: 14,
-                    borderTopRightRadius: 14,
-                    paddingHorizontal: 14,
-                    justifyContent: 'center',
-                    minWidth: 98,
-                    borderTopWidth: 1,
-                    borderLeftWidth: 1,
-                    borderRightWidth: 1,
-                    borderColor,
-                    zIndex: 50,
-                }}
-            >
-                <Text
-                    style={{
-                        color: '#FFFFFF',
-                        fontSize: 13,
-                        fontWeight: '500',
-                    }}
-                >
-                    Tu objetivo
-                </Text>
-            </View>
-
-            {/* Tapador del borde superior detrás de la pestaña */}
-            <View
-                style={{
-                    position: 'absolute',
-                    top: -1,
-                    left: 0,
-                    width: 99,
-                    height: 3,
-                    backgroundColor: cardBg,
-                    zIndex: 45,
-                }}
-            />
-
             <Text
                 style={{
                     color: '#FFFFFF',
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: '500',
-                    marginBottom: 7,
+                    marginBottom: 5,
+                    marginTop: 5,
                 }}
                 numberOfLines={1}
             >
-                Total kilómetros recorridos: {weeklyDistanceKm.toFixed(1)} km
+                {currentLabel}
             </Text>
 
-            {/* Barra */}
             <View
                 style={{
-                    height: 13,
+                    height: 16,
                     borderRadius: 999,
-                    backgroundColor: '#151515',
+                    backgroundColor: '#111111',
                     overflow: 'hidden',
-                    marginBottom: 8,
-                    padding: 2,
+                    marginBottom: 10,
+                    padding: 4,
                 }}
             >
-                <View
+                <Animated.View
                     style={{
                         height: '100%',
-                        width: `${progressPercent}%`,
-                        backgroundColor: COLORS.primary,
+                        width: animatedBarWidth,
+                        backgroundColor: animatedProgressColor,
                         borderRadius: 999,
                     }}
                 />
             </View>
 
-            {/* Porcentaje */}
-            <View
+            <Text
                 style={{
-                    flexDirection: 'row',
+                    color: '#FFFFFF',
+                    fontSize: 13,
+                    fontWeight: '200',
+                    textAlign: 'left',
+                }}
+                numberOfLines={1}
+            >
+                Presiona para ver más de tu progreso
+            </Text>
+
+            {/* Círculo de porcentaje */}
+            <Animated.View
+                style={{
+                    position: 'absolute',
+                    right: 12,
+                    top: 10,
+                    width: 84,
+                    height: 80,
+                    borderRadius: 20,
+                    backgroundColor: animatedProgressColor,
+                    borderWidth: 5,
+                    borderColor: '#111111',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 8,
+                    justifyContent: 'center',
                 }}
             >
-                <Text
-                    style={{
-                        flex: 1,
-                        color: '#FFFFFF',
-                        fontSize: 12,
-                        fontWeight: '500',
-                    }}
-                    numberOfLines={1}
-                >
-                    Porcentaje de objetivo cumplido:
-                </Text>
-
                 <View
                     style={{
-                        minWidth: 100,
-                        backgroundColor: '#151515',
-                        borderRadius: 999,
-                        paddingHorizontal: 10,
-                        paddingVertical: 2,
+                        position: 'relative',
                         alignItems: 'center',
+                        justifyContent: 'center',
+                        height: 32,
                     }}
                 >
+                    {/* Contorno suave */}
+                    <Text
+                        style={{
+                            position: 'absolute',
+                            color: 'rgba(0,0,0,0.75)',
+                            fontSize: 26,
+                            fontWeight: '900',
+                            lineHeight: 29,
+                            transform: [{ translateX: -1 }],
+                        }}
+                    >
+                        {displayPercent}%
+                    </Text>
+
+                    <Text
+                        style={{
+                            position: 'absolute',
+                            color: 'rgba(0,0,0,0.75)',
+                            fontSize: 26,
+                            fontWeight: '900',
+                            lineHeight: 29,
+                            transform: [{ translateX: 1 }],
+                        }}
+                    >
+                        {displayPercent}%
+                    </Text>
+
+                    <Text
+                        style={{
+                            position: 'absolute',
+                            color: 'rgba(0,0,0,0.75)',
+                            fontSize: 26,
+                            fontWeight: '900',
+                            lineHeight: 29,
+                            transform: [{ translateY: -1 }],
+                        }}
+                    >
+                        {displayPercent}%
+                    </Text>
+
+                    <Text
+                        style={{
+                            position: 'absolute',
+                            color: 'rgba(0,0,0,0.75)',
+                            fontSize: 26,
+                            fontWeight: '900',
+                            lineHeight: 29,
+                            transform: [{ translateY: 1 }],
+                        }}
+                    >
+                        {displayPercent}%
+                    </Text>
+
+                    {/* Texto principal */}
                     <Text
                         style={{
                             color: '#FFFFFF',
-                            fontSize: 12,
-                            fontWeight: '800',
+                            fontSize: 26,
+                            fontWeight: '900',
+                            lineHeight: 29,
                         }}
                     >
-                        {progressPercent}%
+                        {displayPercent}%
                     </Text>
                 </View>
-            </View>
+
+                <Text
+                    style={{
+                        color: '#FFFFFF',
+                        fontSize: 11,
+                        fontWeight: '900',
+                        textAlign: 'center',
+                        lineHeight: 12,
+                        textShadowColor: 'rgba(0,0,0,0.75)',
+                        textShadowOffset: { width: 0, height: 1 },
+                        textShadowRadius: 2,
+                    }}
+                >
+                    Objetivo{'\n'}cumplido
+                </Text>
+            </Animated.View>
         </Pressable>
     );
 }
 
+type HomeGoalProgress = {
+    currentLabel: string;
+    targetLabel: string;
+    currentValueLabel: string;
+    remainingLabel: string;
+    progressPercent: number;
+};
+
+function formatGoalNumber(value: number) {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function buildHomeGoalProgress(
+    profile?: UserProfile | null,
+    stats?: MyStatisticsResponse | null
+): HomeGoalProgress | null {
+    if (
+        !profile?.mainGoalType ||
+        !profile?.mainGoalPeriod ||
+        !profile?.mainGoalMetric ||
+        typeof profile.mainGoalTarget !== 'number' ||
+        profile.mainGoalTarget <= 0
+    ) {
+        return null;
+    }
+
+    const period = profile.mainGoalPeriod;
+    const target = profile.mainGoalTarget;
+
+    let currentValue: number | null = 0;
+    let currentLabel = '';
+    let targetLabel = '';
+    let currentValueLabel = '';
+    let remainingLabel = '';
+
+    if (profile.mainGoalType === 'running') {
+        if (profile.mainGoalMetric === 'distance_km') {
+            currentValue =
+                period === 'monthly'
+                    ? (stats?.running.monthlyDistanceMeters ?? 0) / 1000
+                    : (stats?.running.weeklyDistanceMeters ?? 0) / 1000;
+
+            currentLabel = `Total kilómetros recorridos: ${currentValue.toFixed(1)}km`;
+            targetLabel = `Objetivo: ${formatGoalNumber(target)}km`;
+            currentValueLabel = `Recorrido: ${currentValue.toFixed(1)}km`;
+            remainingLabel = `Restante: ${Math.max(target - currentValue, 0).toFixed(1)}km`;
+        }
+
+        if (profile.mainGoalMetric === 'minutes') {
+            currentValue =
+                period === 'monthly'
+                    ? Math.round((stats?.running.monthlyDurationSeconds ?? 0) / 60)
+                    : Math.round((stats?.running.weeklyDurationSeconds ?? 0) / 60);
+
+            currentLabel = `Total minutos de running: ${currentValue}min`;
+            targetLabel = `Objetivo: ${formatGoalNumber(target)}min`;
+            currentValueLabel = `Acumulado: ${currentValue}min`;
+            remainingLabel = `Restante: ${Math.max(target - currentValue, 0)}min`;
+        }
+
+        if (profile.mainGoalMetric === 'sessions') {
+            // Temporal: usamos weeklySessions hasta separar salidas de running en backend.
+            if (period === 'monthly') {
+                currentValue = null;
+                currentLabel = 'Total salidas de running: próximamente';
+                targetLabel = `Objetivo: ${formatGoalNumber(target)} salidas`;
+                currentValueLabel = 'Acumulado: No disponible todavía';
+                remainingLabel = 'Restante: No disponible todavía';
+            } else {
+                currentValue = stats?.summary.weeklySessions ?? 0;
+                currentLabel = `Total salidas de running: ${currentValue}`;
+                targetLabel = `Objetivo: ${formatGoalNumber(target)} salidas`;
+                currentValueLabel = `Acumulado: ${currentValue} salidas`;
+                remainingLabel = `Restante: ${Math.max(target - currentValue, 0)} salidas`;
+            }
+        }
+    }
+
+    if (profile.mainGoalType === 'routine') {
+        // Temporal: usamos weeklySessions hasta separar rutinas reales en backend.
+        if (period === 'monthly') {
+            currentValue = null;
+            currentLabel = 'Total entrenamientos: próximamente';
+            targetLabel = `Objetivo: ${formatGoalNumber(target)} entrenamientos`;
+            currentValueLabel = 'Acumulado: No disponible todavía';
+            remainingLabel = 'Restante: No disponible todavía';
+        } else {
+            currentValue = stats?.summary.weeklySessions ?? 0;
+            currentLabel = `Total entrenamientos: ${currentValue}`;
+            targetLabel = `Objetivo: ${formatGoalNumber(target)} entrenamientos`;
+            currentValueLabel = `Acumulado: ${currentValue} entrenamientos`;
+            remainingLabel = `Restante: ${Math.max(target - currentValue, 0)} entrenamientos`;
+        }
+    }
+
+    const progressPercent =
+        typeof currentValue === 'number'
+            ? Math.min(Math.round((currentValue / target) * 100), 100)
+            : 0;
+
+    return {
+        currentLabel,
+        targetLabel,
+        currentValueLabel,
+        remainingLabel,
+        progressPercent,
+    };
+}
 
 export default function HomeScreen() {
     const { user, isAuthenticated, logout } = useAuth();
@@ -258,6 +443,9 @@ export default function HomeScreen() {
     const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
     const [profileDisplayName, setProfileDisplayName] = useState<string | null>(null);
 
+    const [profileData, setProfileData] = useState<MyProfileResponse | null>(null);
+    const [statsData, setStatsData] = useState<MyStatisticsResponse | null>(null);
+
     const displayName =
         profileDisplayName ??
         user?.name ??
@@ -267,33 +455,40 @@ export default function HomeScreen() {
     const userInitials = getInitials(displayName);
 
     const [progressModalVisible, setProgressModalVisible] = useState(false);
-    // MOCK temporal hasta conectar con objetivo real del perfil
-    const mockWeeklyGoalKm = 17.5;
-    const mockWeeklyDistanceKm = 12.5;
 
-    const mockProgressPercent = Math.min(
-        Math.round((mockWeeklyDistanceKm / mockWeeklyGoalKm) * 100),
-        100
+    const goalProgress = useMemo(
+        () => buildHomeGoalProgress(profileData?.profile, statsData),
+        [profileData, statsData]
     );
-
-    const mockRemainingKm = Math.max(mockWeeklyGoalKm - mockWeeklyDistanceKm, 0);
 
 
     useEffect(() => {
-        const loadProfileImage = async () => {
+        const loadHomeProfileAndStats = async () => {
             try {
-                if (!isAuthenticated) return;
+                if (!isAuthenticated) {
+                    setProfileData(null);
+                    setStatsData(null);
+                    setProfileImageUrl(null);
+                    setProfileDisplayName(null);
+                    return;
+                }
 
-                const data = await getMyProfile();
+                const [profile, stats] = await Promise.all([
+                    getMyProfile(),
+                    getMyStatistics(),
+                ]);
 
-                setProfileImageUrl(data.profile.profileImageUrl);
-                setProfileDisplayName(data.user.name ?? data.user.email);
+                setProfileData(profile);
+                setStatsData(stats);
+
+                setProfileImageUrl(profile.profile.profileImageUrl);
+                setProfileDisplayName(profile.user.name ?? profile.user.email);
             } catch (error) {
-                console.log('Error cargando imagen de perfil en Home:', error);
+                console.log('Error cargando perfil/estadísticas en Home:', error);
             }
         };
 
-        loadProfileImage();
+        loadHomeProfileAndStats();
     }, [isAuthenticated]);
 
     const insets = useSafeAreaInsets();
@@ -402,17 +597,12 @@ export default function HomeScreen() {
             <View className="flex-1 w-full px-4"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
-                <AppHeader />
+                <AppHeader profileGreeting={`Hola, ${displayName}`} />
 
-                {/* SALUDO */}
-                <View className="self-start px-3 mb-1">
-                    <Text className="text-md text-gray-500">
-                        Hola, {displayName}
-                    </Text>
-                </View>
+
 
                 {/* TABS SUPERIORES */}
-                <View className="flex-row justify-around mb-2 mt-2">
+                <View className="flex-row justify-around mb-1 mt-4">
                     <View className="items-center">
                         <Text style={{ color: COLORS.accent }}>Mis rutinas</Text>
                         <View
@@ -445,10 +635,16 @@ export default function HomeScreen() {
 
                 {/* MARCO PRINCIPAL */}
                 <View
-                    className="flex-1 mt-2 rounded-3xl px-3 py-4 relative"
-                    style={{ borderWidth: 2, borderColor: COLORS.primary, position: 'relative' }}
+                    className="flex-1 mt-2 rounded-3xl px-3 py-3 relative"
+                    style={{ borderWidth: 2, borderColor: COLORS.primary, position: 'relative', overflow: 'hidden' }}
                 >
-                    <ScrollView showsVerticalScrollIndicator={false}>
+                    <ScrollView
+                        style={{ flex: 1 }}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{
+                            paddingBottom: routines.length > 0 ? 135 : 0,
+                        }}
+                    >
                         {loadingRoutines && (
                             <Text
                                 className="text-sm mb-2"
@@ -523,118 +719,140 @@ export default function HomeScreen() {
 
                     </ScrollView>
 
-                    <WeeklyProgressCard
-                        weeklyDistanceKm={mockWeeklyDistanceKm}
-                        goalKm={mockWeeklyGoalKm}
-                        progressPercent={mockProgressPercent}
-                        onPress={() => setProgressModalVisible(true)}
-                    />
+                    {!loadingRoutines && routines.length > 0 && goalProgress && (
+                        <>
+                            <LinearGradient
+                                pointerEvents="none"
+                                colors={[
+                                    'rgba(17,17,17,0)',
+                                    'rgba(17,17,17,0.35)',
+                                    'rgba(17,17,17,0.75)',
+                                    '#111111',
+                                ]}
+                                locations={[0, 0.35, 0.72, 1]}
+                                style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 125, // queda justo arriba del panel
+                                    height: 70,
+                                    zIndex: 20,
+                                }}
+                            />
+
+                            <View
+                                pointerEvents="none"
+                                style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    height: 125,
+                                    backgroundColor: '#111111',
+                                    zIndex: 28,
+                                }}
+                            />
+
+                            <WeeklyProgressCard
+                                currentLabel={goalProgress.currentLabel}
+                                progressPercent={goalProgress.progressPercent}
+                                onPress={() => setProgressModalVisible(true)}
+                            />
+                        </>
+                    )}
                 </View>
 
                 {/* BOTONES INFERIORES */}
-                <View className="flex-row justify-between mt-2 mb-2">
+                <View
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginTop: 8,
+                        marginBottom: 8,
+                        gap: 10,
+                    }}
+                >
                     {/* Crear rutina */}
                     <Pressable
-                        className="flex-1 mr-2 rounded-xl items-center justify-center overflow-hidden"
-                        style={{
-                            height: 56,
-                            backgroundColor: '#444444',
-                            position: 'relative',
-                        }}
                         onPress={() => router.push('/routine/new')}
+                        style={({ pressed }) => ({
+                            width: 78,
+                            height: 55,
+                            borderRadius: 16,
+                            backgroundColor: 'rgb(26, 26, 26)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            borderWidth: 3,
+                            borderColor: '#444444',
+                        })}
                     >
                         <Ionicons
                             name="add"
-                            size={35}
-                            color='#FFFFFF'
-                            style={{
-                                position: 'absolute',
-                            }}
+                            size={40}
+                            color="#FFFFFF"
                         />
-
-
                     </Pressable>
 
                     {/* LiveRun Mode */}
                     <Pressable
                         onPress={() => router.push('/liverun')}
-                        className="flex-1 rounded-xl items-center justify-center overflow-hidden"
-                        style={{
-                            height: 56,
-                            backgroundColor: COLORS.primary,
-                            borderWidth: 2,
-                            borderColor: '#C6FF00',
-                            position: 'relative',
-                        }}
+                        style={({ pressed }) => ({
+                            flex: 1,
+                            height: 55,
+                            borderRadius: 18,
+                            backgroundColor: pressed ? '#B8F000' : COLORS.primary,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexDirection: 'row',
+                            overflow: 'hidden',
+                            borderWidth: 3,
+                            borderColor: '#444444',
+                        })}
                     >
+                        <Text
+                            style={{
+                                color: '#111111',
+                                fontSize: 16,
+                                fontWeight: '700',
+                                marginLeft: 2,
+                                marginRight: 2,
+                                marginTop: -2,
+                            }}
+                            numberOfLines={1}
+                        >
+                            Empezar carrera
+                        </Text>
+
                         <Ionicons
                             name="play"
-                            size={45}
-                            color='#222222'
-                            style={{
-                                position: 'absolute',
-                                top: 0,
-                                opacity: 0.8,
-                            }}
+                            size={30}
+                            color="rgb(26, 26, 26)"
+                            style={{ marginTop: 2 }}
                         />
-
-                        <View
-                            style={{
-                                position: 'relative',
-                                alignItems: 'center',
-                                marginTop: 20,
-                                justifyContent: 'center',
-
-                            }}
-                        >
-                            <Text
-                                style={{
-                                    position: 'absolute',
-                                    color: '#C6FF00',
-                                    fontSize: 11,
-                                    fontWeight: '900',
-                                    opacity: 0.6,
-                                    textAlign: 'center',
-                                    lineHeight: 10,
-                                }}
-                            >
-                                LiveRun{"\n"}Mode
-                            </Text>
-
-                            <Text
-                                style={{
-                                    color: '#111111',
-                                    fontSize: 13,
-                                    fontWeight: '700',
-                                    textAlign: 'center',
-                                    lineHeight: 10,
-                                }}
-                            >
-                                LiveRun{"\n"}Mode
-                            </Text>
-                        </View>
                     </Pressable>
 
-                    {/* Tus estadísticas */}
+                    {/* Estadísticas */}
                     <Pressable
-                        className="flex-1 ml-2 rounded-xl items-center justify-center overflow-hidden"
-                        style={{
-                            height: 56,
-                            backgroundColor: '#444444',
-                            position: 'relative',
-                        }}
                         onPress={() => router.push('/statistics')}
+                        style={({ pressed }) => ({
+                            width: 78,
+                            height: 55,
+                            borderRadius: 16,
+                            borderWidth: 3,
+                            borderColor: '#444444',
+                            backgroundColor: 'rgb(26, 26, 26)',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                        })}
                     >
                         <Ionicons
                             name="stats-chart-outline"
                             size={30}
-                            color='#FFFFFF'
-                            style={{
-                                position: 'absolute',
-                            }}
+                            color="#FFFFFF"
                         />
-
-
                     </Pressable>
                 </View>
 
@@ -686,26 +904,32 @@ export default function HomeScreen() {
                                 marginBottom: 14,
                             }}
                         >
-                            Este progreso se calculará según los kilómetros que recorras esta semana y el objetivo semanal guardado en tu perfil.
+                            Este progreso se calcula según el objetivo principal que definiste en tu perfil y tus registros actuales.
                         </Text>
 
-                        <View style={{ gap: 10 }}>
-                            <Text style={{ color: '#FFFFFF' }}>
-                                Objetivo semanal: {mockWeeklyGoalKm.toFixed(1)} km
-                            </Text>
+                        {goalProgress ? (
+                            <View style={{ gap: 10 }}>
+                                <Text style={{ color: '#FFFFFF' }}>
+                                    {goalProgress.targetLabel}
+                                </Text>
 
-                            <Text style={{ color: '#FFFFFF' }}>
-                                Recorrido esta semana: {mockWeeklyDistanceKm.toFixed(1)} km
-                            </Text>
+                                <Text style={{ color: '#FFFFFF' }}>
+                                    {goalProgress.currentValueLabel}
+                                </Text>
 
-                            <Text style={{ color: '#FFFFFF' }}>
-                                Restante: {mockRemainingKm.toFixed(1)} km
-                            </Text>
+                                <Text style={{ color: '#FFFFFF' }}>
+                                    {goalProgress.remainingLabel}
+                                </Text>
 
-                            <Text style={{ color: COLORS.primary, fontWeight: '900' }}>
-                                Cumplido: {mockProgressPercent}%
+                                <Text style={{ color: COLORS.primary, fontWeight: '900' }}>
+                                    Cumplido: {goalProgress.progressPercent}%
+                                </Text>
+                            </View>
+                        ) : (
+                            <Text style={{ color: COLORS.textMuted }}>
+                                Todavía no definiste un objetivo principal en tu perfil.
                             </Text>
-                        </View>
+                        )}
 
                         <View
                             style={{
@@ -719,7 +943,7 @@ export default function HomeScreen() {
                             <View
                                 style={{
                                     height: '100%',
-                                    width: `${mockProgressPercent}%`,
+                                    width: `${goalProgress?.progressPercent ?? 0}%`,
                                     backgroundColor: COLORS.primary,
                                     borderRadius: 999,
                                 }}

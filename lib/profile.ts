@@ -2,6 +2,16 @@ import { apiFetch } from './api';
 
 export type PlanType = 'standard' | 'pro' | 'professional';
 
+export type MainGoalType = 'running' | 'routine';
+
+export type MainGoalPeriod = 'weekly' | 'monthly';
+
+export type MainGoalMetric =
+    | 'distance_km'
+    | 'sessions'
+    | 'minutes'
+    | 'avg_effort';
+
 export type ProfileUser = {
     id: string;
     email: string;
@@ -20,6 +30,13 @@ export type UserProfile = {
     profileImageUrl: string | null;
     planType: PlanType;
     weeklyKmGoal: number | null;
+
+    // Objetivo principal del usuario
+    mainGoalType: MainGoalType | null;
+    mainGoalPeriod: MainGoalPeriod | null;
+    mainGoalMetric: MainGoalMetric | null;
+    mainGoalTarget: number | null;
+
     createdAt: string;
     updatedAt: string;
 };
@@ -38,6 +55,12 @@ export type UpdateMyProfilePayload = {
     profileImageUrl?: string | null;
     planType?: PlanType;
     weeklyKmGoal?: number | null;
+
+    // Objetivo principal del usuario
+    mainGoalType?: MainGoalType | null;
+    mainGoalPeriod?: MainGoalPeriod | null;
+    mainGoalMetric?: MainGoalMetric | null;
+    mainGoalTarget?: number | null;
 };
 
 export async function getMyProfile(): Promise<MyProfileResponse> {

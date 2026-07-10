@@ -15,6 +15,7 @@ import AppLoading from '../components/AppLoading';
 import { SlideInLeft } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 
+
 function getLastActivityTime(routine: Routine): number {
     const dateStr =
         routine.lastDoneAt ??
@@ -323,6 +324,91 @@ function WeeklyProgressCard({
     );
 }
 
+function CreateRoutineOption({
+    icon,
+    title,
+    description,
+    onPress,
+    disabled = false,
+}: {
+    icon: keyof typeof Ionicons.glyphMap;
+    title: string;
+    description: string;
+    onPress: () => void;
+    disabled?: boolean;
+}) {
+    return (
+        <Pressable
+            onPress={onPress}
+            disabled={disabled}
+            style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: pressed
+                    ? 'rgba(198,255,0,0.08)'
+                    : '#1A1A1A',
+                borderWidth: 1,
+                borderColor: disabled
+                    ? '#2A2A2A'
+                    : 'rgba(198,255,0,0.22)',
+                borderRadius: 18,
+                padding: 13,
+                marginBottom: 10,
+                opacity: disabled ? 0.55 : 1,
+            })}
+        >
+            <View
+                style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 14,
+                    backgroundColor: '#111111',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12,
+                    borderWidth: 1,
+                    borderColor: '#333333',
+                }}
+            >
+                <Ionicons
+                    name={icon}
+                    size={24}
+                    color={disabled ? COLORS.textMuted : COLORS.primary}
+                />
+            </View>
+
+            <View style={{ flex: 1 }}>
+                <Text
+                    style={{
+                        color: COLORS.textLight,
+                        fontSize: 14,
+                        fontWeight: '900',
+                        marginBottom: 3,
+                    }}
+                >
+                    {title}
+                </Text>
+
+                <Text
+                    style={{
+                        color: COLORS.textMuted,
+                        fontSize: 12,
+                        lineHeight: 17,
+                    }}
+                >
+                    {description}
+                </Text>
+            </View>
+
+            <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={COLORS.textMuted}
+            />
+        </Pressable>
+    );
+}
+
 type HomeGoalProgress = {
     currentLabel: string;
     targetLabel: string;
@@ -435,6 +521,7 @@ function buildHomeGoalProgress(
 export default function HomeScreen() {
     const { user, isAuthenticated, logout } = useAuth();
 
+
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [routines, setRoutines] = useState<Routine[]>([]);
     const [loadingRoutines, setLoadingRoutines] = useState(true);
@@ -445,6 +532,8 @@ export default function HomeScreen() {
 
     const [profileData, setProfileData] = useState<MyProfileResponse | null>(null);
     const [statsData, setStatsData] = useState<MyStatisticsResponse | null>(null);
+
+    const [createRoutineModalVisible, setCreateRoutineModalVisible] = useState(false);
 
     const displayName =
         profileDisplayName ??
@@ -770,12 +859,13 @@ export default function HomeScreen() {
                         justifyContent: 'space-between',
                         marginTop: 8,
                         marginBottom: 8,
+                        paddingBottom: Math.max(insets.bottom, 10),
                         gap: 10,
                     }}
                 >
                     {/* Crear rutina */}
                     <Pressable
-                        onPress={() => router.push('/routine/new')}
+                        onPress={() => setCreateRoutineModalVisible(true)}
                         style={({ pressed }) => ({
                             width: 78,
                             height: 55,
@@ -993,6 +1083,147 @@ export default function HomeScreen() {
                                     Cerrar
                                 </Text>
                             </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                visible={createRoutineModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setCreateRoutineModalVisible(false)}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor: 'rgba(0,0,0,0.72)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: 18,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 390,
+                            backgroundColor: '#111111',
+                            borderRadius: 26,
+                            borderWidth: 1,
+                            borderColor: 'rgba(198,255,0,0.35)',
+                            padding: 18,
+                        }}
+                    >
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: 14,
+                            }}
+                        >
+                            <View>
+                                <Text
+                                    style={{
+                                        color: COLORS.textLight,
+                                        fontSize: 20,
+                                        fontWeight: '900',
+                                    }}
+                                >
+                                    Crea tu rutina
+                                </Text>
+                            </View>
+
+                            <Pressable
+                                onPress={() => setCreateRoutineModalVisible(false)}
+                                style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 18,
+                                    backgroundColor: '#1A1A1A',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <Ionicons
+                                    name="close"
+                                    size={20}
+                                    color={COLORS.textLight}
+                                />
+                            </Pressable>
+                        </View>
+
+
+
+                        <CreateRoutineOption
+                            icon="create-outline"
+                            title="Crear rutina de cero"
+                            description="Cargá ejercicios manualmente, uno por uno."
+                            onPress={() => {
+                                setCreateRoutineModalVisible(false);
+                                router.push('/routine/new');
+                            }}
+                        />
+
+                        <CreateRoutineOption
+                            icon="camera-outline"
+                            title="Escanear rutina con foto"
+                            description="Sacá una foto a una rutina en papel para detectar ejercicios."
+                            onPress={() => {
+                                setCreateRoutineModalVisible(false);
+                                router.push('/routine/scan-photo');
+                            }}
+                        />
+
+                        <CreateRoutineOption
+                            icon="document-attach-outline"
+                            title="Subir archivo"
+                            description="Importá una imagen o PDF con tu rutina."
+                            onPress={() => {
+                                setCreateRoutineModalVisible(false);
+                                router.push('/routine/import-file');
+                            }}
+                        />
+
+                        <CreateRoutineOption
+                            icon="bulb-outline"
+                            title="Elegir sugerencias"
+                            description="Guardá una rutina recomendada desde nuestras sugerencias."
+                            onPress={() => {
+                                setCreateRoutineModalVisible(false);
+                                router.push('/suggestions');
+                            }}
+                        />
+
+                        <View
+                            style={{
+                                backgroundColor: 'rgba(255,193,7,0.08)',
+                                borderWidth: 1,
+                                borderColor: 'rgba(255,193,7,0.25)',
+                                borderRadius: 16,
+                                padding: 12,
+                                marginTop: 4,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: '#FFD36A',
+                                    fontSize: 12,
+                                    fontWeight: '900',
+                                    marginBottom: 3,
+                                }}
+                            >
+                                Importante
+                            </Text>
+
+                            <Text
+                                style={{
+                                    color: COLORS.textMuted,
+                                    fontSize: 11,
+                                    lineHeight: 16,
+                                }}
+                            >
+                                El escaneo funcionará mejor con texto impreso, buena iluminación y papel claro. En la primera versión no se garantizará lectura correcta de manuscritos.
+                            </Text>
                         </View>
                     </View>
                 </View>

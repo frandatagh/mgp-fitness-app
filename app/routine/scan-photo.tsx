@@ -14,6 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../../constants/colors';
 import AppHeader from '../../components/AppHeader';
+import { parseRoutineText } from '../../utils/parseRoutineText';
+import { uploadRoutineImageForOcr } from '../../lib/ocr';
 
 export default function ScanPhotoScreen() {
     const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -90,30 +92,70 @@ export default function ScanPhotoScreen() {
             setProcessing(true);
 
             setProcessStep('Preparando imagen...');
-            await wait(700);
+            await wait(500);
 
-            setProcessStep('Buscando texto en la rutina...');
-            await wait(900);
+            setProcessStep('Enviando imagen al lector OCR...');
+            const ocrResult = await uploadRoutineImageForOcr(selectedImageUri);
+
+            const rawText = ocrResult.rawText?.trim() ?? '';
+
+            console.log('\n\n================ OCR TEXTO COMPLETO ================');
+            console.log(rawText);
+            console.log('================ FIN OCR TEXTO COMPLETO ================\n\n');
+
+            if (!rawText) {
+                setProcessing(false);
+
+                Alert.alert(
+                    'No se detectó texto',
+                    'No pudimos leer texto en la imagen. Probá con una foto más clara, buena luz y el papel bien enfocado.'
+                );
+                return;
+            }
 
             setProcessStep('Detectando ejercicios, series y repeticiones...');
-            await wait(1100);
+            await wait(500);
+
+            const parsedResult = parseRoutineText(rawText);
+
+            console.log('\n\n================ RESULTADO PARSER OCR ================');
+            console.log(JSON.stringify(parsedResult, null, 2));
+            console.log('================ FIN RESULTADO PARSER OCR ================\n\n');
+
+            if (parsedResult.exercises.length === 0) {
+                setProcessing(false);
+
+                Alert.alert(
+                    'No se detectaron ejercicios',
+                    'Se leyó texto en la imagen, pero no pudimos convertirlo en ejercicios. Probá con una rutina más clara o revisá el formato.'
+                );
+                return;
+            }
 
             setProcessStep('Preparando pantalla de revisión...');
-            await wait(800);
+            await wait(500);
 
             setProcessing(false);
 
             router.push({
                 pathname: '/routine/review-import',
-                params: { imageUri: selectedImageUri },
+                params: {
+                    imageUri: selectedImageUri,
+                    title: parsedResult.title,
+                    parsedExercises: JSON.stringify(parsedResult.exercises),
+                    source: 'scan-photo-ocr',
+                },
             });
         } catch (error) {
             console.log('Error procesando imagen:', error);
+
             setProcessing(false);
 
             Alert.alert(
                 'Error',
-                'No se pudo procesar la imagen. Probá con otra foto más clara.'
+                error instanceof Error
+                    ? error.message
+                    : 'No se pudo procesar la imagen. Probá con otra foto más clara.'
             );
         }
     };
@@ -362,6 +404,7 @@ export default function ScanPhotoScreen() {
 
                                 <Pressable
                                     onPress={processRoutineImage}
+                                    disabled={processing}
                                     style={({ pressed }) => ({
                                         flex: 1,
                                         backgroundColor: pressed

@@ -8,6 +8,7 @@ import {
     ScrollView,
     Text,
     View,
+    Platform
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +17,7 @@ import { COLORS } from '../../constants/colors';
 import AppHeader from '../../components/AppHeader';
 import { parseRoutineText } from '../../utils/parseRoutineText';
 import { uploadRoutineImageForOcr } from '../../lib/ocr';
+import { extractRoutineTextOnDevice } from '../../lib/mobileOcr';
 
 export default function ScanPhotoScreen() {
     const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export default function ScanPhotoScreen() {
         }
 
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: false,
             quality: 0.85,
         });
@@ -94,8 +96,16 @@ export default function ScanPhotoScreen() {
             setProcessStep('Preparando imagen...');
             await wait(500);
 
-            setProcessStep('Enviando imagen al lector OCR...');
-            const ocrResult = await uploadRoutineImageForOcr(selectedImageUri);
+            setProcessStep(
+                Platform.OS === 'web'
+                    ? 'Enviando imagen al lector OCR del servidor...'
+                    : 'Leyendo texto en el dispositivo...'
+            );
+
+            const ocrResult =
+                Platform.OS === 'web'
+                    ? await uploadRoutineImageForOcr(selectedImageUri)
+                    : await extractRoutineTextOnDevice(selectedImageUri);
 
             const rawText = ocrResult.rawText?.trim() ?? '';
 
@@ -142,8 +152,14 @@ export default function ScanPhotoScreen() {
                 params: {
                     imageUri: selectedImageUri,
                     title: parsedResult.title,
+                    description: parsedResult.description,
+                    importMode: parsedResult.importMode,
+                    warning: parsedResult.warning ?? '',
                     parsedExercises: JSON.stringify(parsedResult.exercises),
-                    source: 'scan-photo-ocr',
+                    source:
+                        Platform.OS === 'web'
+                            ? 'scan-photo-backend-ocr'
+                            : 'scan-photo-mobile-ocr',
                 },
             });
         } catch (error) {

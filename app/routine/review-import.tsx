@@ -55,11 +55,30 @@ export default function ReviewImportRoutineScreen() {
     const params = useLocalSearchParams<{
         imageUri?: string;
         title?: string;
+        description?: string;
+        importMode?: string;
+        warning?: string;
         parsedExercises?: string;
         source?: string;
-    }>();
+    }>();;
 
     const imageUri = typeof params.imageUri === 'string' ? params.imageUri : null;
+
+    const isComplexImport = params.importMode === 'complex';
+
+    const importWarning =
+        typeof params.warning === 'string' && params.warning.trim()
+            ? params.warning.trim()
+            : '';
+
+    const initialRoutineDescription =
+        typeof params.description === 'string' && params.description.trim()
+            ? params.description.trim()
+            : 'Rutina creada desde escaneo/importación.';
+
+    const [routineDescription, setRoutineDescription] = useState(
+        initialRoutineDescription
+    );
 
     const [routineTitle, setRoutineTitle] = useState(
         typeof params.title === 'string' ? params.title : 'Rutina importada'
@@ -153,9 +172,15 @@ export default function ReviewImportRoutineScreen() {
 
             console.log('Guardando rutina importada...');
 
+            console.log(
+                'Ejercicios válidos antes de guardar:',
+                validExercises.length,
+                validExercises.map((exercise) => exercise.name)
+            );
+
             const createdRoutineResponse = await createRoutine({
                 title: routineTitle.trim(),
-                notes: 'Rutina creada desde escaneo/importación.',
+                notes: routineDescription,
                 exercises: validExercises.map((exercise, index) => {
                     const details = [
                         exercise.weight ? `Peso: ${exercise.weight} kg` : null,
@@ -294,6 +319,41 @@ export default function ReviewImportRoutineScreen() {
                     </Text>
                 </View>
 
+                {isComplexImport ? (
+                    <View
+                        style={{
+                            backgroundColor: 'rgba(255,193,7,0.10)',
+                            borderWidth: 1,
+                            borderColor: 'rgba(255,193,7,0.35)',
+                            borderRadius: 18,
+                            padding: 13,
+                            marginTop: 14,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color: '#FFD36A',
+                                fontSize: 14,
+                                fontWeight: '900',
+                                marginBottom: 6,
+                            }}
+                        >
+                            Rutina compleja detectada
+                        </Text>
+
+                        <Text
+                            style={{
+                                color: COLORS.textMuted,
+                                fontSize: 12,
+                                lineHeight: 18,
+                            }}
+                        >
+                            {importWarning ||
+                                'Esta rutina parece tener bloques, semanas o progresiones. El escaneo puede detectar ejercicios, pero puede fallar en series, repeticiones o notas. Revisá y corregí antes de guardar.'}
+                        </Text>
+                    </View>
+                ) : null}
+
                 {imageUri ? (
                     <View
                         style={{
@@ -367,6 +427,43 @@ export default function ReviewImportRoutineScreen() {
                             fontWeight: '800',
                         }}
                     />
+
+                    <View
+                        style={{
+                            backgroundColor: '#1A1A1A',
+                            borderRadius: 24,
+                            borderWidth: 1,
+                            borderColor: '#2F2F2F',
+                            padding: 14,
+                            marginTop: 14,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color: COLORS.textLight,
+                                fontSize: 15,
+                                fontWeight: '900',
+                                marginBottom: 8,
+                            }}
+                        >
+                            Descripción detectada
+                        </Text>
+
+                        <TextInput
+                            value={routineDescription}
+                            onChangeText={setRoutineDescription}
+                            placeholder="Descripción de la rutina"
+                            placeholderTextColor={COLORS.textMuted}
+                            multiline
+                            style={[
+                                inputStyle,
+                                {
+                                    minHeight: isComplexImport ? 180 : 100,
+                                    textAlignVertical: 'top',
+                                },
+                            ]}
+                        />
+                    </View>
                 </View>
 
                 <View
@@ -395,7 +492,9 @@ export default function ReviewImportRoutineScreen() {
                                     fontWeight: '900',
                                 }}
                             >
-                                Ejercicios detectados
+                                {isComplexImport
+                                    ? 'Ejercicios detectados desde rutina compleja'
+                                    : 'Ejercicios detectados'}
                             </Text>
 
                             <Text
@@ -405,7 +504,9 @@ export default function ReviewImportRoutineScreen() {
                                     marginTop: 2,
                                 }}
                             >
-                                {validExercises.length} ejercicios válidos
+                                {isComplexImport
+                                    ? `${validExercises.length} ejercicios encontrados para revisar`
+                                    : `${validExercises.length} ejercicios válidos`}
                             </Text>
                         </View>
 
@@ -500,9 +601,10 @@ export default function ReviewImportRoutineScreen() {
                                     onChangeText={(value) =>
                                         updateExercise(exercise.id, 'reps', value)
                                     }
-                                    placeholder="Reps"
+                                    placeholder={isComplexImport ? 'Progresión' : 'Reps'}
                                     placeholderTextColor={COLORS.textMuted}
-                                    keyboardType="numeric"
+                                    keyboardType={isComplexImport ? 'default' : 'numeric'}
+                                    autoCapitalize="none"
                                     style={[inputStyle, { flex: 1 }]}
                                 />
 

@@ -3,7 +3,13 @@ import React from 'react';
 import { View } from 'react-native';
 import { COLORS } from '../constants/colors';
 import type { TrainingPoint } from '../constants/trainingPoints';
-import type { MapRegion } from './TrainingMap';
+
+export type MapRegion = {
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+};
 
 type Props = {
     region: MapRegion;
@@ -12,7 +18,6 @@ type Props = {
     routeFrom?: { latitude: number; longitude: number } | null;
     routeTo?: { latitude: number; longitude: number } | null;
 };
-
 
 export default function TrainingMapWeb({ region, points }: Props) {
     const centerLat = points[0]?.latitude ?? region.latitude;

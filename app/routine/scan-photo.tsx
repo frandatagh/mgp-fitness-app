@@ -16,7 +16,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../../constants/colors';
 import AppHeader from '../../components/AppHeader';
 import { parseRoutineText } from '../../utils/parseRoutineText';
-import { uploadRoutineImageForOcr } from '../../lib/ocr';
 import { extractRoutineTextOnDevice } from '../../lib/mobileOcr';
 
 export default function ScanPhotoScreen() {
@@ -96,17 +95,20 @@ export default function ScanPhotoScreen() {
             setProcessStep('Preparando imagen...');
             await wait(500);
 
-            setProcessStep(
-                Platform.OS === 'web'
-                    ? 'Enviando imagen al lector OCR del servidor...'
-                    : 'Leyendo texto en el dispositivo...'
-            );
+            setProcessStep('Leyendo texto en el dispositivo...');
 
-            const ocrResult =
-                Platform.OS === 'web'
-                    ? await uploadRoutineImageForOcr(selectedImageUri)
-                    : await extractRoutineTextOnDevice(selectedImageUri);
+            if (Platform.OS === 'web') {
+                setProcessing(false);
 
+                Alert.alert(
+                    'Escaneo disponible en la app móvil',
+                    'Por ahora el escaneo inteligente de rutinas funciona desde la app móvil. En navegador web queda desactivado temporalmente.'
+                );
+
+                return;
+            }
+
+            const ocrResult = await extractRoutineTextOnDevice(selectedImageUri);
             const rawText = ocrResult.rawText?.trim() ?? '';
 
             console.log('\n\n================ OCR TEXTO COMPLETO ================');
@@ -156,10 +158,7 @@ export default function ScanPhotoScreen() {
                     importMode: parsedResult.importMode,
                     warning: parsedResult.warning ?? '',
                     parsedExercises: JSON.stringify(parsedResult.exercises),
-                    source:
-                        Platform.OS === 'web'
-                            ? 'scan-photo-backend-ocr'
-                            : 'scan-photo-mobile-ocr',
+                    source: 'scan-photo-mobile-ocr',
                 },
             });
         } catch (error) {
@@ -258,7 +257,7 @@ export default function ScanPhotoScreen() {
                         }}
                     >
                         Sacá una foto a una rutina en papel o elegí una imagen de tu galería.
-                        La app intentará detectar ejercicios, series, repeticiones y notas para crear una rutina editable.
+                        En mobile, la app intentará detectar ejercicios, series, repeticiones y notas para crear una rutina editable.
                     </Text>
 
                     <View
@@ -289,7 +288,7 @@ export default function ScanPhotoScreen() {
                                 lineHeight: 18,
                             }}
                         >
-                            Usá buena iluminación, enfocá bien el papel y evitá sombras. Esta primera versión funcionará mejor con texto impreso o letra muy clara. No se garantiza lectura correcta de manuscritos, fotos borrosas o tablas muy complejas.
+                            Usá buena iluminación, enfocá bien el papel y evitá sombras. Esta función está optimizada para mobile. En navegador web puede estar limitada o disponible solo en modo beta/local.
                         </Text>
                     </View>
 

@@ -581,6 +581,8 @@ export default function HomeScreen() {
     }, [isAuthenticated]);
 
     const insets = useSafeAreaInsets();
+    const footerBottomSpace = Math.max(insets.bottom, 10);
+    const footerReservedHeight = 78 + footerBottomSpace;
 
     // 👉 Redirigir a login si NO está autenticado (pero desde un efecto)
     useEffect(() => {
@@ -684,7 +686,12 @@ export default function HomeScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
             <View className="flex-1 w-full px-4"
-                style={{ maxWidth: 800, alignSelf: 'center' }}
+                style={{
+                    maxWidth: 800,
+                    alignSelf: 'center',
+                    position: 'relative',
+                    paddingBottom: footerReservedHeight,
+                }}
             >
                 <AppHeader profileGreeting={`Hola, ${displayName}`} />
 
@@ -854,13 +861,19 @@ export default function HomeScreen() {
                 {/* BOTONES INFERIORES */}
                 <View
                     style={{
+                        position: 'absolute',
+                        left: 16,
+                        right: 16,
+                        bottom: 5,
                         flexDirection: 'row',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        marginTop: 8,
-                        marginBottom: 8,
-                        paddingBottom: Math.max(insets.bottom, 10),
+                        paddingBottom: footerBottomSpace,
+                        paddingTop: 8,
+                        backgroundColor: COLORS.background,
                         gap: 10,
+                        zIndex: 100,
+                        elevation: 100,
                     }}
                 >
                     {/* Crear rutina */}

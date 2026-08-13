@@ -2,25 +2,63 @@ import { useEffect, useRef, useState } from 'react';
 import {
     Alert,
     Image,
+    ImageBackground,
     Linking,
     Platform,
     Pressable,
     ScrollView,
     Text,
+    useWindowDimensions,
     View,
 } from 'react-native';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 
 const bannerImages = [
-    require('../assets/img/faviconmgp.png'),
-    require('../assets/img/iconhome.png'),
-    require('../assets/img/iconrun.png'),
+    require('../assets/img/landingbanner01.png'),
+    require('../assets/img/landingbanner02.png'),
+    require('../assets/img/landingbanner03.jpg'),
 ];
+
+function navigateWebRoute(route: string) {
+    if (Platform.OS === 'web') {
+        const isGithubPages =
+            typeof window !== 'undefined' &&
+            window.location.hostname.includes('github.io');
+
+        if (isGithubPages) {
+            const cleanRoute = route.replace('/', '');
+            window.location.href = `/mgp-fitness-app/${cleanRoute}.html`;
+            return;
+        }
+    }
+
+    router.push(route as any);
+}
 
 export default function LandingScreen() {
     const [bannerIndex, setBannerIndex] = useState(0);
+    const { width } = useWindowDimensions();
+
+    const bannerContainerWidth = Math.min(width - 36, 1360);
+
+    const bannerHeight =
+        width >= 900
+            ? bannerContainerWidth * 0.5625
+            : width >= 600
+                ? bannerContainerWidth * 0.58
+                : bannerContainerWidth * 1.1;
+
+    const isDesktop = width >= 900;
+    const isTablet = width >= 600;
+    const isSmallMobile = width < 390;
+    const isMobile = width < 600;
+
+    const pageHorizontalPadding = isDesktop ? 28 : 14;
+    const contentMaxWidth = 1180;
+    const panelMaxWidth = 1060;
+
     const directionRef = useRef(1);
     const deferredPromptRef = useRef<any>(null);
 
@@ -41,7 +79,7 @@ export default function LandingScreen() {
 
                 return next;
             });
-        }, 2800);
+        }, 5000);
 
         return () => clearInterval(interval);
     }, []);
@@ -89,6 +127,26 @@ export default function LandingScreen() {
         );
     };
 
+    const goToPage = (route: 'login' | 'register') => {
+        const path = `/${route}` as const;
+
+        if (Platform.OS === 'web') {
+            const isGithubPages =
+                typeof window !== 'undefined' &&
+                window.location.hostname.includes('github.io');
+
+            if (isGithubPages) {
+                window.location.href = `/mgp-fitness-app/${route}.html`;
+                return;
+            }
+
+            router.push(path);
+            return;
+        }
+
+        router.push(path);
+    };
+
     return (
         <View style={{ flex: 1, backgroundColor: '#0B0B0B' }}>
             <ScrollView
@@ -98,401 +156,460 @@ export default function LandingScreen() {
                 {/* Header */}
                 <View
                     style={{
-                        minHeight: 58,
-                        paddingHorizontal: 18,
-                        paddingTop: 12,
-                        paddingBottom: 10,
+                        minHeight: isSmallMobile ? 56 : 64,
+                        paddingHorizontal: pageHorizontalPadding,
+                        paddingVertical: isSmallMobile ? 8 : 10,
                         borderBottomWidth: 1,
                         borderBottomColor: '#242424',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
                         backgroundColor: '#0B0B0B',
                     }}
                 >
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Image
-                            source={require('../assets/img/faviconmgp.png')}
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: contentMaxWidth,
+                            alignSelf: 'center',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 10,
+                        }}
+                    >
+                        <View
                             style={{
-                                width: 34,
-                                height: 34,
-                                borderRadius: 8,
-                                marginRight: 10,
-                            }}
-                            resizeMode="contain"
-                        />
-
-                        <Text
-                            style={{
-                                color: COLORS.textLight,
-                                fontSize: 18,
-                                fontWeight: '900',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                flexShrink: 1,
+                                minWidth: 0,
                             }}
                         >
-                            Mardel Fitness
-                        </Text>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <Link href="/login" asChild>
-                            <Pressable
+                            <Image
+                                source={require('../assets/img/iconrun.png')}
                                 style={{
-                                    paddingHorizontal: 12,
-                                    paddingVertical: 8,
+                                    width: isSmallMobile ? 34 : 42,
+                                    height: isSmallMobile ? 34 : 42,
+                                    marginRight: 6,
+                                }}
+                                resizeMode="contain"
+                            />
+
+                            <Text
+                                numberOfLines={1}
+                                style={{
+                                    color: COLORS.textLight,
+                                    fontSize: isSmallMobile ? 13 : 16,
+                                    fontWeight: '900',
+                                    flexShrink: 1,
+                                }}
+                            >
+                                Mardel Fitness App
+                            </Text>
+                        </View>
+
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                gap: isSmallMobile ? 6 : 8,
+                                flexShrink: 0,
+                            }}
+                        >
+                            <Pressable
+                                onPress={() => goToPage('login')}
+                                style={({ pressed }) => ({
+                                    paddingHorizontal: isSmallMobile ? 9 : 13,
+                                    paddingVertical: isSmallMobile ? 7 : 9,
                                     borderRadius: 999,
                                     borderWidth: 1,
                                     borderColor: '#3A3A3A',
-                                    backgroundColor: '#151515',
-                                }}
+                                    backgroundColor: pressed ? '#222222' : '#151515',
+                                })}
                             >
                                 <Text
                                     style={{
                                         color: COLORS.textLight,
-                                        fontSize: 12,
+                                        fontSize: isSmallMobile ? 10 : 12,
                                         fontWeight: '800',
                                     }}
                                 >
                                     Iniciar sesión
                                 </Text>
                             </Pressable>
-                        </Link>
 
-                        <Link href="/register" asChild>
                             <Pressable
-                                style={{
-                                    paddingHorizontal: 12,
-                                    paddingVertical: 8,
+                                onPress={() => goToPage('register')}
+                                style={({ pressed }) => ({
+                                    paddingHorizontal: isSmallMobile ? 9 : 13,
+                                    paddingVertical: isSmallMobile ? 7 : 9,
                                     borderRadius: 999,
-                                    backgroundColor: COLORS.primary,
-                                }}
+                                    backgroundColor: pressed ? '#B8F000' : COLORS.primary,
+                                })}
                             >
                                 <Text
                                     style={{
                                         color: '#111111',
-                                        fontSize: 12,
+                                        fontSize: isSmallMobile ? 10 : 12,
                                         fontWeight: '900',
                                     }}
                                 >
                                     Registrarse
                                 </Text>
                             </Pressable>
-                        </Link>
+                        </View>
                     </View>
                 </View>
 
                 {/* Banner */}
-                <View
-                    style={{
-                        paddingHorizontal: 18,
-                        paddingTop: 20,
-                    }}
-                >
+                <View>
                     <View
                         style={{
+                            width: '100%',
+                            maxWidth: 1360,
+                            alignSelf: 'center',
+                            height: bannerHeight,
                             backgroundColor: '#111111',
-                            borderRadius: 28,
-                            borderWidth: 1,
-                            borderColor: 'rgba(198,255,0,0.28)',
                             overflow: 'hidden',
-                            minHeight: 260,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: 22,
                         }}
                     >
-                        <Image
+                        <ImageBackground
                             source={bannerImages[bannerIndex]}
+                            resizeMode={width >= 700 ? 'contain' : 'cover'}
                             style={{
+                                flex: 1,
                                 width: '100%',
-                                height: 170,
-                                maxWidth: 420,
-                            }}
-                            resizeMode="contain"
-                        />
-
-                        <Text
-                            style={{
-                                color: COLORS.primary,
-                                fontSize: 13,
-                                fontWeight: '900',
-                                marginTop: 14,
-                                textAlign: 'center',
+                                height: '100%',
+                                backgroundColor: '#050505',
                             }}
                         >
-                            Entrená, registrá y seguí tu progreso
-                        </Text>
-
-                        <Text
-                            style={{
-                                color: COLORS.textLight,
-                                fontSize: 28,
-                                fontWeight: '900',
-                                marginTop: 8,
-                                textAlign: 'center',
-                                lineHeight: 33,
-                            }}
-                        >
-                            Tu rutina fitness en una app simple y gratuita
-                        </Text>
-
-                        <Text
-                            style={{
-                                color: COLORS.textMuted,
-                                fontSize: 14,
-                                marginTop: 10,
-                                textAlign: 'center',
-                                lineHeight: 21,
-                                maxWidth: 560,
-                            }}
-                        >
-                            Creá rutinas, guardá ejercicios, registrá actividad y
-                            visualizá tu progreso desde el celular o navegador.
-                        </Text>
+                            <View
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: 'rgba(0,0,0,0.02)',
+                                }}
+                            />
+                        </ImageBackground>
                     </View>
                 </View>
 
                 {/* Panel instalación */}
                 <View
                     style={{
-                        marginHorizontal: 18,
-                        marginTop: 18,
-                        backgroundColor: '#151515',
-                        borderRadius: 26,
-                        borderWidth: 1,
-                        borderColor: '#303030',
-                        padding: 18,
+                        width: '100%',
+                        maxWidth: panelMaxWidth,
+                        alignSelf: 'center',
+                        marginTop: isDesktop ? 18 : 14,
+                        paddingHorizontal: pageHorizontalPadding,
                     }}
                 >
-                    <Text
-                        style={{
-                            color: COLORS.textLight,
-                            fontSize: 21,
-                            fontWeight: '900',
-                            marginBottom: 8,
-                            textAlign: 'center',
-                        }}
-                    >
-                        Instalá Mardel Fitness en tu celular
-                    </Text>
-
-                    <Text
-                        style={{
-                            color: COLORS.textMuted,
-                            fontSize: 13,
-                            lineHeight: 20,
-                            textAlign: 'center',
-                            marginBottom: 16,
-                        }}
-                    >
-                        Esta es una app web gratuita. Podés agregarla a la pantalla
-                        de inicio de tu celular para usarla con acceso rápido, sin
-                        pasar por App Store o Play Store.
-                    </Text>
-
-                    <View style={{ flexDirection: 'row', gap: 10 }}>
-                        <Pressable
-                            onPress={handleInstallAndroid}
-                            style={({ pressed }) => ({
-                                flex: 1,
-                                backgroundColor: pressed ? '#B8F000' : COLORS.primary,
-                                borderRadius: 18,
-                                paddingVertical: 14,
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexDirection: 'row',
-                            })}
-                        >
-                            <Ionicons
-                                name="logo-android"
-                                size={22}
-                                color="#111111"
-                                style={{ marginRight: 7 }}
-                            />
-                            <Text
-                                style={{
-                                    color: '#111111',
-                                    fontSize: 13,
-                                    fontWeight: '900',
-                                }}
-                            >
-                                Instalar Android
-                            </Text>
-                        </Pressable>
-
-                        <Pressable
-                            onPress={handleInstallIos}
-                            style={({ pressed }) => ({
-                                flex: 1,
-                                backgroundColor: pressed ? '#333333' : '#242424',
-                                borderRadius: 18,
-                                paddingVertical: 14,
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexDirection: 'row',
-                                borderWidth: 1,
-                                borderColor: '#3A3A3A',
-                            })}
-                        >
-                            <Ionicons
-                                name="logo-apple"
-                                size={22}
-                                color="#FFFFFF"
-                                style={{ marginRight: 7 }}
-                            />
-                            <Text
-                                style={{
-                                    color: '#FFFFFF',
-                                    fontSize: 13,
-                                    fontWeight: '900',
-                                }}
-                            >
-                                Instalar iPhone
-                            </Text>
-                        </Pressable>
-                    </View>
-
                     <View
                         style={{
-                            marginTop: 16,
-                            backgroundColor: 'rgba(255,193,7,0.08)',
+                            backgroundColor: '#151515',
+                            borderRadius: isDesktop ? 28 : 22,
                             borderWidth: 1,
-                            borderColor: 'rgba(255,193,7,0.25)',
-                            borderRadius: 18,
-                            padding: 13,
+                            borderColor: '#303030',
+                            padding: isDesktop ? 24 : isSmallMobile ? 14 : 16,
                         }}
                     >
-                        <Text
-                            style={{
-                                color: '#FFD36A',
-                                fontSize: 13,
-                                fontWeight: '900',
-                                marginBottom: 5,
-                            }}
-                        >
-                            Sobre los permisos
-                        </Text>
-
-                        <Text
-                            style={{
-                                color: COLORS.textMuted,
-                                fontSize: 12,
-                                lineHeight: 18,
-                            }}
-                        >
-                            Algunas funciones pueden solicitar permisos del dispositivo,
-                            como ubicación o acceso a imágenes. Estos permisos se utilizan
-                            únicamente para brindar el servicio gratuito de entrenamiento,
-                            registro de actividad y uso personalizado de la app.
-                        </Text>
-                    </View>
-
-                    <View style={{ marginTop: 14 }}>
                         <Text
                             style={{
                                 color: COLORS.textLight,
-                                fontSize: 13,
+                                fontSize: isDesktop ? 25 : isSmallMobile ? 18 : 20,
                                 fontWeight: '900',
-                                marginBottom: 6,
+                                marginBottom: 8,
+                                textAlign: 'center',
                             }}
                         >
-                            Cómo instalar:
+                            Instalá Mardel Fitness en tu celular
                         </Text>
 
                         <Text
                             style={{
                                 color: COLORS.textMuted,
-                                fontSize: 12,
-                                lineHeight: 19,
+                                fontSize: isDesktop ? 14 : 12,
+                                lineHeight: isDesktop ? 22 : 19,
+                                textAlign: 'center',
+                                maxWidth: 720,
+                                alignSelf: 'center',
+                                marginBottom: isDesktop ? 22 : 12,
                             }}
                         >
-                            Android: abrí la app desde Chrome y tocá “Instalar app” o
-                            “Agregar a pantalla principal”.
-                            {'\n'}
-                            iPhone: abrí la app desde Safari, tocá Compartir y elegí
-                            “Agregar a pantalla de inicio”.
+                            Esta es una app web gratuita. Podés agregarla a la pantalla
+                            de inicio de tu celular para usarla con acceso rápido, sin
+                            pasar por App Store o Play Store.
                         </Text>
+
+                        <View
+                            style={{
+                                flexDirection: isDesktop ? 'row' : 'column',
+                                gap: isDesktop ? 16 : 10,
+                                alignItems: 'stretch',
+                            }}
+                        >
+                            {/* Instrucciones */}
+                            <View
+                                style={{
+                                    flex: 1,
+                                    backgroundColor: isMobile ? 'transparent' : '#101010',
+                                    borderRadius: isMobile ? 0 : 20,
+                                    borderWidth: isMobile ? 0 : 1,
+                                    borderColor: '#252525',
+                                    padding: isMobile ? 0 : 15,
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: COLORS.textLight,
+                                        fontSize: isSmallMobile ? 12 : 14,
+                                        fontWeight: '900',
+                                        marginBottom: isSmallMobile ? 4 : 8,
+                                    }}
+                                >
+                                    Cómo instalar:
+                                </Text>
+
+                                <Text
+                                    style={{
+                                        color: COLORS.textMuted,
+                                        fontSize: isSmallMobile ? 10 : 11.5,
+                                        lineHeight: isSmallMobile ? 15 : 17,
+                                    }}
+                                >
+                                    Android: abrí la app desde Chrome y tocá “Instalar app”
+                                    o “Agregar a pantalla principal”.
+                                    {'\n'}
+                                    iPhone: abrí la app desde Safari, tocá Compartir y elegí
+                                    “Agregar a pantalla de inicio”.
+                                </Text>
+                            </View>
+
+                            {/* Botones + permisos */}
+                            <View
+                                style={{
+                                    flex: isDesktop ? 1.1 : undefined,
+                                    marginTop: isMobile ? 0 : 0,
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        flexDirection: isDesktop ? 'row' : 'column',
+                                        gap: isMobile ? 8 : 16,
+                                        alignItems: 'stretch',
+                                    }}
+                                >
+                                    <Pressable
+                                        onPress={handleInstallAndroid}
+                                        style={({ pressed }) => ({
+                                            flex: 1,
+                                            backgroundColor: pressed ? '#B8F000' : COLORS.primary,
+                                            borderRadius: 18,
+                                            paddingVertical: isSmallMobile ? 9 : 12,
+                                            paddingHorizontal: 12,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexDirection: 'row',
+                                            minHeight: isSmallMobile ? 42 : 48,
+                                        })}
+                                    >
+                                        <Ionicons
+                                            name="logo-android"
+                                            size={21}
+                                            color="#111111"
+                                            style={{ marginRight: 7 }}
+                                        />
+                                        <Text
+                                            style={{
+                                                color: '#111111',
+                                                fontSize: isSmallMobile ? 12 : 13,
+                                                fontWeight: '900',
+                                            }}
+                                        >
+                                            Instalar Android
+                                        </Text>
+                                    </Pressable>
+
+                                    <Pressable
+                                        onPress={handleInstallIos}
+                                        style={({ pressed }) => ({
+                                            flex: 1,
+                                            backgroundColor: pressed ? '#333333' : '#242424',
+                                            borderRadius: 18,
+                                            paddingVertical: isSmallMobile ? 9 : 12,
+                                            paddingHorizontal: 12,
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexDirection: 'row',
+                                            borderWidth: 1,
+                                            borderColor: '#3A3A3A',
+                                            minHeight: isSmallMobile ? 42 : 48,
+                                        })}
+                                    >
+                                        <Ionicons
+                                            name="logo-apple"
+                                            size={21}
+                                            color="#FFFFFF"
+                                            style={{ marginRight: 7 }}
+                                        />
+                                        <Text
+                                            style={{
+                                                color: '#FFFFFF',
+                                                fontSize: isSmallMobile ? 12 : 13,
+                                                fontWeight: '900',
+                                            }}
+                                        >
+                                            Instalar iPhone
+                                        </Text>
+                                    </Pressable>
+                                </View>
+
+                                <View
+                                    style={{
+                                        marginTop: isMobile ? 8 : 12,
+                                        padding: isSmallMobile ? 9 : 12,
+                                        backgroundColor: 'rgba(255,193,7,0.08)',
+                                        borderWidth: 1,
+                                        borderColor: 'rgba(255,193,7,0.25)',
+                                        borderRadius: 18,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color: '#FFD36A',
+                                            fontSize: isSmallMobile ? 12 : 13,
+                                            fontWeight: '900',
+                                            marginBottom: 4,
+                                        }}
+                                    >
+                                        Sobre los permisos
+                                    </Text>
+
+                                    <Text
+                                        style={{
+                                            color: COLORS.textMuted,
+                                            fontSize: isSmallMobile ? 10 : 11.5,
+                                            lineHeight: isSmallMobile ? 15 : 17,
+                                        }}
+                                    >
+                                        Algunas funciones pueden solicitar permisos del dispositivo,
+                                        como ubicación o acceso a imágenes. Estos permisos se utilizan
+                                        únicamente para brindar el servicio gratuito de entrenamiento,
+                                        registro de actividad y uso personalizado de la app.
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
                     </View>
                 </View>
 
                 {/* Acceso directo */}
                 <View
                     style={{
-                        marginHorizontal: 18,
-                        marginTop: 18,
-                        alignItems: 'center',
+                        width: '100%',
+                        maxWidth: 460,
+                        alignSelf: 'center',
+                        marginTop: isMobile ? 18 : 18,
+                        paddingHorizontal: pageHorizontalPadding,
                     }}
                 >
-                    <Link href="/login" asChild>
-                        <Pressable
-                            style={({ pressed }) => ({
-                                width: '100%',
-                                maxWidth: 420,
-                                backgroundColor: pressed ? '#B8F000' : COLORS.primary,
-                                borderRadius: 18,
-                                paddingVertical: 15,
-                                alignItems: 'center',
-                            })}
+                    <Pressable
+                        onPress={() => goToPage('login')}
+                        style={({ pressed }) => ({
+                            width: '100%',
+                            backgroundColor: pressed ? '#B8F000' : COLORS.primary,
+                            borderRadius: 18,
+                            paddingVertical: isSmallMobile ? 12 : 15,
+                            alignItems: 'center',
+                            shadowColor: '#9DFF00',
+                            shadowOpacity: 0.18,
+                            shadowRadius: 12,
+                            elevation: 3,
+                        })}
+                    >
+                        <Text
+                            style={{
+                                color: '#111111',
+                                fontSize: isSmallMobile ? 14 : 15,
+                                fontWeight: '900',
+                            }}
                         >
-                            <Text
-                                style={{
-                                    color: '#111111',
-                                    fontSize: 15,
-                                    fontWeight: '900',
-                                }}
-                            >
-                                Entrar a la app
-                            </Text>
-                        </Pressable>
-                    </Link>
+                            Entrar a la app
+                        </Text>
+                    </Pressable>
                 </View>
 
                 {/* Footer */}
                 <View
                     style={{
-                        marginTop: 28,
-                        paddingHorizontal: 18,
-                        paddingVertical: 22,
+                        marginTop: isDesktop ? 34 : 24,
+                        paddingHorizontal: pageHorizontalPadding,
+                        paddingVertical: 24,
                         borderTopWidth: 1,
                         borderTopColor: '#242424',
+                        backgroundColor: '#090909',
                     }}
                 >
-                    <Text
-                        style={{
-                            color: COLORS.textLight,
-                            fontSize: 15,
-                            fontWeight: '900',
-                            textAlign: 'center',
-                            marginBottom: 12,
-                        }}
-                    >
-                        Mardel Fitness
-                    </Text>
-
                     <View
                         style={{
-                            flexDirection: 'row',
-                            flexWrap: 'wrap',
-                            justifyContent: 'center',
-                            gap: 12,
+                            width: '100%',
+                            maxWidth: contentMaxWidth,
+                            alignSelf: 'center',
+                            alignItems: 'center',
                         }}
                     >
-                        <FooterLink label="Soporte" route="/support" />
-                        <FooterLink label="Términos" route="/terms" />
-                        <FooterLink label="Privacidad" route="/privacy" />
-                        <FooterLink label="Acerca de" route="/about" />
-                        <FooterExternal label="Contacto" url="mailto:soporte@mardelfitness.com" />
-                    </View>
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                marginBottom: 14,
+                            }}
+                        >
+                            <Image
+                                source={require('../assets/img/iconrun.png')}
+                                style={{
+                                    width: 30,
+                                    height: 30,
+                                    marginRight: 8,
+                                }}
+                                resizeMode="contain"
+                            />
 
-                    <Text
-                        style={{
-                            color: COLORS.textMuted,
-                            fontSize: 11,
-                            textAlign: 'center',
-                            marginTop: 14,
-                        }}
-                    >
-                        © 2026 Mardel Fitness. Servicio gratuito en etapa inicial.
-                    </Text>
+                            <Text
+                                style={{
+                                    color: COLORS.textLight,
+                                    fontSize: 15,
+                                    fontWeight: '900',
+                                }}
+                            >
+                                Mardel Fitness
+                            </Text>
+                        </View>
+
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                flexWrap: 'wrap',
+                                justifyContent: 'center',
+                                gap: 12,
+                                maxWidth: 620,
+                            }}
+                        >
+                            <FooterLink label="Soporte" route="/support" />
+                            <FooterLink label="Términos" route="/terms" />
+                            <FooterLink label="Privacidad" route="/privacy" />
+                            <FooterLink label="Acerca de" route="/about" />
+                            <FooterExternal label="Contacto" url="mailto:soporte@mardelfitness.com" />
+                        </View>
+
+                        <Text
+                            style={{
+                                color: COLORS.textMuted,
+                                fontSize: 11,
+                                textAlign: 'center',
+                                marginTop: 14,
+                                lineHeight: 17,
+                            }}
+                        >
+                            © 2026 Mardel Fitness. Servicio gratuito en etapa inicial.
+                        </Text>
+                    </View>
                 </View>
             </ScrollView>
         </View>
@@ -501,12 +618,13 @@ export default function LandingScreen() {
 
 function FooterLink({ label, route }: { label: string; route: string }) {
     return (
-        <Pressable onPress={() => router.push(route as any)}>
+        <Pressable onPress={() => navigateWebRoute(route)}>
             <Text
                 style={{
                     color: COLORS.textMuted,
                     fontSize: 12,
                     fontWeight: '700',
+                    textDecorationLine: 'underline',
                 }}
             >
                 {label}
@@ -523,6 +641,7 @@ function FooterExternal({ label, url }: { label: string; url: string }) {
                     color: COLORS.textMuted,
                     fontSize: 12,
                     fontWeight: '700',
+                    textDecorationLine: 'underline',
                 }}
             >
                 {label}

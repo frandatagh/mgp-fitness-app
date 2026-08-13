@@ -58,6 +58,7 @@ function RootNavigator() {
       segment === undefined ||
       segment === '' ||
       segment === 'index' ||
+      segment === 'login' ||
       segment === 'register' ||
       segment === 'forgot-password' ||
       segment === 'reset-password' ||
@@ -74,6 +75,7 @@ function RootNavigator() {
       segment === undefined ||
       segment === '' ||
       segment === 'index' ||
+      segment === 'login' ||
       segment === 'register'
     );
   };

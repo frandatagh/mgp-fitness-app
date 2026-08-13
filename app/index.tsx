@@ -9,7 +9,7 @@ import {
     Text,
     View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 
@@ -134,47 +134,49 @@ export default function LandingScreen() {
                     </View>
 
                     <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <Pressable
-                            onPress={() => router.push('/login')}
-                            style={{
-                                paddingHorizontal: 12,
-                                paddingVertical: 8,
-                                borderRadius: 999,
-                                borderWidth: 1,
-                                borderColor: '#3A3A3A',
-                                backgroundColor: '#151515',
-                            }}
-                        >
-                            <Text
+                        <Link href="/login" asChild>
+                            <Pressable
                                 style={{
-                                    color: COLORS.textLight,
-                                    fontSize: 12,
-                                    fontWeight: '800',
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 8,
+                                    borderRadius: 999,
+                                    borderWidth: 1,
+                                    borderColor: '#3A3A3A',
+                                    backgroundColor: '#151515',
                                 }}
                             >
-                                Iniciar sesión
-                            </Text>
-                        </Pressable>
+                                <Text
+                                    style={{
+                                        color: COLORS.textLight,
+                                        fontSize: 12,
+                                        fontWeight: '800',
+                                    }}
+                                >
+                                    Iniciar sesión
+                                </Text>
+                            </Pressable>
+                        </Link>
 
-                        <Pressable
-                            onPress={() => router.push('/register')}
-                            style={{
-                                paddingHorizontal: 12,
-                                paddingVertical: 8,
-                                borderRadius: 999,
-                                backgroundColor: COLORS.primary,
-                            }}
-                        >
-                            <Text
+                        <Link href="/register" asChild>
+                            <Pressable
                                 style={{
-                                    color: '#111111',
-                                    fontSize: 12,
-                                    fontWeight: '900',
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 8,
+                                    borderRadius: 999,
+                                    backgroundColor: COLORS.primary,
                                 }}
                             >
-                                Registrarse
-                            </Text>
-                        </Pressable>
+                                <Text
+                                    style={{
+                                        color: '#111111',
+                                        fontSize: 12,
+                                        fontWeight: '900',
+                                    }}
+                                >
+                                    Registrarse
+                                </Text>
+                            </Pressable>
+                        </Link>
                     </View>
                 </View>
 
@@ -420,27 +422,28 @@ export default function LandingScreen() {
                         alignItems: 'center',
                     }}
                 >
-                    <Pressable
-                        onPress={() => router.push('/login')}
-                        style={({ pressed }) => ({
-                            width: '100%',
-                            maxWidth: 420,
-                            backgroundColor: pressed ? '#B8F000' : COLORS.primary,
-                            borderRadius: 18,
-                            paddingVertical: 15,
-                            alignItems: 'center',
-                        })}
-                    >
-                        <Text
-                            style={{
-                                color: '#111111',
-                                fontSize: 15,
-                                fontWeight: '900',
-                            }}
+                    <Link href="/login" asChild>
+                        <Pressable
+                            style={({ pressed }) => ({
+                                width: '100%',
+                                maxWidth: 420,
+                                backgroundColor: pressed ? '#B8F000' : COLORS.primary,
+                                borderRadius: 18,
+                                paddingVertical: 15,
+                                alignItems: 'center',
+                            })}
                         >
-                            Entrar a la app
-                        </Text>
-                    </Pressable>
+                            <Text
+                                style={{
+                                    color: '#111111',
+                                    fontSize: 15,
+                                    fontWeight: '900',
+                                }}
+                            >
+                                Entrar a la app
+                            </Text>
+                        </Pressable>
+                    </Link>
                 </View>
 
                 {/* Footer */}

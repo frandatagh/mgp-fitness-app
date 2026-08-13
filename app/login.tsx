@@ -39,6 +39,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginScreen() {
+    console.log('LOGIN SCREEN MONTADO');
     const { login: saveAuthSession, isAuthenticated } = useAuth();
 
 

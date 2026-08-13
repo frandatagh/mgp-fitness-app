@@ -1,534 +1,529 @@
+import { useEffect, useRef, useState } from 'react';
 import {
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    TouchableWithoutFeedback,
-    View,
-    Text,
-    TextInput,
-    Pressable,
+    Alert,
     Image,
-    Modal
+    Linking,
+    Platform,
+    Pressable,
+    ScrollView,
+    Text,
+    View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, Redirect } from 'expo-router';
-import { useForm, Controller } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
-import React, { useRef, useState } from 'react';
-import { loginRequest } from '../lib/auth';
-import { useAuth } from '../context/AuthContext';
-import { forgotPasswordRequest } from '../lib/auth';
-import FieldError from '../components/form/FieldError';
-import AppErrorModal from '../components/feedback/AppErrorModal';
-import AppStatusMessage from '../components/feedback/AppStatusMessage';
 
-// Esquema de validación con Zod
-const loginSchema = z.object({
-    email: z
-        .string()
-        .min(1, 'El correo es obligatorio')
-        .email('Ingrese un correo válido'),
-    password: z
-        .string()
-        .min(6, 'La contraseña debe tener al menos 6 caracteres'),
-});
+const bannerImages = [
+    require('../assets/img/faviconmgp.png'),
+    require('../assets/img/iconhome.png'),
+    require('../assets/img/iconrun.png'),
+];
 
-type LoginFormValues = z.infer<typeof loginSchema>;
+export default function LandingScreen() {
+    const [bannerIndex, setBannerIndex] = useState(0);
+    const directionRef = useRef(1);
+    const deferredPromptRef = useRef<any>(null);
 
-export default function LoginScreen() {
-    const { login: saveAuthSession, isAuthenticated } = useAuth();
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setBannerIndex((current) => {
+                let next = current + directionRef.current;
 
+                if (next >= bannerImages.length - 1) {
+                    directionRef.current = -1;
+                    next = bannerImages.length - 1;
+                }
 
+                if (next <= 0) {
+                    directionRef.current = 1;
+                    next = 0;
+                }
 
-    const [serverError, setServerError] = useState<string | null>(null);
-    const [forgotVisible, setForgotVisible] = useState(false);
-    const [forgotEmail, setForgotEmail] = useState('');
-    const [forgotError, setForgotError] = useState<string | null>(null);
-    const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
-    const [forgotSubmitting, setForgotSubmitting] = useState(false);
-    const passwordInputRef = useRef<TextInput>(null);
+                return next;
+            });
+        }, 2800);
 
-    const insets = useSafeAreaInsets();
+        return () => clearInterval(interval);
+    }, []);
 
-    const {
-        control,
-        handleSubmit,
-        formState: { errors, isSubmitting },
-    } = useForm<LoginFormValues>({
-        resolver: zodResolver(loginSchema),
-        defaultValues: {
-            email: '',
-            password: '',
-        },
-    });
+    useEffect(() => {
+        if (Platform.OS !== 'web') return;
 
-    if (isAuthenticated) {
-        return <Redirect href="/home" />;
-    }
+        const handleBeforeInstallPrompt = (event: any) => {
+            event.preventDefault();
+            deferredPromptRef.current = event;
+        };
 
-    const getLoginErrorMessage = (error: any) => {
-        const status = error?.response?.status;
-        const backendMessage =
-            error?.response?.data?.message ||
-            error?.response?.data?.error ||
-            error?.message;
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-        if (status === 400) {
-            return 'Revisá los datos ingresados e intentá nuevamente.';
-        }
-
-        if (status === 401) {
-            return 'El correo o la contraseña no son correctos.';
-        }
-
-        if (status === 404) {
-            return 'No encontramos una cuenta asociada a ese correo.';
-        }
-
-        if (status === 429) {
-            return 'Se hicieron demasiados intentos. Esperá unos minutos e intentá nuevamente.';
-        }
-
-        if (status >= 500) {
-            return 'El servidor no respondió correctamente. Puede estar iniciando o temporalmente ocupado. Intentá nuevamente en unos segundos.';
-        }
-
-        if (
-            backendMessage?.includes('Network') ||
-            backendMessage?.includes('Failed to fetch') ||
-            backendMessage?.includes('Network request failed')
-        ) {
-            return 'No pudimos conectar con el servidor. Revisá tu conexión a internet o intentá nuevamente en unos segundos.';
-        }
-
-        return 'No pudimos iniciar sesión. Intentá nuevamente.';
-    };
-
-    const onSubmit = async (data: LoginFormValues) => {
-        try {
-            setServerError(null);
-
-            const response = await loginRequest(
-                data.email.trim().toLowerCase(),
-                data.password
+        return () => {
+            window.removeEventListener(
+                'beforeinstallprompt',
+                handleBeforeInstallPrompt
             );
+        };
+    }, []);
 
-            await saveAuthSession(response.user, response.token);
+    const handleInstallAndroid = async () => {
+        if (Platform.OS !== 'web') return;
 
-            router.replace('/auth-loading');
-        } catch (error: any) {
-            console.log('Error login:', error);
-            setServerError(getLoginErrorMessage(error));
-        }
-    };
+        const promptEvent = deferredPromptRef.current;
 
-    const handleForgotPassword = async () => {
-        setForgotError(null);
-        setForgotSuccess(null);
-
-        const trimmedEmail = forgotEmail.trim();
-
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!trimmedEmail) {
-            setForgotError('Ingresa tu correo electrónico.');
+        if (promptEvent) {
+            promptEvent.prompt();
+            await promptEvent.userChoice;
+            deferredPromptRef.current = null;
             return;
         }
 
-        if (!emailRegex.test(trimmedEmail)) {
-            setForgotError('Ingresa un correo electrónico válido.');
-            return;
-        }
-
-        try {
-            setForgotSubmitting(true);
-            const response = await forgotPasswordRequest(trimmedEmail);
-
-            setForgotSuccess(
-                response?.message ||
-                'Mensaje enviado. Revisa tu email.'
-            );
-            setForgotEmail('');
-        } catch (error) {
-            setForgotError(
-                error instanceof Error
-                    ? error.message
-                    : 'No se pudo procesar la solicitud.'
-            );
-        } finally {
-            setForgotSubmitting(false);
-        }
+        Alert.alert(
+            'Instalar en Android',
+            'Abrí esta página desde Chrome, tocá el menú de los tres puntos y elegí “Agregar a pantalla principal” o “Instalar app”.'
+        );
     };
 
-    const loginContent = (
-        <ScrollView
-            style={{ flex: 1, backgroundColor: COLORS.background }}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{
-                flexGrow: 1,
-                backgroundColor: COLORS.background,
-            }}
-        >
-            <View
-                className="flex-1 px-6 pt-8 pb-3"
-                style={{ backgroundColor: COLORS.background }}
+    const handleInstallIos = () => {
+        Alert.alert(
+            'Instalar en iPhone',
+            'Abrí esta página desde Safari. Tocá el botón Compartir y luego “Agregar a pantalla de inicio”.'
+        );
+    };
+
+    return (
+        <View style={{ flex: 1, backgroundColor: '#0B0B0B' }}>
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: 26 }}
             >
-                <View className="flex-1 items-center justify-center">
-                    {/* LOGO / TÍTULO */}
-                    <View className="items-center mb-5">
+                {/* Header */}
+                <View
+                    style={{
+                        minHeight: 58,
+                        paddingHorizontal: 18,
+                        paddingTop: 12,
+                        paddingBottom: 10,
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#242424',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        backgroundColor: '#0B0B0B',
+                    }}
+                >
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Image
-                            source={require('../assets/img/iconhome.png')}
-                            style={{ width: 210, height: 210 }}
+                            source={require('../assets/img/faviconmgp.png')}
+                            style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: 8,
+                                marginRight: 10,
+                            }}
                             resizeMode="contain"
                         />
 
                         <Text
-                            className="text-base mb-2"
-                            style={{ color: COLORS.textMuted }}
+                            style={{
+                                color: COLORS.textLight,
+                                fontSize: 18,
+                                fontWeight: '900',
+                            }}
                         >
-                            ¡Tu entrenamiento al instante!
+                            Mardel Fitness
                         </Text>
                     </View>
 
-                    {/* CARD LOGIN */}
-                    <View
-                        className="w-full rounded-3xl px-6 py-7 shadow-black shadow-md"
-                        style={{ backgroundColor: COLORS.card, maxWidth: 400 }}
-                    >
-                        <Text
-                            className="text-2xl font-bold mb-4 text-center"
-                            style={{ color: COLORS.textLight }}
-                        >
-                            Iniciar sesión
-                        </Text>
-
-                        {/* Correo electrónico */}
-                        <Text
-                            className="text-sm font-semibold mb-1 ml-3"
-                            style={{ color: COLORS.textLight }}
-                        >
-                            Correo electrónico
-                        </Text>
-
-                        <View className="mb-1 rounded-full mx-2 px-4 py-2 bg-white flex-row items-center">
-                            <Controller
-                                control={control}
-                                name="email"
-                                render={({ field: { onChange, onBlur, value } }) => (
-                                    <TextInput
-                                        value={value}
-                                        onChangeText={onChange}
-                                        onBlur={onBlur}
-                                        placeholder="Ingrese su correo electrónico"
-                                        placeholderTextColor="#7BCED1"
-                                        keyboardType="email-address"
-                                        autoCapitalize="none"
-                                        autoCorrect={false}
-                                        returnKeyType="next"
-                                        blurOnSubmit={false}
-                                        onSubmitEditing={() => passwordInputRef.current?.focus()}
-                                        className="flex-1 text-md"
-                                        style={[
-                                            {
-                                                borderWidth: 0,
-                                                color: '#222222',
-                                                flex: 1,
-                                            },
-                                            Platform.OS === 'web'
-                                                ? ({ outlineStyle: 'none' } as any)
-                                                : null,
-                                        ]}
-                                    />
-                                )}
-                            />
-                        </View>
-
-                        <FieldError message={errors.email?.message} />
-
-                        {/* Contraseña */}
-                        <Text
-                            className="text-sm font-semibold mb-1 ml-3"
-                            style={{ color: COLORS.textLight }}
-                        >
-                            Contraseña
-                        </Text>
-
-                        <View className="mb-1 rounded-full mx-2 px-4 py-2 bg-white flex-row items-center">
-                            <Controller
-                                control={control}
-                                name="password"
-                                render={({ field: { onChange, onBlur, value } }) => (
-                                    <TextInput
-                                        ref={passwordInputRef}
-                                        value={value}
-                                        onChangeText={onChange}
-                                        onBlur={onBlur}
-                                        placeholder="Ingrese su contraseña"
-                                        placeholderTextColor="#7BCED1"
-                                        secureTextEntry
-                                        autoCapitalize="none"
-                                        autoCorrect={false}
-                                        returnKeyType="done"
-                                        onSubmitEditing={handleSubmit(onSubmit)}
-                                        className="flex-1 text-md"
-                                        style={[
-                                            {
-                                                borderWidth: 0,
-                                                color: '#222222',
-                                                flex: 1,
-                                            },
-                                            Platform.OS === 'web'
-                                                ? ({ outlineStyle: 'none' } as any)
-                                                : null,
-                                        ]}
-                                    />
-                                )}
-                            />
-                        </View>
-
-                        <FieldError message={errors.password?.message} />
-
-                        {/* Olvidé contraseña */}
-                        <View className="items-center mx-3 my-2 px-2 pb-2">
-                            <Pressable
-                                onPress={() => {
-                                    setForgotError(null);
-                                    setForgotSuccess(null);
-                                    setForgotEmail('');
-                                    setForgotVisible(true);
-                                }}
-                            >
-                                <Text className="text-sm" style={{ color: COLORS.textMuted }}>
-                                    ¿Olvidaste la contraseña?
-                                </Text>
-                            </Pressable>
-                        </View>
-
-                        {/* Botón ingresar */}
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
                         <Pressable
-                            className="rounded-full py-3 items-center mb-4 shadow-neutral-700 shadow-md"
+                            onPress={() => router.push('/login')}
                             style={{
-                                backgroundColor: COLORS.primary,
-                                width: 200,
-                                alignSelf: 'center',
+                                paddingHorizontal: 12,
+                                paddingVertical: 8,
+                                borderRadius: 999,
+                                borderWidth: 1,
+                                borderColor: '#3A3A3A',
+                                backgroundColor: '#151515',
                             }}
-                            onPress={handleSubmit(onSubmit)}
-                            disabled={isSubmitting}
                         >
                             <Text
-                                className="text-base font-semibold"
-                                style={{ color: '#000000' }}
+                                style={{
+                                    color: COLORS.textLight,
+                                    fontSize: 12,
+                                    fontWeight: '800',
+                                }}
                             >
-                                {isSubmitting ? 'Ingresando...' : 'Ingresar cuenta'}
+                                Iniciar sesión
                             </Text>
                         </Pressable>
 
-
-
-                        {/* Link registro */}
-                        <Pressable onPress={() => router.push('/register')}>
+                        <Pressable
+                            onPress={() => router.push('/register')}
+                            style={{
+                                paddingHorizontal: 12,
+                                paddingVertical: 8,
+                                borderRadius: 999,
+                                backgroundColor: COLORS.primary,
+                            }}
+                        >
                             <Text
-                                className="text-center text-sm"
-                                style={{ color: COLORS.textLight }}
+                                style={{
+                                    color: '#111111',
+                                    fontSize: 12,
+                                    fontWeight: '900',
+                                }}
                             >
-                                ¿Eres nuevo?{' '}
-                                <Text style={{ textDecorationLine: 'underline' }}>
-                                    Regístrate
-                                </Text>
+                                Registrarse
                             </Text>
                         </Pressable>
                     </View>
                 </View>
 
-                {/* FOOTER ENLACES */}
+                {/* Banner */}
                 <View
-                    className="pt-2"
                     style={{
-                        paddingBottom:
-                            Platform.OS === 'web'
-                                ? 8
-                                : Math.max(insets.bottom + 8, 16),
+                        paddingHorizontal: 18,
+                        paddingTop: 20,
                     }}
                 >
-                    <View className="flex-row justify-center flex-wrap">
-                        <Pressable onPress={() => router.push('/support')} className="mx-2 my-1">
-                            <Text
-                                className="text-[11px]"
-                                style={{
-                                    color: COLORS.textMuted,
-                                    textDecorationLine: 'underline',
-                                }}
-                            >
-                                Soporte & Ayuda
-                            </Text>
-                        </Pressable>
-
-                        <Pressable onPress={() => router.push('/terms')} className="mx-2 my-1">
-                            <Text
-                                className="text-[11px]"
-                                style={{
-                                    color: COLORS.textMuted,
-                                    textDecorationLine: 'underline',
-                                }}
-                            >
-                                Términos y condiciones
-                            </Text>
-                        </Pressable>
-
-                        <Pressable onPress={() => router.push('/contact')} className="mx-2 my-1">
-                            <Text
-                                className="text-[11px]"
-                                style={{
-                                    color: COLORS.textMuted,
-                                    textDecorationLine: 'underline',
-                                }}
-                            >
-                                Contacto
-                            </Text>
-                        </Pressable>
-
-                        <Pressable onPress={() => router.push('/about')} className="mx-2 my-1">
-                            <Text
-                                className="text-[11px]"
-                                style={{
-                                    color: COLORS.textMuted,
-                                    textDecorationLine: 'underline',
-                                }}
-                            >
-                                Acerca de nosotros
-                            </Text>
-                        </Pressable>
-                    </View>
-                </View>
-            </View>
-        </ScrollView>
-    );
-
-    return (
-        <KeyboardAvoidingView
-            style={{ flex: 1, backgroundColor: COLORS.background }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0}
-        >
-            {Platform.OS === 'web' ? (
-                loginContent
-            ) : (
-                <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-                    {loginContent}
-                </TouchableWithoutFeedback>
-            )}
-
-            <Modal
-                visible={forgotVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setForgotVisible(false)}
-            >
-                <View
-                    className="flex-1 justify-center items-center px-4"
-                    style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
-                >
                     <View
-                        className="w-full max-w-sm rounded-3xl px-5 py-5"
                         style={{
                             backgroundColor: '#111111',
+                            borderRadius: 28,
                             borderWidth: 1,
-                            borderColor: COLORS.primary,
+                            borderColor: 'rgba(198,255,0,0.28)',
+                            overflow: 'hidden',
+                            minHeight: 260,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 22,
                         }}
                     >
-                        <View className="flex-row justify-between items-center mb-3">
-                            <Text
-                                className="text-[16px] font-semibold"
-                                style={{ color: COLORS.textLight }}
-                            >
-                                Recuperar contraseña
-                            </Text>
-
-                            <Pressable
-                                onPress={() => {
-                                    setForgotVisible(false);
-                                    setForgotError(null);
-                                    setForgotSuccess(null);
-                                    setForgotEmail('');
-                                }}
-                            >
-                                <Text style={{ color: COLORS.textLight, fontSize: 18 }}>✕</Text>
-                            </Pressable>
-                        </View>
+                        <Image
+                            source={bannerImages[bannerIndex]}
+                            style={{
+                                width: '100%',
+                                height: 170,
+                                maxWidth: 420,
+                            }}
+                            resizeMode="contain"
+                        />
 
                         <Text
-                            className="text-[13px] mb-3 leading-5"
-                            style={{ color: COLORS.textMuted }}
+                            style={{
+                                color: COLORS.primary,
+                                fontSize: 13,
+                                fontWeight: '900',
+                                marginTop: 14,
+                                textAlign: 'center',
+                            }}
                         >
-                            Ingresa el correo asociado a tu cuenta. Si existe, te enviaremos un enlace
-                            para restablecer tu contraseña.
+                            Entrená, registrá y seguí tu progreso
                         </Text>
 
-                        <TextInput
-                            value={forgotEmail}
-                            onChangeText={setForgotEmail}
-                            placeholder="correo@ejemplo.com"
-                            placeholderTextColor={COLORS.textMuted}
-                            keyboardType="email-address"
-                            autoCapitalize="none"
-                            autoCorrect={false}
-                            returnKeyType="send"
-                            onSubmitEditing={handleForgotPassword}
-                            className="rounded-2xl px-4 py-3 mb-2"
-                            style={[
-                                {
-                                    backgroundColor: '#1A1A1A',
-                                    color: COLORS.textLight,
-                                    borderWidth: 1,
-                                    borderColor: '#2F2F2F',
-                                },
-                                Platform.OS === 'web'
-                                    ? ({
-                                        outlineStyle: 'none',
-                                        outlineWidth: 0,
-                                        outlineColor: 'transparent',
-                                    } as any)
-                                    : null,
-                            ]}
-                        />
+                        <Text
+                            style={{
+                                color: COLORS.textLight,
+                                fontSize: 28,
+                                fontWeight: '900',
+                                marginTop: 8,
+                                textAlign: 'center',
+                                lineHeight: 33,
+                            }}
+                        >
+                            Tu rutina fitness en una app simple y gratuita
+                        </Text>
 
-                        <AppStatusMessage
-                            message={forgotError}
-                            type="warning"
-                        />
+                        <Text
+                            style={{
+                                color: COLORS.textMuted,
+                                fontSize: 14,
+                                marginTop: 10,
+                                textAlign: 'center',
+                                lineHeight: 21,
+                                maxWidth: 560,
+                            }}
+                        >
+                            Creá rutinas, guardá ejercicios, registrá actividad y
+                            visualizá tu progreso desde el celular o navegador.
+                        </Text>
+                    </View>
+                </View>
 
-                        <AppStatusMessage
-                            message={forgotSuccess}
-                            type="success"
-                        />
+                {/* Panel instalación */}
+                <View
+                    style={{
+                        marginHorizontal: 18,
+                        marginTop: 18,
+                        backgroundColor: '#151515',
+                        borderRadius: 26,
+                        borderWidth: 1,
+                        borderColor: '#303030',
+                        padding: 18,
+                    }}
+                >
+                    <Text
+                        style={{
+                            color: COLORS.textLight,
+                            fontSize: 21,
+                            fontWeight: '900',
+                            marginBottom: 8,
+                            textAlign: 'center',
+                        }}
+                    >
+                        Instalá Mardel Fitness en tu celular
+                    </Text>
+
+                    <Text
+                        style={{
+                            color: COLORS.textMuted,
+                            fontSize: 13,
+                            lineHeight: 20,
+                            textAlign: 'center',
+                            marginBottom: 16,
+                        }}
+                    >
+                        Esta es una app web gratuita. Podés agregarla a la pantalla
+                        de inicio de tu celular para usarla con acceso rápido, sin
+                        pasar por App Store o Play Store.
+                    </Text>
+
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                        <Pressable
+                            onPress={handleInstallAndroid}
+                            style={({ pressed }) => ({
+                                flex: 1,
+                                backgroundColor: pressed ? '#B8F000' : COLORS.primary,
+                                borderRadius: 18,
+                                paddingVertical: 14,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'row',
+                            })}
+                        >
+                            <Ionicons
+                                name="logo-android"
+                                size={22}
+                                color="#111111"
+                                style={{ marginRight: 7 }}
+                            />
+                            <Text
+                                style={{
+                                    color: '#111111',
+                                    fontSize: 13,
+                                    fontWeight: '900',
+                                }}
+                            >
+                                Instalar Android
+                            </Text>
+                        </Pressable>
 
                         <Pressable
-                            onPress={handleForgotPassword}
-                            disabled={forgotSubmitting}
-                            className="mt-2 px-4 py-3 rounded-xl items-center justify-center"
-                            style={{ backgroundColor: COLORS.primary }}
+                            onPress={handleInstallIos}
+                            style={({ pressed }) => ({
+                                flex: 1,
+                                backgroundColor: pressed ? '#333333' : '#242424',
+                                borderRadius: 18,
+                                paddingVertical: 14,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexDirection: 'row',
+                                borderWidth: 1,
+                                borderColor: '#3A3A3A',
+                            })}
                         >
+                            <Ionicons
+                                name="logo-apple"
+                                size={22}
+                                color="#FFFFFF"
+                                style={{ marginRight: 7 }}
+                            />
                             <Text
-                                className="text-[14px] font-semibold"
-                                style={{ color: '#111111' }}
+                                style={{
+                                    color: '#FFFFFF',
+                                    fontSize: 13,
+                                    fontWeight: '900',
+                                }}
                             >
-                                {forgotSubmitting ? 'Enviando...' : 'Restablecer contraseña'}
+                                Instalar iPhone
                             </Text>
                         </Pressable>
                     </View>
-                </View>
-            </Modal>
-            <AppErrorModal
-                visible={!!serverError}
-                title="No pudimos iniciar sesión"
-                message={serverError ?? ''}
-                primaryText="Entendido"
-                onPrimaryPress={() => setServerError(null)}
-            />
-        </KeyboardAvoidingView>
 
+                    <View
+                        style={{
+                            marginTop: 16,
+                            backgroundColor: 'rgba(255,193,7,0.08)',
+                            borderWidth: 1,
+                            borderColor: 'rgba(255,193,7,0.25)',
+                            borderRadius: 18,
+                            padding: 13,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color: '#FFD36A',
+                                fontSize: 13,
+                                fontWeight: '900',
+                                marginBottom: 5,
+                            }}
+                        >
+                            Sobre los permisos
+                        </Text>
+
+                        <Text
+                            style={{
+                                color: COLORS.textMuted,
+                                fontSize: 12,
+                                lineHeight: 18,
+                            }}
+                        >
+                            Algunas funciones pueden solicitar permisos del dispositivo,
+                            como ubicación o acceso a imágenes. Estos permisos se utilizan
+                            únicamente para brindar el servicio gratuito de entrenamiento,
+                            registro de actividad y uso personalizado de la app.
+                        </Text>
+                    </View>
+
+                    <View style={{ marginTop: 14 }}>
+                        <Text
+                            style={{
+                                color: COLORS.textLight,
+                                fontSize: 13,
+                                fontWeight: '900',
+                                marginBottom: 6,
+                            }}
+                        >
+                            Cómo instalar:
+                        </Text>
+
+                        <Text
+                            style={{
+                                color: COLORS.textMuted,
+                                fontSize: 12,
+                                lineHeight: 19,
+                            }}
+                        >
+                            Android: abrí la app desde Chrome y tocá “Instalar app” o
+                            “Agregar a pantalla principal”.
+                            {'\n'}
+                            iPhone: abrí la app desde Safari, tocá Compartir y elegí
+                            “Agregar a pantalla de inicio”.
+                        </Text>
+                    </View>
+                </View>
+
+                {/* Acceso directo */}
+                <View
+                    style={{
+                        marginHorizontal: 18,
+                        marginTop: 18,
+                        alignItems: 'center',
+                    }}
+                >
+                    <Pressable
+                        onPress={() => router.push('/login')}
+                        style={({ pressed }) => ({
+                            width: '100%',
+                            maxWidth: 420,
+                            backgroundColor: pressed ? '#B8F000' : COLORS.primary,
+                            borderRadius: 18,
+                            paddingVertical: 15,
+                            alignItems: 'center',
+                        })}
+                    >
+                        <Text
+                            style={{
+                                color: '#111111',
+                                fontSize: 15,
+                                fontWeight: '900',
+                            }}
+                        >
+                            Entrar a la app
+                        </Text>
+                    </Pressable>
+                </View>
+
+                {/* Footer */}
+                <View
+                    style={{
+                        marginTop: 28,
+                        paddingHorizontal: 18,
+                        paddingVertical: 22,
+                        borderTopWidth: 1,
+                        borderTopColor: '#242424',
+                    }}
+                >
+                    <Text
+                        style={{
+                            color: COLORS.textLight,
+                            fontSize: 15,
+                            fontWeight: '900',
+                            textAlign: 'center',
+                            marginBottom: 12,
+                        }}
+                    >
+                        Mardel Fitness
+                    </Text>
+
+                    <View
+                        style={{
+                            flexDirection: 'row',
+                            flexWrap: 'wrap',
+                            justifyContent: 'center',
+                            gap: 12,
+                        }}
+                    >
+                        <FooterLink label="Soporte" route="/support" />
+                        <FooterLink label="Términos" route="/terms" />
+                        <FooterLink label="Privacidad" route="/privacy" />
+                        <FooterLink label="Acerca de" route="/about" />
+                        <FooterExternal label="Contacto" url="mailto:soporte@mardelfitness.com" />
+                    </View>
+
+                    <Text
+                        style={{
+                            color: COLORS.textMuted,
+                            fontSize: 11,
+                            textAlign: 'center',
+                            marginTop: 14,
+                        }}
+                    >
+                        © 2026 Mardel Fitness. Servicio gratuito en etapa inicial.
+                    </Text>
+                </View>
+            </ScrollView>
+        </View>
+    );
+}
+
+function FooterLink({ label, route }: { label: string; route: string }) {
+    return (
+        <Pressable onPress={() => router.push(route as any)}>
+            <Text
+                style={{
+                    color: COLORS.textMuted,
+                    fontSize: 12,
+                    fontWeight: '700',
+                }}
+            >
+                {label}
+            </Text>
+        </Pressable>
+    );
+}
+
+function FooterExternal({ label, url }: { label: string; url: string }) {
+    return (
+        <Pressable onPress={() => Linking.openURL(url)}>
+            <Text
+                style={{
+                    color: COLORS.textMuted,
+                    fontSize: 12,
+                    fontWeight: '700',
+                }}
+            >
+                {label}
+            </Text>
+        </Pressable>
     );
 }

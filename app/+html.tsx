@@ -20,7 +20,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
 
                 <meta name="theme-color" content="#0B0B0B" />
 
-                <link rel="manifest" href="/mgp-fitness-app/manifest.json" />
+                <link rel="manifest" href="/mgp-fitness-app/public/manifest.json" />
                 <link
                     rel="apple-touch-icon"
                     href="/mgp-fitness-app/icons/icon-192.png"

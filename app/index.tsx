@@ -28,8 +28,7 @@ function navigateWebRoute(route: string) {
             window.location.hostname.includes('github.io');
 
         if (isGithubPages) {
-            const cleanRoute = route.replace('/', '');
-            window.location.href = `/mgp-fitness-app/${cleanRoute}.html`;
+            window.location.href = `/mgp-fitness-app${route}`;
             return;
         }
     }
@@ -136,7 +135,7 @@ export default function LandingScreen() {
                 window.location.hostname.includes('github.io');
 
             if (isGithubPages) {
-                window.location.href = `/mgp-fitness-app/${route}.html`;
+                window.location.href = `/mgp-fitness-app${path}`;
                 return;
             }
 

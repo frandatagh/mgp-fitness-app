@@ -4,11 +4,19 @@ export default function Root({ children }: { children: React.ReactNode }) {
     return (
         <html lang="es">
             <head>
+                <style>
+                    {`
+                        html, body {
+                            margin: 0;
+                            background-color: #0B0B0B;
+                        }
+                    `}
+                </style>
                 <meta charSet="utf-8" />
                 <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
                 <meta
                     name="viewport"
-                    content="width=device-width, initial-scale=1, shrink-to-fit=no"
+                    content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
                 />
 
                 <title>Mardel Fitness</title>
@@ -31,7 +39,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
                 <meta name="apple-mobile-web-app-title" content="Mardel Fitness" />
                 <meta
                     name="apple-mobile-web-app-status-bar-style"
-                    content="black-translucent"
+                    content="black"
                 />
 
                 <ScrollViewStyleReset />

@@ -1,4 +1,5 @@
 import '../global.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import { View, Text, ActivityIndicator, Image } from 'react-native';

@@ -925,7 +925,7 @@ export default function HomeScreen() {
                             }}
                             numberOfLines={1}
                         >
-                            Empezar carrera
+                            RUNNING
                         </Text>
 
                         <Ionicons

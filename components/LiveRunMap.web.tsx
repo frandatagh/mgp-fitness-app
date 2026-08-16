@@ -1,65 +1,359 @@
-import React from 'react';
-import { Text, View } from 'react-native';
-import { COLORS } from '../constants/colors';
+import React, {
+    forwardRef,
+    useEffect,
+    useImperativeHandle,
+    useRef,
+} from 'react';
+
+import type {
+    Map as MapLibreMap,
+    Marker as MapLibreMarker,
+} from 'maplibre-gl';
 
 type RunPoint = {
     latitude: number;
     longitude: number;
-    timestamp: number;
-    speed?: number | null;
 };
 
 type Props = {
-    currentPosition: RunPoint | null;
-    routePoints: RunPoint[];
-    shouldFollowUser: boolean;
+    currentPosition: RunPoint;
+    routePoints?: RunPoint[];
+    shouldFollowUser?: boolean;
+    zoomLevel?: number;
+    profileImageUrl?: string | null;
+    recenterTick?: number;
+
+    onMapPress?: (point: {
+        latitude: number;
+        longitude: number;
+    }) => void;
 };
 
-export default function LiveRunMap({
-    currentPosition,
-    routePoints,
-}: Props) {
-    return (
-        <View
-            style={{
-                flex: 1,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: '#0f0f0f',
-                paddingHorizontal: 24,
-            }}
-        >
-            <Text
-                style={{
-                    color: COLORS.textLight,
-                    fontSize: 16,
-                    fontWeight: '600',
-                    marginBottom: 8,
-                }}
-            >
-                Mapa en vivo disponible en móvil
-            </Text>
+function buildRouteGeoJson(
+    points: RunPoint[]
+) {
+    if (points.length < 2) {
+        return {
+            type: 'FeatureCollection',
+            features: [],
+        };
+    }
 
-            <Text
-                style={{
-                    color: COLORS.textMuted,
-                    fontSize: 13,
-                    textAlign: 'center',
-                    marginBottom: 16,
-                }}
-            >
-                La versión web muestra métricas, pero el mapa nativo se renderiza en tu development build.
-            </Text>
-
-            <Text style={{ color: COLORS.textLight, fontSize: 13 }}>
-                Lat: {currentPosition?.latitude?.toFixed(6) ?? '--'}
-            </Text>
-            <Text style={{ color: COLORS.textLight, fontSize: 13, marginTop: 4 }}>
-                Lng: {currentPosition?.longitude?.toFixed(6) ?? '--'}
-            </Text>
-            <Text style={{ color: COLORS.textMuted, fontSize: 12, marginTop: 10 }}>
-                Puntos acumulados: {routePoints.length}
-            </Text>
-        </View>
-    );
+    return {
+        type: 'Feature',
+        properties: {},
+        geometry: {
+            type: 'LineString',
+            coordinates: points.map(
+                (point) => [
+                    point.longitude,
+                    point.latitude,
+                ]
+            ),
+        },
+    };
 }
+
+const MAP_STYLE =
+    'https://tiles.openfreemap.org/styles/positron';
+
+const LiveRunMapWeb = forwardRef<any, Props>(
+    (
+        {
+            currentPosition,
+            routePoints = [],
+            shouldFollowUser = true,
+            zoomLevel = 16,
+            recenterTick = 0,
+            onMapPress,
+        },
+        ref
+    ) => {
+        const containerRef = useRef<HTMLDivElement | null>(null);
+
+        const mapRef = useRef<MapLibreMap | null>(null);
+        const userMarkerRef = useRef<MapLibreMarker | null>(null);
+        const routePointsRef =
+            useRef<RunPoint[]>(routePoints);
+
+        useEffect(() => {
+            routePointsRef.current =
+                routePoints;
+        }, [routePoints]);
+
+        /*
+         * 1. Crear mapa solamente una vez.
+         *
+         * Usamos import dinámico para que MapLibre se cargue
+         * exclusivamente en el navegador.
+         */
+        useEffect(() => {
+            if (!containerRef.current) return;
+
+            let disposed = false;
+            let localMap: MapLibreMap | null = null;
+            let localMarker: MapLibreMarker | null = null;
+
+            void import('maplibre-gl').then((module) => {
+                const maplibregl = (module.default ?? module) as typeof module;
+
+                if (disposed || !containerRef.current) return;
+
+                const map = new maplibregl.Map({
+                    container: containerRef.current,
+                    style: MAP_STYLE,
+                    center: [
+                        currentPosition.longitude,
+                        currentPosition.latitude,
+                    ],
+                    zoom: zoomLevel,
+                });
+
+                localMap = map;
+                mapRef.current = map;
+                map.on('load', () => {
+                    if (!map.getSource('run-route')) {
+                        map.addSource('run-route', {
+                            type: 'geojson',
+                            data: buildRouteGeoJson(
+                                routePointsRef.current
+                            ) as any,
+                        });
+                    }
+
+                    if (!map.getLayer('run-route-shadow')) {
+                        map.addLayer({
+                            id: 'run-route-shadow',
+                            type: 'line',
+                            source: 'run-route',
+
+                            layout: {
+                                'line-cap': 'round',
+                                'line-join': 'round',
+                            },
+
+                            paint: {
+                                'line-color': '#65A30D',
+                                'line-width': 9,
+                                'line-opacity': 0.55,
+                            },
+                        });
+                    }
+
+                    if (!map.getLayer('run-route-line')) {
+                        map.addLayer({
+                            id: 'run-route-line',
+                            type: 'line',
+                            source: 'run-route',
+
+                            layout: {
+                                'line-cap': 'round',
+                                'line-join': 'round',
+                            },
+
+                            paint: {
+                                'line-color': '#C6FF00',
+                                'line-width': 5,
+                                'line-opacity': 1,
+                            },
+                        });
+                    }
+                });
+
+                /*
+                 * Marcador personalizado del usuario.
+                 *
+                 * Por ahora es sencillo.
+                 * Después vamos a poner foto de perfil,
+                 * igual que en mobile.
+                 */
+                const markerElement = document.createElement('div');
+
+                markerElement.style.width = '26px';
+                markerElement.style.height = '26px';
+                markerElement.style.borderRadius = '50%';
+                markerElement.style.backgroundColor = '#C6FF00';
+                markerElement.style.border = '4px solid #111111';
+                markerElement.style.boxShadow =
+                    '0 2px 10px rgba(0,0,0,0.45)';
+
+                const marker = new maplibregl.Marker({
+                    element: markerElement,
+                    anchor: 'center',
+                })
+                    .setLngLat([
+                        currentPosition.longitude,
+                        currentPosition.latitude,
+                    ])
+                    .addTo(map);
+
+                localMarker = marker;
+                userMarkerRef.current = marker;
+
+                /*
+                 * Click/tap del mapa.
+                 *
+                 * Todavía no lo usamos, pero lo dejamos preparado
+                 * para el futuro punto de llegada.
+                 */
+                map.on('click', (event) => {
+                    onMapPress?.({
+                        latitude: event.lngLat.lat,
+                        longitude: event.lngLat.lng,
+                    });
+                });
+
+                map.on('error', (event) => {
+                    console.error(
+                        'MapLibre web error:',
+                        event.error
+                    );
+                });
+            });
+
+            return () => {
+                disposed = true;
+
+                localMarker?.remove();
+                localMap?.remove();
+
+                userMarkerRef.current = null;
+                mapRef.current = null;
+            };
+        }, []);
+
+        /*
+         * 2. Cada vez que cambia el GPS,
+         * mover el marcador.
+         */
+        useEffect(() => {
+            if (!currentPosition) return;
+
+            const coords: [number, number] = [
+                currentPosition.longitude,
+                currentPosition.latitude,
+            ];
+
+            userMarkerRef.current?.setLngLat(coords);
+
+            /*
+             * Si estamos siguiendo al corredor,
+             * mover también la cámara.
+             */
+            if (shouldFollowUser && mapRef.current) {
+                mapRef.current.easeTo({
+                    center: coords,
+                    zoom: zoomLevel,
+                    duration: 700,
+                });
+            }
+        }, [
+            currentPosition.latitude,
+            currentPosition.longitude,
+            shouldFollowUser,
+            zoomLevel,
+        ]);
+
+        /*
+         * 3. Recentrar cuando cambie recenterTick.
+         */
+        useEffect(() => {
+            if (!mapRef.current) return;
+
+            mapRef.current.easeTo({
+                center: [
+                    currentPosition.longitude,
+                    currentPosition.latitude,
+                ],
+                zoom: zoomLevel,
+                duration: 600,
+            });
+        }, [recenterTick]);
+
+        useEffect(() => {
+            const map = mapRef.current;
+
+            if (!map) return;
+
+            const updateRoute = () => {
+                const source =
+                    map.getSource(
+                        'run-route'
+                    ) as any;
+
+                if (!source) return;
+
+                source.setData(
+                    buildRouteGeoJson(
+                        routePoints
+                    ) as any
+                );
+            };
+
+            if (map.isStyleLoaded()) {
+                updateRoute();
+            } else {
+                map.once(
+                    'load',
+                    updateRoute
+                );
+            }
+        }, [routePoints]);
+
+        /*
+         * 4. Métodos que podrá llamar liverun.web.
+         *
+         * Los hacemos equivalentes a los que ya usamos
+         * en la implementación mobile.
+         */
+        useImperativeHandle(ref, () => ({
+            recenterOnUser: (
+                coordinate?: [number, number],
+                requestedZoom?: number
+            ) => {
+                const center: [number, number] =
+                    coordinate ?? [
+                        currentPosition.longitude,
+                        currentPosition.latitude,
+                    ];
+
+                mapRef.current?.easeTo({
+                    center,
+                    zoom: requestedZoom ?? zoomLevel,
+                    duration: 600,
+                });
+            },
+
+            fitBounds: (
+                ne: [number, number],
+                sw: [number, number],
+                padding = 60,
+                duration = 600
+            ) => {
+                mapRef.current?.fitBounds(
+                    [sw, ne],
+                    {
+                        padding,
+                        duration,
+                    }
+                );
+            },
+        }));
+
+        return (
+            <div
+                ref={containerRef}
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    minHeight: 300,
+                    backgroundColor: '#111111',
+                }}
+            />
+        );
+    }
+);
+
+LiveRunMapWeb.displayName = 'LiveRunMapWeb';
+
+export default LiveRunMapWeb;

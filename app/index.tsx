@@ -47,7 +47,7 @@ export default function LandingScreen() {
             ? bannerContainerWidth * 0.5625
             : width >= 600
                 ? bannerContainerWidth * 0.58
-                : bannerContainerWidth * 1.1;
+                : bannerContainerWidth * 0.9;
 
     const isDesktop = width >= 900;
     const isTablet = width >= 600;

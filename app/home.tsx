@@ -881,7 +881,7 @@ export default function HomeScreen() {
                         onPress={() => setCreateRoutineModalVisible(true)}
                         style={({ pressed }) => ({
                             width: 78,
-                            height: 55,
+                            height: 65,
                             borderRadius: 16,
                             backgroundColor: 'rgb(26, 26, 26)',
                             alignItems: 'center',
@@ -903,7 +903,7 @@ export default function HomeScreen() {
                         onPress={() => router.push('/liverun')}
                         style={({ pressed }) => ({
                             flex: 1,
-                            height: 55,
+                            height: 65,
                             borderRadius: 18,
                             backgroundColor: pressed ? '#B8F000' : COLORS.primary,
                             alignItems: 'center',
@@ -941,7 +941,7 @@ export default function HomeScreen() {
                         onPress={() => router.push('/statistics')}
                         style={({ pressed }) => ({
                             width: 78,
-                            height: 55,
+                            height: 65,
                             borderRadius: 16,
                             borderWidth: 3,
                             borderColor: '#444444',

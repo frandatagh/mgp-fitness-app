@@ -13,6 +13,7 @@ import type {
 type RunPoint = {
     latitude: number;
     longitude: number;
+    segmentId?: number;
 };
 
 type Props = {
@@ -32,25 +33,57 @@ type Props = {
 function buildRouteGeoJson(
     points: RunPoint[]
 ) {
-    if (points.length < 2) {
-        return {
-            type: 'FeatureCollection',
-            features: [],
-        };
-    }
+    const segments =
+        new Map<number, RunPoint[]>();
+
+    points.forEach((point) => {
+        const segmentId =
+            point.segmentId ?? 0;
+
+        const existing =
+            segments.get(segmentId) ?? [];
+
+        existing.push(point);
+
+        segments.set(
+            segmentId,
+            existing
+        );
+    });
+
+    const features =
+        Array.from(
+            segments.entries()
+        )
+            .filter(
+                ([, segmentPoints]) =>
+                    segmentPoints.length >= 2
+            )
+            .map(
+                ([
+                    segmentId,
+                    segmentPoints,
+                ]) => ({
+                    type: 'Feature',
+                    properties: {
+                        segmentId,
+                    },
+                    geometry: {
+                        type: 'LineString',
+                        coordinates:
+                            segmentPoints.map(
+                                (point) => [
+                                    point.longitude,
+                                    point.latitude,
+                                ]
+                            ),
+                    },
+                })
+            );
 
     return {
-        type: 'Feature',
-        properties: {},
-        geometry: {
-            type: 'LineString',
-            coordinates: points.map(
-                (point) => [
-                    point.longitude,
-                    point.latitude,
-                ]
-            ),
-        },
+        type: 'FeatureCollection',
+        features,
     };
 }
 

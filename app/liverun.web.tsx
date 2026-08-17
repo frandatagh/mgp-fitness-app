@@ -25,6 +25,7 @@ type RunPoint = {
     timestamp: number;
     speed?: number | null;
     accuracy?: number | null;
+    segmentId?: number;
 };
 
 function haversineDistanceMeters(a: RunPoint, b: RunPoint) {
@@ -170,6 +171,39 @@ export default function LiveRunWeb() {
     const lastAcceptedPointRef =
         useRef<RunPoint | null>(null);
 
+    const currentSegmentIdRef = useRef(0);
+
+    const forceSegmentBreakRef = useRef(false);
+
+    const [gpsBreakCount, setGpsBreakCount] =
+        useState(0);
+
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+
+        const handleVisibilityChange = () => {
+            if (
+                document.visibilityState === 'hidden' &&
+                isRunningRef.current
+            ) {
+                forceSegmentBreakRef.current = true;
+            }
+        };
+
+        document.addEventListener(
+            'visibilitychange',
+            handleVisibilityChange
+        );
+
+        return () => {
+            document.removeEventListener(
+                'visibilitychange',
+                handleVisibilityChange
+            );
+        };
+    }, []);
+
     useEffect(() => {
         let active = true;
 
@@ -192,30 +226,126 @@ export default function LiveRunWeb() {
                 const lastPoint =
                     lastAcceptedPointRef.current;
 
+                /*
+                 * Primero comprobamos si el nuevo punto
+                 * tiene una precisión GPS aceptable.
+                 */
+                const validAsSegmentStart =
+                    shouldAcceptWebPoint(
+                        null,
+                        nextPoint
+                    );
+
+                /*
+                 * Protección adicional:
+                 * si pasó mucho tiempo y además estamos
+                 * lejos del último punto, probablemente
+                 * hubo una interrupción del GPS.
+                 */
+                const timeGapMs =
+                    lastPoint
+                        ? Math.max(
+                            nextPoint.timestamp -
+                            lastPoint.timestamp,
+                            0
+                        )
+                        : 0;
+
+                const jumpDistanceMeters =
+                    lastPoint
+                        ? haversineDistanceMeters(
+                            lastPoint,
+                            nextPoint
+                        )
+                        : 0;
+
+                const probableGpsInterruption =
+                    forceSegmentBreakRef.current ||
+                    (
+                        timeGapMs > 15000 &&
+                        jumpDistanceMeters > 30
+                    );
+
+                /*
+                 * Si hubo una interrupción:
+                 * NO sumamos la distancia faltante.
+                 * Iniciamos un segmento nuevo.
+                 */
+                if (
+                    lastPoint &&
+                    probableGpsInterruption
+                ) {
+                    /*
+                     * Esperamos un punto suficientemente
+                     * preciso antes de iniciar el nuevo tramo.
+                     */
+                    if (!validAsSegmentStart.accept) {
+                        return;
+                    }
+
+                    currentSegmentIdRef.current += 1;
+
+                    const restartPoint: RunPoint = {
+                        ...nextPoint,
+                        segmentId:
+                            currentSegmentIdRef.current,
+                    };
+
+                    setRoutePoints(
+                        (current) => [
+                            ...current,
+                            restartPoint,
+                        ]
+                    );
+
+                    lastAcceptedPointRef.current =
+                        restartPoint;
+
+                    forceSegmentBreakRef.current =
+                        false;
+
+                    setGpsBreakCount(
+                        (current) => current + 1
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Funcionamiento normal.
+                 */
                 const decision =
                     shouldAcceptWebPoint(
                         lastPoint,
                         nextPoint
                     );
 
-                if (decision.accept) {
-                    if (lastPoint) {
-                        setDistanceMeters(
-                            (current) =>
-                                current + decision.distance
-                        );
-                    }
-
-                    setRoutePoints(
-                        (current) => [
-                            ...current,
-                            nextPoint,
-                        ]
-                    );
-
-                    lastAcceptedPointRef.current =
-                        nextPoint;
+                if (!decision.accept) {
+                    return;
                 }
+
+                const acceptedPoint: RunPoint = {
+                    ...nextPoint,
+                    segmentId:
+                        currentSegmentIdRef.current,
+                };
+
+                if (lastPoint) {
+                    setDistanceMeters(
+                        (current) =>
+                            current + decision.distance
+                    );
+                }
+
+                setRoutePoints(
+                    (current) => [
+                        ...current,
+                        acceptedPoint,
+                    ]
+                );
+
+                lastAcceptedPointRef.current =
+                    acceptedPoint;
             }
         };
 
@@ -309,14 +439,23 @@ export default function LiveRunWeb() {
     const startRun = () => {
         if (!currentPosition) return;
 
+        const firstPoint: RunPoint = {
+            ...currentPosition,
+            segmentId: 0,
+        };
+
+        currentSegmentIdRef.current = 0;
+        forceSegmentBreakRef.current = false;
+
+        setGpsBreakCount(0);
         setDistanceMeters(0);
 
         setRoutePoints([
-            currentPosition,
+            firstPoint,
         ]);
 
         lastAcceptedPointRef.current =
-            currentPosition;
+            firstPoint;
 
         isRunningRef.current = true;
         setIsRunning(true);
@@ -327,6 +466,7 @@ export default function LiveRunWeb() {
         setIsRunning(false);
 
         lastAcceptedPointRef.current = null;
+        forceSegmentBreakRef.current = false;
     };
 
     return (
@@ -532,6 +672,14 @@ export default function LiveRunWeb() {
                                     >
                                         Distancia:{' '}
                                         {formatDistance(distanceMeters)}
+                                    </Text>
+                                    <Text
+                                        style={{
+                                            color: '#FFFFFF',
+                                            fontSize: 10,
+                                        }}
+                                    >
+                                        Cortes GPS: {gpsBreakCount}
                                     </Text>
                                 </View>
                             </>

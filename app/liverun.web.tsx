@@ -139,6 +139,94 @@ function formatDistance(meters: number) {
     return `${(meters / 1000).toFixed(2)} km`;
 }
 
+function formatDuration(totalSeconds: number) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const hh = String(hours).padStart(2, '0');
+    const mm = String(minutes).padStart(2, '0');
+    const ss = String(seconds).padStart(2, '0');
+
+    return `${hh}:${mm}:${ss}`;
+}
+
+function formatSpeed(speedMps: number | null) {
+    if (
+        speedMps == null ||
+        Number.isNaN(speedMps)
+    ) {
+        return '--';
+    }
+
+    return `${(speedMps * 3.6).toFixed(1)} km/h`;
+}
+
+function formatPace(
+    distanceMeters: number,
+    elapsedSeconds: number
+) {
+    if (
+        distanceMeters < 1 ||
+        elapsedSeconds < 1
+    ) {
+        return '--';
+    }
+
+    const secondsPerKm =
+        elapsedSeconds /
+        (distanceMeters / 1000);
+
+    const minutes =
+        Math.floor(secondsPerKm / 60);
+
+    const seconds =
+        Math.round(secondsPerKm % 60);
+
+    return `${String(minutes).padStart(2, '0')}:${String(
+        seconds
+    ).padStart(2, '0')} /km`;
+}
+
+function Metric({
+    label,
+    value,
+}: {
+    label: string;
+    value: string;
+}) {
+    return (
+        <View
+            style={{
+                flex: 1,
+                alignItems: 'center',
+                paddingHorizontal: 2,
+            }}
+        >
+            <Text
+                style={{
+                    color: '#999999',
+                    fontSize: 9,
+                }}
+            >
+                {label}
+            </Text>
+
+            <Text
+                numberOfLines={1}
+                style={{
+                    color: '#FFFFFF',
+                    fontSize: 12,
+                    fontWeight: '800',
+                    marginTop: 2,
+                }}
+            >
+                {value}
+            </Text>
+        </View>
+    );
+}
+
 export default function LiveRunWeb() {
     const { height } = useWindowDimensions();
 
@@ -167,6 +255,30 @@ export default function LiveRunWeb() {
 
     const isRunningRef =
         useRef(false);
+
+    const [isPaused, setIsPaused] =
+        useState(false);
+
+    const isPausedRef =
+        useRef(false);
+
+    const [elapsedSeconds, setElapsedSeconds] =
+        useState(0);
+
+    const [currentSpeedMps, setCurrentSpeedMps] =
+        useState<number | null>(null);
+
+    const [maxSpeedMps, setMaxSpeedMps] =
+        useState(0);
+
+    const startedAtMsRef =
+        useRef<number | null>(null);
+
+    const pauseStartedAtRef =
+        useRef<number | null>(null);
+
+    const totalPausedMsRef =
+        useRef(0);
 
     const [routePoints, setRoutePoints] =
         useState<RunPoint[]>([]);
@@ -383,6 +495,45 @@ export default function LiveRunWeb() {
     };
 
     useEffect(() => {
+        if (
+            !isRunning ||
+            isPaused ||
+            startedAtMsRef.current == null
+        ) {
+            return;
+        }
+
+        const updateTimer = () => {
+            const startedAt =
+                startedAtMsRef.current;
+
+            if (startedAt == null) return;
+
+            const elapsed = Math.max(
+                0,
+                Math.floor(
+                    (
+                        Date.now() -
+                        startedAt -
+                        totalPausedMsRef.current
+                    ) / 1000
+                )
+            );
+
+            setElapsedSeconds(elapsed);
+        };
+
+        updateTimer();
+
+        const interval =
+            setInterval(updateTimer, 1000);
+
+        return () => {
+            clearInterval(interval);
+        };
+    }, [isRunning, isPaused]);
+
+    useEffect(() => {
         if (typeof document === 'undefined') return;
 
         const handleVisibilityChange = () => {
@@ -469,7 +620,10 @@ export default function LiveRunWeb() {
             setLocationError(null);
             setLoading(false);
 
-            if (isRunningRef.current) {
+            if (
+                isRunningRef.current &&
+                !isPausedRef.current
+            ) {
                 const lastPoint =
                     lastAcceptedPointRef.current;
 
@@ -537,6 +691,7 @@ export default function LiveRunWeb() {
                         segmentId:
                             currentSegmentIdRef.current,
                     };
+                    setCurrentSpeedMps(0);
 
                     setRoutePoints(
                         (current) => [
@@ -568,6 +723,17 @@ export default function LiveRunWeb() {
                     );
 
                 if (!decision.accept) {
+                    /*
+                     * Si simplemente estamos prácticamente
+                     * quietos, mostramos velocidad cero.
+                     */
+                    if (
+                        decision.reason ===
+                        'tiny_noise'
+                    ) {
+                        setCurrentSpeedMps(0);
+                    }
+
                     return;
                 }
 
@@ -576,6 +742,60 @@ export default function LiveRunWeb() {
                     segmentId:
                         currentSegmentIdRef.current,
                 };
+                /*
+ * Calculamos velocidad.
+ *
+ * Primero usamos la velocidad que nos da
+ * directamente el GPS cuando es válida.
+ *
+ * Si el navegador no la proporciona,
+ * la derivamos usando distancia / tiempo.
+ */
+                let safeSpeedMps: number | null = null;
+
+                if (
+                    nextPoint.speed != null &&
+                    nextPoint.speed >= 0 &&
+                    nextPoint.speed <= 6.5
+                ) {
+                    safeSpeedMps =
+                        nextPoint.speed;
+                } else if (lastPoint) {
+                    const secondsBetweenPoints =
+                        Math.max(
+                            (
+                                nextPoint.timestamp -
+                                lastPoint.timestamp
+                            ) / 1000,
+                            0.1
+                        );
+
+                    const calculatedSpeed =
+                        decision.distance /
+                        secondsBetweenPoints;
+
+                    if (
+                        calculatedSpeed >= 0 &&
+                        calculatedSpeed <= 6.5
+                    ) {
+                        safeSpeedMps =
+                            calculatedSpeed;
+                    }
+                }
+
+                setCurrentSpeedMps(
+                    safeSpeedMps ?? 0
+                );
+
+                if (safeSpeedMps != null) {
+                    setMaxSpeedMps(
+                        (previous) =>
+                            Math.max(
+                                previous,
+                                safeSpeedMps
+                            )
+                    );
+                }
 
                 if (lastPoint) {
                     setDistanceMeters(
@@ -701,10 +921,25 @@ export default function LiveRunWeb() {
 
         setGpsBreakCount(0);
         setDistanceMeters(0);
+        setElapsedSeconds(0);
+        setCurrentSpeedMps(null);
+        setMaxSpeedMps(0);
+
+        startedAtMsRef.current =
+            Date.now();
+
+        pauseStartedAtRef.current =
+            null;
+
+        totalPausedMsRef.current = 0;
+
+        isPausedRef.current = false;
+        setIsPaused(false);
 
         /*
-         * Si el GPS ya está preciso,
-         * comenzamos la ruta inmediatamente.
+         * Solamente comenzamos a guardar
+         * recorrido si el GPS ya tiene
+         * precisión suficiente.
          */
         if (
             accuracy <=
@@ -722,12 +957,6 @@ export default function LiveRunWeb() {
             lastAcceptedPointRef.current =
                 firstPoint;
         } else {
-            /*
-             * Podemos iniciar la carrera,
-             * pero esperamos una posición
-             * precisa antes de comenzar
-             * a calcular ruta/distancia.
-             */
             setRoutePoints([]);
 
             lastAcceptedPointRef.current =
@@ -738,8 +967,101 @@ export default function LiveRunWeb() {
         setIsRunning(true);
     };
 
+    const pauseRun = () => {
+        if (
+            !isRunningRef.current ||
+            isPausedRef.current
+        ) {
+            return;
+        }
+
+        isPausedRef.current = true;
+        setIsPaused(true);
+
+        pauseStartedAtRef.current =
+            Date.now();
+
+        setCurrentSpeedMps(0);
+
+        /*
+         * Cuando retomemos no queremos
+         * dibujar una línea desde el punto
+         * previo a la pausa.
+         */
+        forceSegmentBreakRef.current =
+            true;
+    };
+
+    const resumeRun = () => {
+        if (
+            !isRunningRef.current ||
+            !isPausedRef.current
+        ) {
+            return;
+        }
+
+        if (
+            pauseStartedAtRef.current != null
+        ) {
+            totalPausedMsRef.current +=
+                Date.now() -
+                pauseStartedAtRef.current;
+
+            pauseStartedAtRef.current =
+                null;
+        }
+
+        /*
+         * El próximo punto válido comienza
+         * un segmento nuevo.
+         */
+        forceSegmentBreakRef.current =
+            true;
+
+        isPausedRef.current = false;
+        setIsPaused(false);
+    };
+
     const finishRun = async () => {
-        screenLockModeRef.current = false;
+        /*
+         * Si terminamos estando pausados,
+         * cerramos también ese último tramo
+         * de pausa.
+         */
+        if (
+            pauseStartedAtRef.current != null
+        ) {
+            totalPausedMsRef.current +=
+                Date.now() -
+                pauseStartedAtRef.current;
+
+            pauseStartedAtRef.current =
+                null;
+        }
+
+        if (
+            startedAtMsRef.current != null
+        ) {
+            const finalSeconds =
+                Math.max(
+                    0,
+                    Math.floor(
+                        (
+                            Date.now() -
+                            startedAtMsRef.current -
+                            totalPausedMsRef.current
+                        ) / 1000
+                    )
+                );
+
+            setElapsedSeconds(
+                finalSeconds
+            );
+        }
+
+        screenLockModeRef.current =
+            false;
+
         setScreenLockMode(false);
 
         await releaseScreenWakeLock();
@@ -747,8 +1069,16 @@ export default function LiveRunWeb() {
         isRunningRef.current = false;
         setIsRunning(false);
 
-        lastAcceptedPointRef.current = null;
-        forceSegmentBreakRef.current = false;
+        isPausedRef.current = false;
+        setIsPaused(false);
+
+        setCurrentSpeedMps(0);
+
+        lastAcceptedPointRef.current =
+            null;
+
+        forceSegmentBreakRef.current =
+            false;
     };
 
     return (
@@ -850,10 +1180,84 @@ export default function LiveRunWeb() {
                                 <LiveRunMap
                                     currentPosition={currentPosition}
                                     routePoints={routePoints}
-                                    shouldFollowUser={isRunning}
+                                    shouldFollowUser={isRunning &&
+                                        !isPaused}
                                     zoomLevel={16}
                                     recenterTick={recenterTick}
                                 />
+
+                                <View
+                                    pointerEvents="none"
+                                    style={{
+                                        position: 'absolute',
+                                        left: 12,
+                                        right: 12,
+                                        top: 12,
+
+                                        backgroundColor:
+                                            'rgba(17,17,17,0.92)',
+
+                                        borderWidth: 1,
+                                        borderColor:
+                                            COLORS.primary,
+
+                                        borderRadius: 16,
+
+                                        paddingHorizontal: 12,
+                                        paddingVertical: 10,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color:
+                                                COLORS.textLight,
+                                            fontSize: 12,
+                                            fontWeight: '800',
+                                            marginBottom: 8,
+                                        }}
+                                    >
+                                        {isPaused
+                                            ? 'Sesión pausada'
+                                            : isRunning
+                                                ? 'Sesión libre (en vivo)'
+                                                : 'Sesión libre'}
+                                    </Text>
+
+                                    <View
+                                        style={{
+                                            flexDirection: 'row',
+                                        }}
+                                    >
+                                        <Metric
+                                            label="Tiempo"
+                                            value={formatDuration(
+                                                elapsedSeconds
+                                            )}
+                                        />
+
+                                        <Metric
+                                            label="Distancia"
+                                            value={formatDistance(
+                                                distanceMeters
+                                            )}
+                                        />
+
+                                        <Metric
+                                            label="Velocidad"
+                                            value={formatSpeed(
+                                                currentSpeedMps
+                                            )}
+                                        />
+
+                                        <Metric
+                                            label="Ritmo"
+                                            value={formatPace(
+                                                distanceMeters,
+                                                elapsedSeconds
+                                            )}
+                                        />
+                                    </View>
+                                </View>
 
                                 {/* Debug temporal */}
 
@@ -984,43 +1388,45 @@ export default function LiveRunWeb() {
                         )}
                 </View>
 
-                {isRunning && !screenLockMode && (
-                    <Pressable
-                        onPress={() =>
-                            void enterScreenLockMode()
-                        }
-                        style={{
-                            marginTop: 10,
-                            backgroundColor: '#181818',
-                            borderWidth: 1,
-                            borderColor: COLORS.primary,
-                            borderRadius: 14,
-                            paddingVertical: 12,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                        }}
-                    >
-                        <Text
+                {isRunning &&
+                    !isPaused &&
+                    !screenLockMode && (
+                        <Pressable
+                            onPress={() =>
+                                void enterScreenLockMode()
+                            }
                             style={{
-                                color: COLORS.primary,
-                                fontSize: 14,
-                                fontWeight: '800',
+                                marginTop: 10,
+                                backgroundColor: '#181818',
+                                borderWidth: 1,
+                                borderColor: COLORS.primary,
+                                borderRadius: 14,
+                                paddingVertical: 12,
+                                alignItems: 'center',
+                                justifyContent: 'center',
                             }}
                         >
-                            🔒 Activar modo carrera
-                        </Text>
+                            <Text
+                                style={{
+                                    color: COLORS.primary,
+                                    fontSize: 14,
+                                    fontWeight: '800',
+                                }}
+                            >
+                                🔒 Activar modo carrera
+                            </Text>
 
-                        <Text
-                            style={{
-                                color: '#AAAAAA',
-                                fontSize: 10,
-                                marginTop: 3,
-                            }}
-                        >
-                            Mantiene la pantalla activa y evita toques accidentales
-                        </Text>
-                    </Pressable>
-                )}
+                            <Text
+                                style={{
+                                    color: '#AAAAAA',
+                                    fontSize: 10,
+                                    marginTop: 3,
+                                }}
+                            >
+                                Mantiene la pantalla activa y evita toques accidentales
+                            </Text>
+                        </Pressable>
+                    )}
 
                 {/* Botones */}
 
@@ -1077,6 +1483,42 @@ export default function LiveRunWeb() {
                             Recentrar
                         </Text>
                     </Pressable>
+                    {isRunning && (
+                        <Pressable
+                            onPress={
+                                isPaused
+                                    ? resumeRun
+                                    : pauseRun
+                            }
+                            style={{
+                                flex: 1,
+                                backgroundColor:
+                                    isPaused
+                                        ? COLORS.primary
+                                        : '#444444',
+
+                                paddingVertical: 13,
+                                borderRadius: 14,
+                                alignItems: 'center',
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color:
+                                        isPaused
+                                            ? '#111111'
+                                            : '#FFFFFF',
+
+                                    fontWeight: '800',
+                                    fontSize: 12,
+                                }}
+                            >
+                                {isPaused
+                                    ? 'Reanudar'
+                                    : 'Pausar'}
+                            </Text>
+                        </Pressable>
+                    )}
                     <Pressable
                         onPress={
                             isRunning
@@ -1165,14 +1607,123 @@ export default function LiveRunWeb() {
                     <Text
                         style={{
                             color: '#FFFFFF',
-                            fontSize: 34,
+                            fontSize: 36,
                             fontWeight: '900',
                         }}
                     >
-                        {formatDistance(
-                            distanceMeters
+                        {formatDuration(
+                            elapsedSeconds
                         )}
                     </Text>
+
+                    <Text
+                        style={{
+                            color: '#777777',
+                            fontSize: 11,
+                            marginTop: 3,
+                        }}
+                    >
+                        TIEMPO
+                    </Text>
+
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 330,
+
+                            flexDirection: 'row',
+
+                            marginTop: 28,
+                        }}
+                    >
+                        <View
+                            style={{
+                                flex: 1,
+                                alignItems: 'center',
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: '#888888',
+                                    fontSize: 10,
+                                }}
+                            >
+                                DISTANCIA
+                            </Text>
+
+                            <Text
+                                style={{
+                                    color: '#FFFFFF',
+                                    fontSize: 21,
+                                    fontWeight: '900',
+                                    marginTop: 4,
+                                }}
+                            >
+                                {formatDistance(
+                                    distanceMeters
+                                )}
+                            </Text>
+                        </View>
+
+                        <View
+                            style={{
+                                flex: 1,
+                                alignItems: 'center',
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: '#888888',
+                                    fontSize: 10,
+                                }}
+                            >
+                                VELOCIDAD
+                            </Text>
+
+                            <Text
+                                style={{
+                                    color: '#FFFFFF',
+                                    fontSize: 21,
+                                    fontWeight: '900',
+                                    marginTop: 4,
+                                }}
+                            >
+                                {formatSpeed(
+                                    currentSpeedMps
+                                )}
+                            </Text>
+                        </View>
+                    </View>
+
+                    <View
+                        style={{
+                            marginTop: 22,
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color: '#888888',
+                                fontSize: 10,
+                            }}
+                        >
+                            RITMO
+                        </Text>
+
+                        <Text
+                            style={{
+                                color: COLORS.primary,
+                                fontSize: 22,
+                                fontWeight: '900',
+                                marginTop: 4,
+                            }}
+                        >
+                            {formatPace(
+                                distanceMeters,
+                                elapsedSeconds
+                            )}
+                        </Text>
+                    </View>
 
                     <Text
                         style={{

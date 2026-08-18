@@ -28,6 +28,9 @@ type RunPoint = {
     segmentId?: number;
 };
 
+const MAX_DISPLAY_ACCURACY_METERS = 100;
+const MAX_RUN_ACCURACY_METERS = 35;
+
 function haversineDistanceMeters(a: RunPoint, b: RunPoint) {
     const toRad = (value: number) => (value * Math.PI) / 180;
     const R = 6371000;
@@ -151,6 +154,8 @@ export default function LiveRunWeb() {
 
     const watchIdRef = useRef<number | null>(null);
 
+    const hasReliablePositionRef = useRef(false);
+
     const mapHeight = Math.max(
         360,
         Math.min(height - 230, 650)
@@ -178,16 +183,234 @@ export default function LiveRunWeb() {
     const [gpsBreakCount, setGpsBreakCount] =
         useState(0);
 
+    type WakeLockSentinelLike = {
+        released: boolean;
+        release: () => Promise<void>;
+        addEventListener: (
+            type: 'release',
+            listener: () => void
+        ) => void;
+    };
+
+    const [screenLockMode, setScreenLockMode] =
+        useState(false);
+
+    const screenLockModeRef =
+        useRef(false);
+
+    const [wakeLockActive, setWakeLockActive] =
+        useState(false);
+
+    const wakeLockRef =
+        useRef<WakeLockSentinelLike | null>(null);
+
+    const unlockTimerRef =
+        useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const [unlockHolding, setUnlockHolding] =
+        useState(false);
+
+    const [wakeLockMessage, setWakeLockMessage] =
+        useState<string | null>(null);
+
+    const canStartRun =
+        currentPosition != null &&
+        (currentPosition.accuracy ?? 999) <=
+        MAX_RUN_ACCURACY_METERS;
+
+    const requestScreenWakeLock = async () => {
+        if (typeof navigator === 'undefined') {
+            return false;
+        }
+
+        const wakeLockManager = (
+            navigator as Navigator & {
+                wakeLock?: {
+                    request: (
+                        type: 'screen'
+                    ) => Promise<WakeLockSentinelLike>;
+                };
+            }
+        ).wakeLock;
+
+        if (!wakeLockManager) {
+            setWakeLockMessage(
+                'Este dispositivo no permite mantener la pantalla activa.'
+            );
+
+            setWakeLockActive(false);
+            return false;
+        }
+
+        try {
+            /*
+             * Si ya tenemos uno activo,
+             * no pedimos otro.
+             */
+            if (
+                wakeLockRef.current &&
+                !wakeLockRef.current.released
+            ) {
+                setWakeLockActive(true);
+                return true;
+            }
+
+            const sentinel =
+                await wakeLockManager.request('screen');
+
+            wakeLockRef.current = sentinel;
+            setWakeLockActive(true);
+            setWakeLockMessage(null);
+
+            /*
+             * El sistema puede liberar el Wake Lock
+             * por su cuenta.
+             */
+            sentinel.addEventListener(
+                'release',
+                () => {
+                    if (
+                        wakeLockRef.current ===
+                        sentinel
+                    ) {
+                        wakeLockRef.current = null;
+                    }
+
+                    setWakeLockActive(false);
+                }
+            );
+
+            return true;
+        } catch (error) {
+            console.error(
+                'No se pudo activar Wake Lock:',
+                error
+            );
+
+            setWakeLockActive(false);
+
+            setWakeLockMessage(
+                'No se pudo mantener la pantalla activa.'
+            );
+
+            return false;
+        }
+    };
+
+    const releaseScreenWakeLock = async () => {
+        const sentinel =
+            wakeLockRef.current;
+
+        wakeLockRef.current = null;
+        setWakeLockActive(false);
+
+        if (
+            sentinel &&
+            !sentinel.released
+        ) {
+            try {
+                await sentinel.release();
+            } catch (error) {
+                console.log(
+                    'Wake Lock ya estaba liberado:',
+                    error
+                );
+            }
+        }
+    };
+
+    const enterScreenLockMode = async () => {
+        if (!isRunningRef.current) return;
+
+        const acquired =
+            await requestScreenWakeLock();
+
+        if (!acquired) {
+            return;
+        }
+
+        screenLockModeRef.current = true;
+        setScreenLockMode(true);
+    };
+
+    const exitScreenLockMode = async () => {
+        screenLockModeRef.current = false;
+        setScreenLockMode(false);
+
+        if (unlockTimerRef.current) {
+            clearTimeout(
+                unlockTimerRef.current
+            );
+
+            unlockTimerRef.current = null;
+        }
+
+        setUnlockHolding(false);
+
+        await releaseScreenWakeLock();
+    };
+
+    const startUnlockHold = () => {
+        if (unlockTimerRef.current) {
+            clearTimeout(
+                unlockTimerRef.current
+            );
+        }
+
+        setUnlockHolding(true);
+
+        unlockTimerRef.current =
+            setTimeout(() => {
+                unlockTimerRef.current = null;
+
+                setUnlockHolding(false);
+
+                void exitScreenLockMode();
+            }, 5000);
+    };
+
+    const cancelUnlockHold = () => {
+        if (unlockTimerRef.current) {
+            clearTimeout(
+                unlockTimerRef.current
+            );
+
+            unlockTimerRef.current = null;
+        }
+
+        setUnlockHolding(false);
+    };
 
     useEffect(() => {
         if (typeof document === 'undefined') return;
 
         const handleVisibilityChange = () => {
+            /*
+             * La PWA deja de estar visible.
+             */
             if (
-                document.visibilityState === 'hidden' &&
+                document.visibilityState === 'hidden'
+            ) {
+                if (isRunningRef.current) {
+                    forceSegmentBreakRef.current =
+                        true;
+                }
+
+                return;
+            }
+
+            /*
+             * La PWA volvió a estar visible.
+             *
+             * Si estábamos en Modo Carrera,
+             * intentamos recuperar el Wake Lock.
+             */
+            if (
+                document.visibilityState === 'visible' &&
+                screenLockModeRef.current &&
                 isRunningRef.current
             ) {
-                forceSegmentBreakRef.current = true;
+                void requestScreenWakeLock();
             }
         };
 
@@ -217,6 +440,29 @@ export default function LiveRunWeb() {
                 speed: position.coords.speed,
                 accuracy: position.coords.accuracy,
             };
+
+            const accuracy =
+                nextPoint.accuracy ?? 999;
+
+            /*
+             * No movemos el mapa con posiciones
+             * extremadamente imprecisas.
+             */
+            if (accuracy > MAX_DISPLAY_ACCURACY_METERS) {
+                setLoading(false);
+
+                if (!hasReliablePositionRef.current) {
+                    setLocationError(
+                        `Señal GPS imprecisa (${Math.round(
+                            accuracy
+                        )} m). Esperando una ubicación más precisa...`
+                    );
+                }
+
+                return;
+            }
+
+            hasReliablePositionRef.current = true;
 
             setCurrentPosition(nextPoint);
             setLocationError(null);
@@ -461,7 +707,12 @@ export default function LiveRunWeb() {
         setIsRunning(true);
     };
 
-    const finishRun = () => {
+    const finishRun = async () => {
+        screenLockModeRef.current = false;
+        setScreenLockMode(false);
+
+        await releaseScreenWakeLock();
+
         isRunningRef.current = false;
         setIsRunning(false);
 
@@ -686,6 +937,44 @@ export default function LiveRunWeb() {
                         )}
                 </View>
 
+                {isRunning && !screenLockMode && (
+                    <Pressable
+                        onPress={() =>
+                            void enterScreenLockMode()
+                        }
+                        style={{
+                            marginTop: 10,
+                            backgroundColor: '#181818',
+                            borderWidth: 1,
+                            borderColor: COLORS.primary,
+                            borderRadius: 14,
+                            paddingVertical: 12,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color: COLORS.primary,
+                                fontSize: 14,
+                                fontWeight: '800',
+                            }}
+                        >
+                            🔒 Activar modo carrera
+                        </Text>
+
+                        <Text
+                            style={{
+                                color: '#AAAAAA',
+                                fontSize: 10,
+                                marginTop: 3,
+                            }}
+                        >
+                            Mantiene la pantalla activa y evita toques accidentales
+                        </Text>
+                    </Pressable>
+                )}
+
                 {/* Botones */}
 
                 <View
@@ -747,7 +1036,10 @@ export default function LiveRunWeb() {
                                 ? finishRun
                                 : startRun
                         }
-                        disabled={!currentPosition}
+                        disabled={
+                            !isRunning &&
+                            !canStartRun
+                        }
                         style={{
                             flex: 1,
                             backgroundColor:
@@ -758,7 +1050,7 @@ export default function LiveRunWeb() {
                             borderRadius: 14,
                             alignItems: 'center',
                             opacity:
-                                currentPosition
+                                isRunning || canStartRun
                                     ? 1
                                     : 0.5,
                         }}
@@ -774,11 +1066,192 @@ export default function LiveRunWeb() {
                         >
                             {isRunning
                                 ? 'Finalizar'
-                                : 'Iniciar'}
+                                : canStartRun
+                                    ? 'Iniciar'
+                                    : 'Esperando GPS'}
                         </Text>
                     </Pressable>
                 </View>
             </View>
+
+            {screenLockMode && (
+                <View
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+
+                        backgroundColor: '#000000',
+
+                        alignItems: 'center',
+                        justifyContent: 'center',
+
+                        zIndex: 9999,
+                        elevation: 9999,
+
+                        padding: 30,
+                    }}
+                >
+                    <Text
+                        style={{
+                            color: COLORS.primary,
+                            fontSize: 14,
+                            fontWeight: '900',
+                            marginBottom: 30,
+                            letterSpacing: 1,
+                        }}
+                    >
+                        MARDEL FITNESS
+                    </Text>
+
+                    <Text
+                        style={{
+                            fontSize: 38,
+                            marginBottom: 14,
+                        }}
+                    >
+                        🔒
+                    </Text>
+
+                    <Text
+                        style={{
+                            color: '#FFFFFF',
+                            fontSize: 34,
+                            fontWeight: '900',
+                        }}
+                    >
+                        {formatDistance(
+                            distanceMeters
+                        )}
+                    </Text>
+
+                    <Text
+                        style={{
+                            color: '#888888',
+                            fontSize: 12,
+                            marginTop: 7,
+                        }}
+                    >
+                        Carrera en curso
+                    </Text>
+
+                    <View
+                        style={{
+                            marginTop: 24,
+                            paddingHorizontal: 14,
+                            paddingVertical: 8,
+                            borderRadius: 999,
+                            backgroundColor:
+                                wakeLockActive
+                                    ? '#162000'
+                                    : '#251111',
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color:
+                                    wakeLockActive
+                                        ? COLORS.primary
+                                        : '#FF7777',
+
+                                fontSize: 11,
+                                fontWeight: '800',
+                            }}
+                        >
+                            {wakeLockActive
+                                ? '● Pantalla protegida'
+                                : '● Wake Lock inactivo'}
+                        </Text>
+                    </View>
+
+                    {wakeLockMessage && (
+                        <Text
+                            style={{
+                                color: '#FF9999',
+                                fontSize: 10,
+                                textAlign: 'center',
+                                marginTop: 10,
+                            }}
+                        >
+                            {wakeLockMessage}
+                        </Text>
+                    )}
+
+                    <Pressable
+                        onPressIn={
+                            startUnlockHold
+                        }
+                        onPressOut={
+                            cancelUnlockHold
+                        }
+                        style={{
+                            marginTop: 50,
+
+                            width: '100%',
+                            maxWidth: 300,
+
+                            borderWidth: 1,
+                            borderColor:
+                                unlockHolding
+                                    ? COLORS.primary
+                                    : '#333333',
+
+                            backgroundColor:
+                                unlockHolding
+                                    ? '#182300'
+                                    : '#111111',
+
+                            borderRadius: 22,
+
+                            paddingVertical: 22,
+                            paddingHorizontal: 20,
+
+                            alignItems: 'center',
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color:
+                                    unlockHolding
+                                        ? COLORS.primary
+                                        : '#FFFFFF',
+
+                                fontSize: 15,
+                                fontWeight: '800',
+                                textAlign: 'center',
+                            }}
+                        >
+                            {unlockHolding
+                                ? 'Seguí presionando...'
+                                : 'Mantener presionado'}
+                        </Text>
+
+                        <Text
+                            style={{
+                                color: '#888888',
+                                fontSize: 11,
+                                marginTop: 5,
+                            }}
+                        >
+                            5 segundos para desbloquear
+                        </Text>
+                    </Pressable>
+
+                    <Text
+                        style={{
+                            color: '#555555',
+                            fontSize: 10,
+                            textAlign: 'center',
+                            marginTop: 30,
+                            lineHeight: 15,
+                        }}
+                    >
+                        No uses el botón lateral del teléfono durante la carrera.
+                    </Text>
+                </View>
+            )}
         </SafeAreaView>
     );
 }

@@ -1,17 +1,27 @@
 import React, {
     useEffect,
+    useMemo,
     useRef,
     useState,
 } from 'react';
 
 import {
     ActivityIndicator,
+    Alert,
     Image,
+    Modal,
     Pressable,
+    ScrollView,
     Text,
     useWindowDimensions,
     View,
 } from 'react-native';
+
+import {
+    createRunSession,
+    getMyRunSessions,
+    type RunSession,
+} from '../lib/runSessions';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -227,6 +237,351 @@ function Metric({
     );
 }
 
+function buildStoredPathGeoJson(points: RunPoint[]) {
+    const segments =
+        new Map<number, RunPoint[]>();
+
+    points.forEach((point) => {
+        const segmentId =
+            point.segmentId ?? 0;
+
+        const existing =
+            segments.get(segmentId) ?? [];
+
+        existing.push(point);
+
+        segments.set(
+            segmentId,
+            existing
+        );
+    });
+
+    return {
+        type: 'FeatureCollection',
+        features: Array.from(
+            segments.entries()
+        )
+            .filter(
+                ([, segmentPoints]) =>
+                    segmentPoints.length >= 2
+            )
+            .map(
+                ([
+                    segmentId,
+                    segmentPoints,
+                ]) => ({
+                    type: 'Feature',
+                    properties: {
+                        segmentId,
+                    },
+                    geometry: {
+                        type: 'LineString',
+                        coordinates:
+                            segmentPoints.map(
+                                (point) => [
+                                    point.longitude,
+                                    point.latitude,
+                                ]
+                            ),
+                    },
+                })
+            ),
+    };
+}
+
+function pathGeoJsonToPoints(
+    pathGeoJson: any
+): RunPoint[] {
+    if (!pathGeoJson) return [];
+
+    try {
+        const parsed =
+            typeof pathGeoJson === 'string'
+                ? JSON.parse(pathGeoJson)
+                : pathGeoJson;
+
+        let counter = 0;
+
+        const convertLine = (
+            coordinates: any[],
+            segmentId: number
+        ) =>
+            coordinates
+                .filter(
+                    (coord) =>
+                        Array.isArray(coord) &&
+                        coord.length >= 2 &&
+                        typeof coord[0] === 'number' &&
+                        typeof coord[1] === 'number'
+                )
+                .map((coord) => ({
+                    latitude: coord[1],
+                    longitude: coord[0],
+                    timestamp:
+                        Date.now() +
+                        counter++,
+                    speed: null,
+                    accuracy: null,
+                    segmentId,
+                }));
+
+        /*
+         * Sesiones mobile antiguas.
+         */
+        if (
+            parsed.type === 'LineString' &&
+            Array.isArray(
+                parsed.coordinates
+            )
+        ) {
+            return convertLine(
+                parsed.coordinates,
+                0
+            );
+        }
+
+        /*
+         * Feature individual.
+         */
+        if (
+            parsed.type === 'Feature' &&
+            parsed.geometry?.type ===
+            'LineString'
+        ) {
+            return convertLine(
+                parsed.geometry.coordinates ??
+                [],
+                parsed.properties
+                    ?.segmentId ?? 0
+            );
+        }
+
+        /*
+         * Sesiones web segmentadas.
+         */
+        if (
+            parsed.type ===
+            'FeatureCollection' &&
+            Array.isArray(
+                parsed.features
+            )
+        ) {
+            return parsed.features.flatMap(
+                (
+                    feature: any,
+                    index: number
+                ) => {
+                    if (
+                        feature?.geometry
+                            ?.type !==
+                        'LineString'
+                    ) {
+                        return [];
+                    }
+
+                    return convertLine(
+                        feature.geometry
+                            .coordinates ?? [],
+                        feature.properties
+                            ?.segmentId ??
+                        index
+                    );
+                }
+            );
+        }
+
+        /*
+         * Lo dejamos compatible también
+         * con MultiLineString.
+         */
+        if (
+            parsed.type ===
+            'MultiLineString' &&
+            Array.isArray(
+                parsed.coordinates
+            )
+        ) {
+            return parsed.coordinates.flatMap(
+                (
+                    line: any[],
+                    index: number
+                ) =>
+                    convertLine(
+                        line,
+                        index
+                    )
+            );
+        }
+
+        return [];
+    } catch {
+        return [];
+    }
+}
+
+function getRouteBounds(
+    points: RunPoint[]
+) {
+    if (points.length === 0) {
+        return null;
+    }
+
+    let minLng =
+        points[0].longitude;
+
+    let maxLng =
+        points[0].longitude;
+
+    let minLat =
+        points[0].latitude;
+
+    let maxLat =
+        points[0].latitude;
+
+    points.forEach((point) => {
+        minLng = Math.min(
+            minLng,
+            point.longitude
+        );
+
+        maxLng = Math.max(
+            maxLng,
+            point.longitude
+        );
+
+        minLat = Math.min(
+            minLat,
+            point.latitude
+        );
+
+        maxLat = Math.max(
+            maxLat,
+            point.latitude
+        );
+    });
+
+    const lngSpan =
+        maxLng - minLng;
+
+    const latSpan =
+        maxLat - minLat;
+
+    const lngPadding =
+        Math.max(
+            lngSpan * 0.18,
+            0.0012
+        );
+
+    const latPadding =
+        Math.max(
+            latSpan * 0.18,
+            0.0012
+        );
+
+    return {
+        ne: [
+            maxLng + lngPadding,
+            maxLat + latPadding,
+        ] as [number, number],
+
+        sw: [
+            minLng - lngPadding,
+            minLat - latPadding,
+        ] as [number, number],
+    };
+}
+
+function HistorySessionMapPreview({
+    session,
+}: {
+    session: RunSession;
+}) {
+    const mapRef =
+        useRef<any>(null);
+
+    const points = useMemo(
+        () =>
+            pathGeoJsonToPoints(
+                session.pathGeoJson
+            ),
+        [session.pathGeoJson]
+    );
+
+    const bounds = useMemo(
+        () =>
+            getRouteBounds(points),
+        [points]
+    );
+
+    useEffect(() => {
+        if (!bounds) return;
+
+        const timer =
+            setTimeout(() => {
+                mapRef.current?.fitBounds?.(
+                    bounds.ne,
+                    bounds.sw,
+                    45,
+                    600
+                );
+            }, 600);
+
+        return () =>
+            clearTimeout(timer);
+    }, [bounds]);
+
+    if (points.length < 2) {
+        return (
+            <View
+                style={{
+                    height: 200,
+                    borderRadius: 18,
+                    backgroundColor:
+                        '#111111',
+                    alignItems:
+                        'center',
+                    justifyContent:
+                        'center',
+                }}
+            >
+                <Text
+                    style={{
+                        color: '#888888',
+                    }}
+                >
+                    Sin ruta suficiente
+                </Text>
+            </View>
+        );
+    }
+
+    return (
+        <View
+            style={{
+                height: 240,
+                borderRadius: 18,
+                overflow: 'hidden',
+                borderWidth: 1,
+                borderColor:
+                    COLORS.primary,
+            }}
+        >
+            <LiveRunMap
+                ref={mapRef}
+                currentPosition={
+                    points[
+                    points.length - 1
+                    ]
+                }
+                routePoints={points}
+                shouldFollowUser={false}
+                zoomLevel={13}
+                recenterTick={0}
+            />
+        </View>
+    );
+}
+
 export default function LiveRunWeb() {
     const { height } = useWindowDimensions();
 
@@ -330,6 +685,24 @@ export default function LiveRunWeb() {
         currentPosition != null &&
         (currentPosition.accuracy ?? 999) <=
         MAX_START_ACCURACY_METERS;
+
+    const [savingSession, setSavingSession] =
+        useState(false);
+
+    const [historyVisible, setHistoryVisible] =
+        useState(false);
+
+    const [historyLoading, setHistoryLoading] =
+        useState(false);
+
+    const [runHistory, setRunHistory] =
+        useState<RunSession[]>([]);
+
+    const [
+        selectedHistorySession,
+        setSelectedHistorySession,
+    ] =
+        useState<RunSession | null>(null);
 
     const requestScreenWakeLock = async () => {
         if (typeof navigator === 'undefined') {
@@ -1023,41 +1396,61 @@ export default function LiveRunWeb() {
     };
 
     const finishRun = async () => {
-        /*
-         * Si terminamos estando pausados,
-         * cerramos también ese último tramo
-         * de pausa.
-         */
         if (
-            pauseStartedAtRef.current != null
+            !isRunningRef.current ||
+            savingSession
         ) {
-            totalPausedMsRef.current +=
-                Date.now() -
-                pauseStartedAtRef.current;
-
-            pauseStartedAtRef.current =
-                null;
+            return;
         }
 
-        if (
-            startedAtMsRef.current != null
-        ) {
-            const finalSeconds =
-                Math.max(
+        const endedAtMs =
+            Date.now();
+
+        const startedAtMs =
+            startedAtMsRef.current;
+
+        const pendingPauseMs =
+            pauseStartedAtRef.current !=
+                null
+                ? endedAtMs -
+                pauseStartedAtRef.current
+                : 0;
+
+        const totalPausedMs =
+            totalPausedMsRef.current +
+            pendingPauseMs;
+
+        const finalElapsedSeconds =
+            startedAtMs != null
+                ? Math.max(
                     0,
                     Math.floor(
                         (
-                            Date.now() -
-                            startedAtMsRef.current -
-                            totalPausedMsRef.current
+                            endedAtMs -
+                            startedAtMs -
+                            totalPausedMs
                         ) / 1000
                     )
-                );
+                )
+                : elapsedSeconds;
 
-            setElapsedSeconds(
-                finalSeconds
-            );
-        }
+        /*
+         * Primero detenemos la sesión
+         * localmente para que el GPS
+         * deje de sumar mientras hablamos
+         * con Render.
+         */
+        isRunningRef.current = false;
+        setIsRunning(false);
+
+        isPausedRef.current = false;
+        setIsPaused(false);
+
+        setElapsedSeconds(
+            finalElapsedSeconds
+        );
+
+        setCurrentSpeedMps(0);
 
         screenLockModeRef.current =
             false;
@@ -1066,20 +1459,212 @@ export default function LiveRunWeb() {
 
         await releaseScreenWakeLock();
 
-        isRunningRef.current = false;
-        setIsRunning(false);
+        const avgPaceSecPerKm =
+            distanceMeters > 0
+                ? finalElapsedSeconds /
+                (
+                    distanceMeters /
+                    1000
+                )
+                : null;
 
-        isPausedRef.current = false;
-        setIsPaused(false);
+        try {
+            setSavingSession(true);
 
-        setCurrentSpeedMps(0);
+            if (startedAtMs == null) {
+                throw new Error(
+                    'No se encontró el inicio de la sesión.'
+                );
+            }
 
-        lastAcceptedPointRef.current =
-            null;
+            const created =
+                await createRunSession({
+                    startedAt:
+                        new Date(
+                            startedAtMs
+                        ).toISOString(),
 
-        forceSegmentBreakRef.current =
-            false;
+                    endedAt:
+                        new Date(
+                            endedAtMs
+                        ).toISOString(),
+
+                    durationSeconds:
+                        finalElapsedSeconds,
+
+                    distanceMeters,
+
+                    avgPaceSecPerKm,
+
+                    maxSpeedMps:
+                        maxSpeedMps > 0
+                            ? maxSpeedMps
+                            : null,
+
+                    pathGeoJson:
+                        routePoints.length >= 2
+                            ? buildStoredPathGeoJson(
+                                routePoints
+                            )
+                            : null,
+                });
+
+            /*
+             * Actualizamos también el historial
+             * local inmediatamente.
+             */
+            if (created?.item) {
+                setRunHistory(
+                    (current) => [
+                        created.item,
+                        ...current.filter(
+                            (session) =>
+                                session.id !==
+                                created.item.id
+                        ),
+                    ]
+                );
+            }
+
+            Alert.alert(
+                'Sesión guardada',
+                'La carrera fue guardada correctamente.'
+            );
+        } catch (error) {
+            console.error(
+                'Error guardando sesión web:',
+                error
+            );
+
+            Alert.alert(
+                'Error',
+                error instanceof Error
+                    ? error.message
+                    : 'No se pudo guardar la sesión.'
+            );
+        } finally {
+            setSavingSession(false);
+
+            lastAcceptedPointRef.current =
+                null;
+
+            forceSegmentBreakRef.current =
+                false;
+
+            pauseStartedAtRef.current =
+                null;
+
+            totalPausedMsRef.current = 0;
+
+            startedAtMsRef.current =
+                null;
+        }
     };
+
+    const toggleHistory =
+        async () => {
+            if (historyVisible) {
+                setHistoryVisible(false);
+                setSelectedHistorySession(
+                    null
+                );
+                return;
+            }
+
+            try {
+                setHistoryLoading(true);
+
+                const data =
+                    await getMyRunSessions();
+
+                setRunHistory(
+                    data.items ?? []
+                );
+
+                setHistoryVisible(true);
+            } catch (error) {
+                console.error(
+                    'Error cargando historial web:',
+                    error
+                );
+
+                Alert.alert(
+                    'Error',
+                    'No se pudo cargar el historial.'
+                );
+            } finally {
+                setHistoryLoading(false);
+            }
+        };
+
+    function formatSessionDate(
+        dateString: string
+    ) {
+        return new Date(
+            dateString
+        ).toLocaleDateString(
+            'es-AR',
+            {
+                day: '2-digit',
+                month: '2-digit',
+                year: '2-digit',
+            }
+        );
+    }
+
+    function formatSessionTime(
+        dateString: string
+    ) {
+        return new Date(
+            dateString
+        ).toLocaleTimeString(
+            'es-AR',
+            {
+                hour: '2-digit',
+                minute: '2-digit',
+            }
+        );
+    }
+
+    function HistoryMetric({
+        label,
+        value,
+    }: {
+        label: string;
+        value: string;
+    }) {
+        return (
+            <View
+                style={{
+                    width: '47%',
+                    backgroundColor:
+                        '#181818',
+                    borderRadius: 14,
+                    padding: 12,
+                }}
+            >
+                <Text
+                    style={{
+                        color: '#888888',
+                        fontSize: 10,
+                    }}
+                >
+                    {label}
+                </Text>
+
+                <Text
+                    style={{
+                        color: '#FFFFFF',
+                        fontSize: 15,
+                        fontWeight: '900',
+                        marginTop: 3,
+                    }}
+                >
+                    {value}
+                </Text>
+            </View>
+        );
+    }
 
     return (
         <SafeAreaView
@@ -1185,6 +1770,38 @@ export default function LiveRunWeb() {
                                     zoomLevel={16}
                                     recenterTick={recenterTick}
                                 />
+
+                                <Pressable
+                                    onPress={toggleHistory}
+                                    disabled={historyLoading}
+                                    style={{
+                                        marginTop: 10,
+                                        backgroundColor: '#181818',
+                                        borderWidth: 1,
+                                        borderColor: '#333333',
+                                        borderRadius: 14,
+                                        paddingVertical: 11,
+                                        alignItems: 'center',
+                                    }}
+                                >
+                                    {historyLoading ? (
+                                        <ActivityIndicator
+                                            size="small"
+                                            color={COLORS.primary}
+                                        />
+                                    ) : (
+                                        <Text
+                                            style={{
+                                                color:
+                                                    COLORS.textLight,
+                                                fontWeight: '800',
+                                                fontSize: 13,
+                                            }}
+                                        >
+                                            Historial de carreras
+                                        </Text>
+                                    )}
+                                </Pressable>
 
                                 <View
                                     pointerEvents="none"
@@ -1860,6 +2477,240 @@ export default function LiveRunWeb() {
                     </Text>
                 </View>
             )}
+            <Modal
+                visible={historyVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => {
+                    setHistoryVisible(false);
+                    setSelectedHistorySession(
+                        null
+                    );
+                }}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor:
+                            'rgba(0,0,0,0.78)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: 18,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 420,
+                            maxHeight: '85%',
+                            backgroundColor:
+                                '#101010',
+                            borderRadius: 24,
+                            borderWidth: 1,
+                            borderColor:
+                                COLORS.primary,
+                            padding: 16,
+                        }}
+                    >
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                justifyContent:
+                                    'space-between',
+                                alignItems: 'center',
+                                marginBottom: 12,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: '#FFFFFF',
+                                    fontSize: 18,
+                                    fontWeight: '900',
+                                }}
+                            >
+                                {selectedHistorySession
+                                    ? 'Detalle de carrera'
+                                    : 'Historial'}
+                            </Text>
+
+                            <Pressable
+                                onPress={() => {
+                                    if (
+                                        selectedHistorySession
+                                    ) {
+                                        setSelectedHistorySession(
+                                            null
+                                        );
+                                    } else {
+                                        setHistoryVisible(
+                                            false
+                                        );
+                                    }
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.primary,
+                                        fontWeight:
+                                            '900',
+                                    }}
+                                >
+                                    {selectedHistorySession
+                                        ? 'Volver'
+                                        : 'Cerrar'}
+                                </Text>
+                            </Pressable>
+                        </View>
+
+                        {!selectedHistorySession ? (
+                            <ScrollView
+                                showsVerticalScrollIndicator={
+                                    false
+                                }
+                            >
+                                {runHistory.length ===
+                                    0 ? (
+                                    <Text
+                                        style={{
+                                            color:
+                                                '#999999',
+                                            textAlign:
+                                                'center',
+                                            paddingVertical:
+                                                30,
+                                        }}
+                                    >
+                                        Todavía no hay
+                                        carreras guardadas.
+                                    </Text>
+                                ) : (
+                                    runHistory.map(
+                                        (session) => (
+                                            <Pressable
+                                                key={
+                                                    session.id
+                                                }
+                                                onPress={() =>
+                                                    setSelectedHistorySession(
+                                                        session
+                                                    )
+                                                }
+                                                style={{
+                                                    backgroundColor:
+                                                        '#181818',
+                                                    borderWidth:
+                                                        1,
+                                                    borderColor:
+                                                        '#303030',
+                                                    borderRadius:
+                                                        16,
+                                                    padding: 12,
+                                                    marginBottom:
+                                                        9,
+                                                }}
+                                            >
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            '#FFFFFF',
+                                                        fontWeight:
+                                                            '800',
+                                                    }}
+                                                >
+                                                    {formatSessionDate(
+                                                        session.startedAt
+                                                    )}
+                                                    {' · '}
+                                                    {formatSessionTime(
+                                                        session.startedAt
+                                                    )}
+                                                </Text>
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.primary,
+                                                        marginTop:
+                                                            5,
+                                                        fontWeight:
+                                                            '800',
+                                                    }}
+                                                >
+                                                    {formatDistance(
+                                                        session.distanceMeters
+                                                    )}
+                                                    {' · '}
+                                                    {formatDuration(
+                                                        session.durationSeconds
+                                                    )}
+                                                </Text>
+                                            </Pressable>
+                                        )
+                                    )
+                                )}
+                            </ScrollView>
+                        ) : (
+                            <ScrollView
+                                showsVerticalScrollIndicator={
+                                    false
+                                }
+                            >
+                                <HistorySessionMapPreview
+                                    session={
+                                        selectedHistorySession
+                                    }
+                                />
+
+                                <View
+                                    style={{
+                                        flexDirection:
+                                            'row',
+                                        flexWrap:
+                                            'wrap',
+                                        marginTop: 14,
+                                        gap: 10,
+                                    }}
+                                >
+                                    <HistoryMetric
+                                        label="Distancia"
+                                        value={formatDistance(
+                                            selectedHistorySession.distanceMeters
+                                        )}
+                                    />
+
+                                    <HistoryMetric
+                                        label="Tiempo"
+                                        value={formatDuration(
+                                            selectedHistorySession.durationSeconds
+                                        )}
+                                    />
+
+                                    <HistoryMetric
+                                        label="Ritmo"
+                                        value={
+                                            selectedHistorySession.avgPaceSecPerKm !=
+                                                null
+                                                ? formatPace(
+                                                    selectedHistorySession.distanceMeters,
+                                                    selectedHistorySession.durationSeconds
+                                                )
+                                                : '--'
+                                        }
+                                    />
+
+                                    <HistoryMetric
+                                        label="Vel. máx."
+                                        value={formatSpeed(
+                                            selectedHistorySession.maxSpeedMps
+                                        )}
+                                    />
+                                </View>
+                            </ScrollView>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }

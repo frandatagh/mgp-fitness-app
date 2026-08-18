@@ -28,8 +28,9 @@ type RunPoint = {
     segmentId?: number;
 };
 
-const MAX_DISPLAY_ACCURACY_METERS = 100;
-const MAX_RUN_ACCURACY_METERS = 35;
+const MAX_DISPLAY_ACCURACY_METERS = 120;
+const MAX_START_ACCURACY_METERS = 120;
+const MAX_ROUTE_ACCURACY_METERS = 35;
 
 function haversineDistanceMeters(a: RunPoint, b: RunPoint) {
     const toRad = (value: number) => (value * Math.PI) / 180;
@@ -62,7 +63,7 @@ function shouldAcceptWebPoint(
 
     // Para la primera prueba web somos un poco
     // más tolerantes que en native.
-    if (accuracy > 35) {
+    if (accuracy > MAX_ROUTE_ACCURACY_METERS) {
         return {
             accept: false,
             distance: 0,
@@ -216,7 +217,7 @@ export default function LiveRunWeb() {
     const canStartRun =
         currentPosition != null &&
         (currentPosition.accuracy ?? 999) <=
-        MAX_RUN_ACCURACY_METERS;
+        MAX_START_ACCURACY_METERS;
 
     const requestScreenWakeLock = async () => {
         if (typeof navigator === 'undefined') {
@@ -685,10 +686,15 @@ export default function LiveRunWeb() {
     const startRun = () => {
         if (!currentPosition) return;
 
-        const firstPoint: RunPoint = {
-            ...currentPosition,
-            segmentId: 0,
-        };
+        const accuracy =
+            currentPosition.accuracy ?? 999;
+
+        if (
+            accuracy >
+            MAX_START_ACCURACY_METERS
+        ) {
+            return;
+        }
 
         currentSegmentIdRef.current = 0;
         forceSegmentBreakRef.current = false;
@@ -696,12 +702,37 @@ export default function LiveRunWeb() {
         setGpsBreakCount(0);
         setDistanceMeters(0);
 
-        setRoutePoints([
-            firstPoint,
-        ]);
+        /*
+         * Si el GPS ya está preciso,
+         * comenzamos la ruta inmediatamente.
+         */
+        if (
+            accuracy <=
+            MAX_ROUTE_ACCURACY_METERS
+        ) {
+            const firstPoint: RunPoint = {
+                ...currentPosition,
+                segmentId: 0,
+            };
 
-        lastAcceptedPointRef.current =
-            firstPoint;
+            setRoutePoints([
+                firstPoint,
+            ]);
+
+            lastAcceptedPointRef.current =
+                firstPoint;
+        } else {
+            /*
+             * Podemos iniciar la carrera,
+             * pero esperamos una posición
+             * precisa antes de comenzar
+             * a calcular ruta/distancia.
+             */
+            setRoutePoints([]);
+
+            lastAcceptedPointRef.current =
+                null;
+        }
 
         isRunningRef.current = true;
         setIsRunning(true);
@@ -931,6 +962,22 @@ export default function LiveRunWeb() {
                                         }}
                                     >
                                         Cortes GPS: {gpsBreakCount}
+                                    </Text>
+                                    <Text
+                                        style={{
+                                            color:
+                                                (currentPosition.accuracy ?? 999) <=
+                                                    MAX_ROUTE_ACCURACY_METERS
+                                                    ? COLORS.primary
+                                                    : '#FFD36A',
+                                            fontSize: 10,
+                                            fontWeight: '700',
+                                        }}
+                                    >
+                                        {(currentPosition.accuracy ?? 999) <=
+                                            MAX_ROUTE_ACCURACY_METERS
+                                            ? 'GPS listo'
+                                            : 'GPS ajustando precisión...'}
                                     </Text>
                                 </View>
                             </>
@@ -1188,7 +1235,6 @@ export default function LiveRunWeb() {
                         }
                         style={{
                             marginTop: 50,
-
                             width: '100%',
                             maxWidth: 300,
 
@@ -1204,14 +1250,21 @@ export default function LiveRunWeb() {
                                     : '#111111',
 
                             borderRadius: 22,
-
                             paddingVertical: 22,
                             paddingHorizontal: 20,
-
                             alignItems: 'center',
-                        }}
+
+                            // WEB: impedir selección durante pulsación larga
+                            userSelect: 'none',
+
+                            // Safari/iPhone
+                            WebkitUserSelect: 'none',
+                            WebkitTouchCallout: 'none',
+                        } as any}
                     >
                         <Text
+                            selectable={false}
+                            pointerEvents="none"
                             style={{
                                 color:
                                     unlockHolding
@@ -1221,6 +1274,7 @@ export default function LiveRunWeb() {
                                 fontSize: 15,
                                 fontWeight: '800',
                                 textAlign: 'center',
+                                userSelect: 'none',
                             }}
                         >
                             {unlockHolding
@@ -1229,10 +1283,13 @@ export default function LiveRunWeb() {
                         </Text>
 
                         <Text
+                            selectable={false}
+                            pointerEvents="none"
                             style={{
                                 color: '#888888',
                                 fontSize: 11,
                                 marginTop: 5,
+                                userSelect: 'none',
                             }}
                         >
                             5 segundos para desbloquear

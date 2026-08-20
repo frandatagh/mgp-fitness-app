@@ -27,7 +27,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
 import { COLORS } from '../constants/colors';
+import { Ionicons } from '@expo/vector-icons';
 import LiveRunMap from '../components/LiveRunMap.web';
+import AppHeader from '@/components/AppHeader';
 
 type RunPoint = {
     latitude: number;
@@ -38,9 +40,16 @@ type RunPoint = {
     segmentId?: number;
 };
 
-const MAX_DISPLAY_ACCURACY_METERS = 120;
-const MAX_START_ACCURACY_METERS = 120;
-const MAX_ROUTE_ACCURACY_METERS = 35;
+const IS_LOCAL_DEV = __DEV__;
+
+const MAX_DISPLAY_ACCURACY_METERS =
+    IS_LOCAL_DEV ? 90000 : 120;
+
+const MAX_START_ACCURACY_METERS =
+    IS_LOCAL_DEV ? 90000 : 120;
+
+const MAX_ROUTE_ACCURACY_METERS =
+    IS_LOCAL_DEV ? 90000 : 35;
 
 function haversineDistanceMeters(a: RunPoint, b: RunPoint) {
     const toRad = (value: number) => (value * Math.PI) / 180;
@@ -583,7 +592,7 @@ function HistorySessionMapPreview({
 }
 
 export default function LiveRunWeb() {
-    const { height } = useWindowDimensions();
+
 
     const [loading, setLoading] = useState(true);
 
@@ -600,10 +609,7 @@ export default function LiveRunWeb() {
 
     const hasReliablePositionRef = useRef(false);
 
-    const mapHeight = Math.max(
-        360,
-        Math.min(height - 230, 650)
-    );
+
 
     const [isRunning, setIsRunning] =
         useState(false);
@@ -1561,6 +1567,70 @@ export default function LiveRunWeb() {
         }
     };
 
+    const resetRun = async () => {
+        /*
+         * Si había una pausa abierta,
+         * la descartamos.
+         */
+        pauseStartedAtRef.current = null;
+        totalPausedMsRef.current = 0;
+
+        /*
+         * Nueva sesión lógica desde este instante.
+         */
+        startedAtMsRef.current =
+            isRunningRef.current
+                ? Date.now()
+                : null;
+
+        setElapsedSeconds(0);
+        setDistanceMeters(0);
+        setCurrentSpeedMps(null);
+        setMaxSpeedMps(0);
+
+        setGpsBreakCount(0);
+
+        currentSegmentIdRef.current = 0;
+        forceSegmentBreakRef.current = false;
+
+        isPausedRef.current = false;
+        setIsPaused(false);
+
+        /*
+         * Si tenemos un GPS suficientemente bueno,
+         * usamos la posición actual como nuevo inicio.
+         */
+        const accuracy =
+            currentPosition?.accuracy ?? 999;
+
+        if (
+            currentPosition &&
+            accuracy <= MAX_ROUTE_ACCURACY_METERS
+        ) {
+            const firstPoint: RunPoint = {
+                ...currentPosition,
+                segmentId: 0,
+            };
+
+            setRoutePoints([firstPoint]);
+
+            lastAcceptedPointRef.current =
+                firstPoint;
+        } else {
+            setRoutePoints([]);
+
+            lastAcceptedPointRef.current =
+                null;
+        }
+
+        /*
+         * Volvemos a centrar el mapa.
+         */
+        setRecenterTick(
+            (current) => current + 1
+        );
+    };
+
     const toggleHistory =
         async () => {
             if (historyVisible) {
@@ -1596,6 +1666,115 @@ export default function LiveRunWeb() {
                 setHistoryLoading(false);
             }
         };
+
+    type IoniconName =
+        React.ComponentProps<
+            typeof Ionicons
+        >['name'];
+
+    function BottomActionButton({
+        icon,
+        label,
+        onPress,
+        primary = false,
+        danger = false,
+        large = false,
+        disabled = false,
+    }: {
+        icon: IoniconName;
+        label: string;
+        onPress: () => void;
+        primary?: boolean;
+        danger?: boolean;
+        large?: boolean;
+        disabled?: boolean;
+    }) {
+        return (
+            <Pressable
+                disabled={disabled}
+                onPress={onPress}
+                style={({ pressed }) => ({
+                    flex:
+                        large
+                            ? 1.2
+                            : 1,
+
+                    minWidth: 0,
+
+                    height:
+                        large
+                            ? 62
+                            : 56,
+
+                    borderRadius: 17,
+
+                    alignItems: 'center',
+                    justifyContent: 'center',
+
+                    backgroundColor:
+                        disabled
+                            ? '#252525'
+                            : primary
+                                ? COLORS.primary
+                                : danger
+                                    ? '#3A2020'
+                                    : pressed
+                                        ? '#333333'
+                                        : '#242424',
+
+                    borderWidth: 1,
+
+                    borderColor:
+                        primary
+                            ? COLORS.primary
+                            : danger
+                                ? '#704040'
+                                : '#353535',
+
+                    opacity:
+                        disabled
+                            ? 0.45
+                            : pressed
+                                ? 0.8
+                                : 1,
+                })}
+            >
+                <Ionicons
+                    name={icon}
+                    size={
+                        large
+                            ? 25
+                            : 21
+                    }
+                    color={
+                        primary
+                            ? '#111111'
+                            : danger
+                                ? '#FF7777'
+                                : '#FFFFFF'
+                    }
+                />
+
+                <Text
+                    numberOfLines={1}
+                    style={{
+                        color:
+                            primary
+                                ? '#111111'
+                                : danger
+                                    ? '#FF9999'
+                                    : '#DADADA',
+
+                        fontSize: 8,
+                        fontWeight: '700',
+                        marginTop: 3,
+                    }}
+                >
+                    {label}
+                </Text>
+            </Pressable>
+        );
+    }
 
     function formatSessionDate(
         dateString: string
@@ -1680,34 +1859,22 @@ export default function LiveRunWeb() {
                     maxWidth: 800,
                     alignSelf: 'center',
                     paddingHorizontal: 14,
-                    paddingTop: 6,
                 }}
             >
                 {/* Logo */}
 
-                <View
-                    style={{
-                        alignItems: 'center',
-                    }}
-                >
-                    <Image
-                        source={require(
-                            '../assets/img/icontwist.png'
-                        )}
-                        style={{
-                            width: 150,
-                            height: 75,
-                        }}
-                        resizeMode="contain"
-                    />
-                </View>
+                <AppHeader profileGreeting={`A correr`} />
 
                 {/* Mapa */}
 
+
+
                 <View
                     style={{
-                        height: mapHeight,
+                        flex: 1,
+                        minHeight: 320,
                         borderRadius: 24,
+                        marginTop: 15,
                         overflow: 'hidden',
                         borderWidth: 2,
                         borderColor: COLORS.primary,
@@ -1771,38 +1938,53 @@ export default function LiveRunWeb() {
                                     recenterTick={recenterTick}
                                 />
 
+
                                 <Pressable
-                                    onPress={toggleHistory}
-                                    disabled={historyLoading}
-                                    style={{
-                                        marginTop: 10,
-                                        backgroundColor: '#181818',
+                                    onPress={() =>
+                                        setRecenterTick(
+                                            (value) => value + 1
+                                        )
+                                    }
+                                    style={({ pressed }) => ({
+                                        position: 'absolute',
+
+                                        right: 14,
+                                        bottom: 58,
+
+                                        width: 46,
+                                        height: 46,
+                                        borderRadius: 23,
+
+                                        backgroundColor: pressed
+                                            ? COLORS.primary
+                                            : 'rgba(17,17,17,0.92)',
+
                                         borderWidth: 1,
-                                        borderColor: '#333333',
-                                        borderRadius: 14,
-                                        paddingVertical: 11,
+                                        borderColor: COLORS.primary,
+
                                         alignItems: 'center',
-                                    }}
+                                        justifyContent: 'center',
+
+                                        zIndex: 30,
+
+                                        shadowColor: '#000000',
+                                        shadowOpacity: 0.25,
+                                        shadowRadius: 5,
+                                        elevation: 5,
+                                    })}
                                 >
-                                    {historyLoading ? (
-                                        <ActivityIndicator
-                                            size="small"
-                                            color={COLORS.primary}
+                                    {({ pressed }) => (
+                                        <Ionicons
+                                            name="compass-outline"
+                                            size={25}
+                                            color={
+                                                pressed
+                                                    ? '#111111'
+                                                    : COLORS.primary
+                                            }
                                         />
-                                    ) : (
-                                        <Text
-                                            style={{
-                                                color:
-                                                    COLORS.textLight,
-                                                fontWeight: '800',
-                                                fontSize: 13,
-                                            }}
-                                        >
-                                            Historial de carreras
-                                        </Text>
                                     )}
                                 </Pressable>
-
                                 <View
                                     pointerEvents="none"
                                     style={{
@@ -2050,667 +2232,631 @@ export default function LiveRunWeb() {
                 <View
                     style={{
                         flexDirection: 'row',
-                        gap: 10,
-                        marginTop: 12,
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        marginTop: 10,
+                        marginBottom: 10,
                     }}
                 >
-                    <Pressable
+                    {/* 1 — HOME */}
+                    <BottomActionButton
+                        icon="home-outline"
+                        label="Home"
                         onPress={() =>
                             router.replace('/home')
                         }
-                        style={{
-                            flex: 1,
-                            backgroundColor: '#444444',
-                            paddingVertical: 13,
-                            borderRadius: 14,
-                            alignItems: 'center',
-                        }}
-                    >
-                        <Text
-                            style={{
-                                color: COLORS.textLight,
-                                fontWeight: '700',
-                            }}
-                        >
-                            Volver
-                        </Text>
-                    </Pressable>
+                    />
 
-                    <Pressable
+                    {/* 2 — REINICIAR */}
+                    <BottomActionButton
+                        icon="refresh"
+                        label="Reiniciar"
                         onPress={() =>
-                            setRecenterTick(
-                                (value) => value + 1
-                            )
+                            void resetRun()
                         }
-                        style={{
-                            flex: 1,
-                            backgroundColor:
-                                COLORS.primary,
-                            paddingVertical: 13,
-                            borderRadius: 14,
-                            alignItems: 'center',
-                        }}
-                    >
-                        <Text
-                            style={{
-                                color: '#111111',
-                                fontWeight: '800',
-                            }}
-                        >
-                            Recentrar
-                        </Text>
-                    </Pressable>
-                    {isRunning && (
-                        <Pressable
+                    />
+
+                    {/* 3 — BOTÓN CENTRAL */}
+                    {!isRunning ? (
+                        <BottomActionButton
+                            icon="play"
+                            label={
+                                canStartRun
+                                    ? 'Iniciar'
+                                    : 'GPS'
+                            }
+                            primary
+                            large
+                            disabled={!canStartRun}
+                            onPress={startRun}
+                        />
+                    ) : (
+                        <BottomActionButton
+                            icon={
+                                isPaused
+                                    ? 'play'
+                                    : 'pause'
+                            }
+                            label={
+                                isPaused
+                                    ? 'Reanudar'
+                                    : 'Pausar'
+                            }
+                            primary={isPaused}
+                            large
                             onPress={
                                 isPaused
                                     ? resumeRun
                                     : pauseRun
                             }
-                            style={{
-                                flex: 1,
-                                backgroundColor:
-                                    isPaused
-                                        ? COLORS.primary
-                                        : '#444444',
+                        />
+                    )}
 
-                                paddingVertical: 13,
-                                borderRadius: 14,
+                    {/* 4 — ESTADÍSTICAS / FINALIZAR */}
+                    {!isRunning ? (
+                        <BottomActionButton
+                            icon="stats-chart-outline"
+                            label="Estadísticas"
+                            onPress={() =>
+                                router.push('/statistics')
+                            }
+                        />
+                    ) : (
+                        <BottomActionButton
+                            icon="stop"
+                            label="Finalizar"
+                            danger
+                            onPress={() =>
+                                void finishRun()
+                            }
+                        />
+                    )}
+
+                    {/* 5 — HISTORIAL */}
+                    <BottomActionButton
+                        icon="time-outline"
+                        label="Historial"
+                        onPress={() =>
+                            void toggleHistory()
+                        }
+                    />
+                </View>
+
+                {screenLockMode && (
+                    <View
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+
+                            backgroundColor: '#000000',
+
+                            alignItems: 'center',
+                            justifyContent: 'center',
+
+                            zIndex: 9999,
+                            elevation: 9999,
+
+                            padding: 30,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color: COLORS.primary,
+                                fontSize: 14,
+                                fontWeight: '900',
+                                marginBottom: 30,
+                                letterSpacing: 1,
+                            }}
+                        >
+                            MARDEL FITNESS
+                        </Text>
+
+                        <Text
+                            style={{
+                                fontSize: 38,
+                                marginBottom: 14,
+                            }}
+                        >
+                            🔒
+                        </Text>
+
+                        <Text
+                            style={{
+                                color: '#FFFFFF',
+                                fontSize: 36,
+                                fontWeight: '900',
+                            }}
+                        >
+                            {formatDuration(
+                                elapsedSeconds
+                            )}
+                        </Text>
+
+                        <Text
+                            style={{
+                                color: '#777777',
+                                fontSize: 11,
+                                marginTop: 3,
+                            }}
+                        >
+                            TIEMPO
+                        </Text>
+
+                        <View
+                            style={{
+                                width: '100%',
+                                maxWidth: 330,
+
+                                flexDirection: 'row',
+
+                                marginTop: 28,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    flex: 1,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: '#888888',
+                                        fontSize: 10,
+                                    }}
+                                >
+                                    DISTANCIA
+                                </Text>
+
+                                <Text
+                                    style={{
+                                        color: '#FFFFFF',
+                                        fontSize: 21,
+                                        fontWeight: '900',
+                                        marginTop: 4,
+                                    }}
+                                >
+                                    {formatDistance(
+                                        distanceMeters
+                                    )}
+                                </Text>
+                            </View>
+
+                            <View
+                                style={{
+                                    flex: 1,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: '#888888',
+                                        fontSize: 10,
+                                    }}
+                                >
+                                    VELOCIDAD
+                                </Text>
+
+                                <Text
+                                    style={{
+                                        color: '#FFFFFF',
+                                        fontSize: 21,
+                                        fontWeight: '900',
+                                        marginTop: 4,
+                                    }}
+                                >
+                                    {formatSpeed(
+                                        currentSpeedMps
+                                    )}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <View
+                            style={{
+                                marginTop: 22,
                                 alignItems: 'center',
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color: '#888888',
+                                    fontSize: 10,
+                                }}
+                            >
+                                RITMO
+                            </Text>
+
+                            <Text
+                                style={{
+                                    color: COLORS.primary,
+                                    fontSize: 22,
+                                    fontWeight: '900',
+                                    marginTop: 4,
+                                }}
+                            >
+                                {formatPace(
+                                    distanceMeters,
+                                    elapsedSeconds
+                                )}
+                            </Text>
+                        </View>
+
+                        <Text
+                            style={{
+                                color: '#888888',
+                                fontSize: 12,
+                                marginTop: 7,
+                            }}
+                        >
+                            Carrera en curso
+                        </Text>
+
+                        <View
+                            style={{
+                                marginTop: 24,
+                                paddingHorizontal: 14,
+                                paddingVertical: 8,
+                                borderRadius: 999,
+                                backgroundColor:
+                                    wakeLockActive
+                                        ? '#162000'
+                                        : '#251111',
                             }}
                         >
                             <Text
                                 style={{
                                     color:
-                                        isPaused
-                                            ? '#111111'
-                                            : '#FFFFFF',
+                                        wakeLockActive
+                                            ? COLORS.primary
+                                            : '#FF7777',
 
+                                    fontSize: 11,
                                     fontWeight: '800',
-                                    fontSize: 12,
                                 }}
                             >
-                                {isPaused
-                                    ? 'Reanudar'
-                                    : 'Pausar'}
+                                {wakeLockActive
+                                    ? '● Pantalla protegida'
+                                    : '● Wake Lock inactivo'}
+                            </Text>
+                        </View>
+
+                        {wakeLockMessage && (
+                            <Text
+                                style={{
+                                    color: '#FF9999',
+                                    fontSize: 10,
+                                    textAlign: 'center',
+                                    marginTop: 10,
+                                }}
+                            >
+                                {wakeLockMessage}
+                            </Text>
+                        )}
+
+                        <Pressable
+                            onPressIn={
+                                startUnlockHold
+                            }
+                            onPressOut={
+                                cancelUnlockHold
+                            }
+                            style={{
+                                marginTop: 50,
+                                width: '100%',
+                                maxWidth: 300,
+
+                                borderWidth: 1,
+                                borderColor:
+                                    unlockHolding
+                                        ? COLORS.primary
+                                        : '#333333',
+
+                                backgroundColor:
+                                    unlockHolding
+                                        ? '#182300'
+                                        : '#111111',
+
+                                borderRadius: 22,
+                                paddingVertical: 22,
+                                paddingHorizontal: 20,
+                                alignItems: 'center',
+
+                                // WEB: impedir selección durante pulsación larga
+                                userSelect: 'none',
+
+                                // Safari/iPhone
+                                WebkitUserSelect: 'none',
+                                WebkitTouchCallout: 'none',
+                            } as any}
+                        >
+                            <Text
+                                selectable={false}
+                                pointerEvents="none"
+                                style={{
+                                    color:
+                                        unlockHolding
+                                            ? COLORS.primary
+                                            : '#FFFFFF',
+
+                                    fontSize: 15,
+                                    fontWeight: '800',
+                                    textAlign: 'center',
+                                    userSelect: 'none',
+                                }}
+                            >
+                                {unlockHolding
+                                    ? 'Seguí presionando...'
+                                    : 'Mantener presionado'}
+                            </Text>
+
+                            <Text
+                                selectable={false}
+                                pointerEvents="none"
+                                style={{
+                                    color: '#888888',
+                                    fontSize: 11,
+                                    marginTop: 5,
+                                    userSelect: 'none',
+                                }}
+                            >
+                                5 segundos para desbloquear
                             </Text>
                         </Pressable>
-                    )}
-                    <Pressable
-                        onPress={
-                            isRunning
-                                ? finishRun
-                                : startRun
-                        }
-                        disabled={
-                            !isRunning &&
-                            !canStartRun
-                        }
+
+                        <Text
+                            style={{
+                                color: '#555555',
+                                fontSize: 10,
+                                textAlign: 'center',
+                                marginTop: 30,
+                                lineHeight: 15,
+                            }}
+                        >
+                            No uses el botón lateral del teléfono durante la carrera.
+                        </Text>
+                    </View>
+                )}
+                <Modal
+                    visible={historyVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => {
+                        setHistoryVisible(false);
+                        setSelectedHistorySession(
+                            null
+                        );
+                    }}
+                >
+                    <View
                         style={{
                             flex: 1,
                             backgroundColor:
-                                isRunning
-                                    ? '#444444'
-                                    : COLORS.primary,
-                            paddingVertical: 13,
-                            borderRadius: 14,
+                                'rgba(0,0,0,0.78)',
+                            justifyContent: 'center',
                             alignItems: 'center',
-                            opacity:
-                                isRunning || canStartRun
-                                    ? 1
-                                    : 0.5,
-                        }}
-                    >
-                        <Text
-                            style={{
-                                color:
-                                    isRunning
-                                        ? '#FFFFFF'
-                                        : '#111111',
-                                fontWeight: '800',
-                            }}
-                        >
-                            {isRunning
-                                ? 'Finalizar'
-                                : canStartRun
-                                    ? 'Iniciar'
-                                    : 'Esperando GPS'}
-                        </Text>
-                    </Pressable>
-                </View>
-            </View>
-
-            {screenLockMode && (
-                <View
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-
-                        backgroundColor: '#000000',
-
-                        alignItems: 'center',
-                        justifyContent: 'center',
-
-                        zIndex: 9999,
-                        elevation: 9999,
-
-                        padding: 30,
-                    }}
-                >
-                    <Text
-                        style={{
-                            color: COLORS.primary,
-                            fontSize: 14,
-                            fontWeight: '900',
-                            marginBottom: 30,
-                            letterSpacing: 1,
-                        }}
-                    >
-                        MARDEL FITNESS
-                    </Text>
-
-                    <Text
-                        style={{
-                            fontSize: 38,
-                            marginBottom: 14,
-                        }}
-                    >
-                        🔒
-                    </Text>
-
-                    <Text
-                        style={{
-                            color: '#FFFFFF',
-                            fontSize: 36,
-                            fontWeight: '900',
-                        }}
-                    >
-                        {formatDuration(
-                            elapsedSeconds
-                        )}
-                    </Text>
-
-                    <Text
-                        style={{
-                            color: '#777777',
-                            fontSize: 11,
-                            marginTop: 3,
-                        }}
-                    >
-                        TIEMPO
-                    </Text>
-
-                    <View
-                        style={{
-                            width: '100%',
-                            maxWidth: 330,
-
-                            flexDirection: 'row',
-
-                            marginTop: 28,
+                            padding: 18,
                         }}
                     >
                         <View
                             style={{
-                                flex: 1,
-                                alignItems: 'center',
+                                width: '100%',
+                                maxWidth: 420,
+                                maxHeight: '85%',
+                                backgroundColor:
+                                    '#101010',
+                                borderRadius: 24,
+                                borderWidth: 1,
+                                borderColor:
+                                    COLORS.primary,
+                                padding: 16,
                             }}
                         >
-                            <Text
+                            <View
                                 style={{
-                                    color: '#888888',
-                                    fontSize: 10,
-                                }}
-                            >
-                                DISTANCIA
-                            </Text>
-
-                            <Text
-                                style={{
-                                    color: '#FFFFFF',
-                                    fontSize: 21,
-                                    fontWeight: '900',
-                                    marginTop: 4,
-                                }}
-                            >
-                                {formatDistance(
-                                    distanceMeters
-                                )}
-                            </Text>
-                        </View>
-
-                        <View
-                            style={{
-                                flex: 1,
-                                alignItems: 'center',
-                            }}
-                        >
-                            <Text
-                                style={{
-                                    color: '#888888',
-                                    fontSize: 10,
-                                }}
-                            >
-                                VELOCIDAD
-                            </Text>
-
-                            <Text
-                                style={{
-                                    color: '#FFFFFF',
-                                    fontSize: 21,
-                                    fontWeight: '900',
-                                    marginTop: 4,
-                                }}
-                            >
-                                {formatSpeed(
-                                    currentSpeedMps
-                                )}
-                            </Text>
-                        </View>
-                    </View>
-
-                    <View
-                        style={{
-                            marginTop: 22,
-                            alignItems: 'center',
-                        }}
-                    >
-                        <Text
-                            style={{
-                                color: '#888888',
-                                fontSize: 10,
-                            }}
-                        >
-                            RITMO
-                        </Text>
-
-                        <Text
-                            style={{
-                                color: COLORS.primary,
-                                fontSize: 22,
-                                fontWeight: '900',
-                                marginTop: 4,
-                            }}
-                        >
-                            {formatPace(
-                                distanceMeters,
-                                elapsedSeconds
-                            )}
-                        </Text>
-                    </View>
-
-                    <Text
-                        style={{
-                            color: '#888888',
-                            fontSize: 12,
-                            marginTop: 7,
-                        }}
-                    >
-                        Carrera en curso
-                    </Text>
-
-                    <View
-                        style={{
-                            marginTop: 24,
-                            paddingHorizontal: 14,
-                            paddingVertical: 8,
-                            borderRadius: 999,
-                            backgroundColor:
-                                wakeLockActive
-                                    ? '#162000'
-                                    : '#251111',
-                        }}
-                    >
-                        <Text
-                            style={{
-                                color:
-                                    wakeLockActive
-                                        ? COLORS.primary
-                                        : '#FF7777',
-
-                                fontSize: 11,
-                                fontWeight: '800',
-                            }}
-                        >
-                            {wakeLockActive
-                                ? '● Pantalla protegida'
-                                : '● Wake Lock inactivo'}
-                        </Text>
-                    </View>
-
-                    {wakeLockMessage && (
-                        <Text
-                            style={{
-                                color: '#FF9999',
-                                fontSize: 10,
-                                textAlign: 'center',
-                                marginTop: 10,
-                            }}
-                        >
-                            {wakeLockMessage}
-                        </Text>
-                    )}
-
-                    <Pressable
-                        onPressIn={
-                            startUnlockHold
-                        }
-                        onPressOut={
-                            cancelUnlockHold
-                        }
-                        style={{
-                            marginTop: 50,
-                            width: '100%',
-                            maxWidth: 300,
-
-                            borderWidth: 1,
-                            borderColor:
-                                unlockHolding
-                                    ? COLORS.primary
-                                    : '#333333',
-
-                            backgroundColor:
-                                unlockHolding
-                                    ? '#182300'
-                                    : '#111111',
-
-                            borderRadius: 22,
-                            paddingVertical: 22,
-                            paddingHorizontal: 20,
-                            alignItems: 'center',
-
-                            // WEB: impedir selección durante pulsación larga
-                            userSelect: 'none',
-
-                            // Safari/iPhone
-                            WebkitUserSelect: 'none',
-                            WebkitTouchCallout: 'none',
-                        } as any}
-                    >
-                        <Text
-                            selectable={false}
-                            pointerEvents="none"
-                            style={{
-                                color:
-                                    unlockHolding
-                                        ? COLORS.primary
-                                        : '#FFFFFF',
-
-                                fontSize: 15,
-                                fontWeight: '800',
-                                textAlign: 'center',
-                                userSelect: 'none',
-                            }}
-                        >
-                            {unlockHolding
-                                ? 'Seguí presionando...'
-                                : 'Mantener presionado'}
-                        </Text>
-
-                        <Text
-                            selectable={false}
-                            pointerEvents="none"
-                            style={{
-                                color: '#888888',
-                                fontSize: 11,
-                                marginTop: 5,
-                                userSelect: 'none',
-                            }}
-                        >
-                            5 segundos para desbloquear
-                        </Text>
-                    </Pressable>
-
-                    <Text
-                        style={{
-                            color: '#555555',
-                            fontSize: 10,
-                            textAlign: 'center',
-                            marginTop: 30,
-                            lineHeight: 15,
-                        }}
-                    >
-                        No uses el botón lateral del teléfono durante la carrera.
-                    </Text>
-                </View>
-            )}
-            <Modal
-                visible={historyVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => {
-                    setHistoryVisible(false);
-                    setSelectedHistorySession(
-                        null
-                    );
-                }}
-            >
-                <View
-                    style={{
-                        flex: 1,
-                        backgroundColor:
-                            'rgba(0,0,0,0.78)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        padding: 18,
-                    }}
-                >
-                    <View
-                        style={{
-                            width: '100%',
-                            maxWidth: 420,
-                            maxHeight: '85%',
-                            backgroundColor:
-                                '#101010',
-                            borderRadius: 24,
-                            borderWidth: 1,
-                            borderColor:
-                                COLORS.primary,
-                            padding: 16,
-                        }}
-                    >
-                        <View
-                            style={{
-                                flexDirection: 'row',
-                                justifyContent:
-                                    'space-between',
-                                alignItems: 'center',
-                                marginBottom: 12,
-                            }}
-                        >
-                            <Text
-                                style={{
-                                    color: '#FFFFFF',
-                                    fontSize: 18,
-                                    fontWeight: '900',
-                                }}
-                            >
-                                {selectedHistorySession
-                                    ? 'Detalle de carrera'
-                                    : 'Historial'}
-                            </Text>
-
-                            <Pressable
-                                onPress={() => {
-                                    if (
-                                        selectedHistorySession
-                                    ) {
-                                        setSelectedHistorySession(
-                                            null
-                                        );
-                                    } else {
-                                        setHistoryVisible(
-                                            false
-                                        );
-                                    }
+                                    flexDirection: 'row',
+                                    justifyContent:
+                                        'space-between',
+                                    alignItems: 'center',
+                                    marginBottom: 12,
                                 }}
                             >
                                 <Text
                                     style={{
-                                        color:
-                                            COLORS.primary,
-                                        fontWeight:
-                                            '900',
+                                        color: '#FFFFFF',
+                                        fontSize: 18,
+                                        fontWeight: '900',
                                     }}
                                 >
                                     {selectedHistorySession
-                                        ? 'Volver'
-                                        : 'Cerrar'}
+                                        ? 'Detalle de carrera'
+                                        : 'Últimas carreras'}
                                 </Text>
-                            </Pressable>
-                        </View>
 
-                        {!selectedHistorySession ? (
-                            <ScrollView
-                                showsVerticalScrollIndicator={
-                                    false
-                                }
-                            >
-                                {runHistory.length ===
-                                    0 ? (
+                                <Pressable
+                                    onPress={() => {
+                                        if (
+                                            selectedHistorySession
+                                        ) {
+                                            setSelectedHistorySession(
+                                                null
+                                            );
+                                        } else {
+                                            setHistoryVisible(
+                                                false
+                                            );
+                                        }
+                                    }}
+                                >
                                     <Text
                                         style={{
                                             color:
-                                                '#999999',
-                                            textAlign:
-                                                'center',
-                                            paddingVertical:
-                                                30,
+                                                COLORS.primary,
+                                            fontWeight:
+                                                '900',
                                         }}
                                     >
-                                        Todavía no hay
-                                        carreras guardadas.
+                                        {selectedHistorySession
+                                            ? 'Volver'
+                                            : 'Cerrar'}
                                     </Text>
-                                ) : (
-                                    runHistory.map(
-                                        (session) => (
-                                            <Pressable
-                                                key={
-                                                    session.id
-                                                }
-                                                onPress={() =>
-                                                    setSelectedHistorySession(
-                                                        session
-                                                    )
-                                                }
-                                                style={{
-                                                    backgroundColor:
-                                                        '#181818',
-                                                    borderWidth:
-                                                        1,
-                                                    borderColor:
-                                                        '#303030',
-                                                    borderRadius:
-                                                        16,
-                                                    padding: 12,
-                                                    marginBottom:
-                                                        9,
-                                                }}
-                                            >
-                                                <Text
-                                                    style={{
-                                                        color:
-                                                            '#FFFFFF',
-                                                        fontWeight:
-                                                            '800',
-                                                    }}
-                                                >
-                                                    {formatSessionDate(
-                                                        session.startedAt
-                                                    )}
-                                                    {' · '}
-                                                    {formatSessionTime(
-                                                        session.startedAt
-                                                    )}
-                                                </Text>
+                                </Pressable>
+                            </View>
 
-                                                <Text
-                                                    style={{
-                                                        color:
-                                                            COLORS.primary,
-                                                        marginTop:
-                                                            5,
-                                                        fontWeight:
-                                                            '800',
-                                                    }}
-                                                >
-                                                    {formatDistance(
-                                                        session.distanceMeters
-                                                    )}
-                                                    {' · '}
-                                                    {formatDuration(
-                                                        session.durationSeconds
-                                                    )}
-                                                </Text>
-                                            </Pressable>
-                                        )
-                                    )
-                                )}
-                            </ScrollView>
-                        ) : (
-                            <ScrollView
-                                showsVerticalScrollIndicator={
-                                    false
-                                }
-                            >
-                                <HistorySessionMapPreview
-                                    session={
-                                        selectedHistorySession
+                            {!selectedHistorySession ? (
+                                <ScrollView
+                                    showsVerticalScrollIndicator={
+                                        false
                                     }
-                                />
-
-                                <View
-                                    style={{
-                                        flexDirection:
-                                            'row',
-                                        flexWrap:
-                                            'wrap',
-                                        marginTop: 14,
-                                        gap: 10,
-                                    }}
                                 >
-                                    <HistoryMetric
-                                        label="Distancia"
-                                        value={formatDistance(
-                                            selectedHistorySession.distanceMeters
-                                        )}
-                                    />
+                                    {runHistory.length ===
+                                        0 ? (
+                                        <Text
+                                            style={{
+                                                color:
+                                                    '#999999',
+                                                textAlign:
+                                                    'center',
+                                                paddingVertical:
+                                                    30,
+                                            }}
+                                        >
+                                            Todavía no hay
+                                            carreras guardadas.
+                                        </Text>
+                                    ) : (
+                                        runHistory
+                                            .slice(0, 10)
+                                            .map(
+                                                (session) => (
+                                                    <Pressable
+                                                        key={
+                                                            session.id
+                                                        }
+                                                        onPress={() =>
+                                                            setSelectedHistorySession(
+                                                                session
+                                                            )
+                                                        }
+                                                        style={{
+                                                            backgroundColor:
+                                                                '#181818',
+                                                            borderWidth:
+                                                                1,
+                                                            borderColor:
+                                                                '#303030',
+                                                            borderRadius:
+                                                                16,
+                                                            padding: 12,
+                                                            marginBottom:
+                                                                9,
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    '#FFFFFF',
+                                                                fontWeight:
+                                                                    '800',
+                                                            }}
+                                                        >
+                                                            {formatSessionDate(
+                                                                session.startedAt
+                                                            )}
+                                                            {' · '}
+                                                            {formatSessionTime(
+                                                                session.startedAt
+                                                            )}
+                                                        </Text>
 
-                                    <HistoryMetric
-                                        label="Tiempo"
-                                        value={formatDuration(
-                                            selectedHistorySession.durationSeconds
-                                        )}
-                                    />
-
-                                    <HistoryMetric
-                                        label="Ritmo"
-                                        value={
-                                            selectedHistorySession.avgPaceSecPerKm !=
-                                                null
-                                                ? formatPace(
-                                                    selectedHistorySession.distanceMeters,
-                                                    selectedHistorySession.durationSeconds
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    COLORS.primary,
+                                                                marginTop:
+                                                                    5,
+                                                                fontWeight:
+                                                                    '800',
+                                                            }}
+                                                        >
+                                                            {formatDistance(
+                                                                session.distanceMeters
+                                                            )}
+                                                            {' · '}
+                                                            {formatDuration(
+                                                                session.durationSeconds
+                                                            )}
+                                                        </Text>
+                                                    </Pressable>
                                                 )
-                                                : '--'
+                                            )
+                                    )}
+                                </ScrollView>
+                            ) : (
+                                <ScrollView
+                                    showsVerticalScrollIndicator={
+                                        false
+                                    }
+                                >
+                                    <HistorySessionMapPreview
+                                        session={
+                                            selectedHistorySession
                                         }
                                     />
 
-                                    <HistoryMetric
-                                        label="Vel. máx."
-                                        value={formatSpeed(
-                                            selectedHistorySession.maxSpeedMps
-                                        )}
-                                    />
-                                </View>
-                            </ScrollView>
-                        )}
+                                    <View
+                                        style={{
+                                            flexDirection:
+                                                'row',
+                                            flexWrap:
+                                                'wrap',
+                                            marginTop: 14,
+                                            gap: 10,
+                                        }}
+                                    >
+                                        <HistoryMetric
+                                            label="Distancia"
+                                            value={formatDistance(
+                                                selectedHistorySession.distanceMeters
+                                            )}
+                                        />
+
+                                        <HistoryMetric
+                                            label="Tiempo"
+                                            value={formatDuration(
+                                                selectedHistorySession.durationSeconds
+                                            )}
+                                        />
+
+                                        <HistoryMetric
+                                            label="Ritmo"
+                                            value={
+                                                selectedHistorySession.avgPaceSecPerKm !=
+                                                    null
+                                                    ? formatPace(
+                                                        selectedHistorySession.distanceMeters,
+                                                        selectedHistorySession.durationSeconds
+                                                    )
+                                                    : '--'
+                                            }
+                                        />
+
+                                        <HistoryMetric
+                                            label="Vel. máx."
+                                            value={formatSpeed(
+                                                selectedHistorySession.maxSpeedMps
+                                            )}
+                                        />
+                                    </View>
+                                </ScrollView>
+                            )}
+                        </View>
                     </View>
-                </View>
-            </Modal>
+                </Modal>
+            </View>
         </SafeAreaView>
     );
 }

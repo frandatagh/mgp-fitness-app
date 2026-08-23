@@ -16,18 +16,37 @@ type RunPoint = {
     segmentId?: number;
 };
 
+type MapPoint = {
+    latitude: number;
+    longitude: number;
+};
+
 type Props = {
     currentPosition: RunPoint;
     routePoints?: RunPoint[];
+
     shouldFollowUser?: boolean;
     zoomLevel?: number;
+
     profileImageUrl?: string | null;
+
     recenterTick?: number;
 
-    onMapPress?: (point: {
-        latitude: number;
-        longitude: number;
-    }) => void;
+    onMapPress?: (
+        point: MapPoint
+    ) => void;
+
+    pendingFinishPoint?:
+    | MapPoint
+    | null;
+
+    finishPoint?:
+    | MapPoint
+    | null;
+
+    plannedRouteGeometry?:
+    | any
+    | null;
 };
 
 function buildRouteGeoJson(
@@ -87,6 +106,28 @@ function buildRouteGeoJson(
     };
 }
 
+function buildPlannedRouteGeoJson(
+    geometry: any
+) {
+    if (
+        !geometry ||
+        geometry.type !==
+        'LineString'
+    ) {
+        return {
+            type:
+                'FeatureCollection',
+            features: [],
+        };
+    }
+
+    return {
+        type: 'Feature',
+        properties: {},
+        geometry,
+    };
+}
+
 const MAP_STYLE =
     'https://tiles.openfreemap.org/styles/positron';
 
@@ -99,6 +140,11 @@ const LiveRunMapWeb = forwardRef<any, Props>(
             zoomLevel = 16,
             recenterTick = 0,
             onMapPress,
+
+            pendingFinishPoint = null,
+            finishPoint = null,
+
+            plannedRouteGeometry = null,
         },
         ref
     ) => {
@@ -114,6 +160,199 @@ const LiveRunMapWeb = forwardRef<any, Props>(
                 routePoints;
         }, [routePoints]);
 
+        const onMapPressRef =
+            useRef(onMapPress);
+
+        useEffect(() => {
+            onMapPressRef.current =
+                onMapPress;
+        }, [onMapPress]);
+
+        const pendingFinishMarkerRef =
+            useRef<MapLibreMarker | null>(
+                null
+            );
+
+        const finishMarkerRef =
+            useRef<MapLibreMarker | null>(
+                null
+            );
+
+        const createFinishMarkerElement =
+            (confirmed: boolean) => {
+                const element =
+                    document.createElement(
+                        'div'
+                    );
+
+                element.innerHTML = '🏁';
+
+                element.style.width =
+                    confirmed
+                        ? '34px'
+                        : '38px';
+
+                element.style.height =
+                    confirmed
+                        ? '34px'
+                        : '38px';
+
+                element.style.borderRadius =
+                    '50%';
+
+                element.style.display =
+                    'flex';
+
+                element.style.alignItems =
+                    'center';
+
+                element.style.justifyContent =
+                    'center';
+
+                element.style.fontSize =
+                    confirmed
+                        ? '17px'
+                        : '20px';
+
+                element.style.backgroundColor =
+                    '#111111';
+
+                element.style.border =
+                    `2px solid #C6FF00`;
+
+                element.style.boxShadow =
+                    '0 2px 10px rgba(0,0,0,0.45)';
+
+                return element;
+            };
+        useEffect(() => {
+            pendingFinishMarkerRef.current
+                ?.remove();
+
+            pendingFinishMarkerRef.current =
+                null;
+
+            if (
+                !pendingFinishPoint ||
+                !mapRef.current
+            ) {
+                return;
+            }
+
+            let cancelled = false;
+
+            void import(
+                'maplibre-gl'
+            ).then((module) => {
+                if (
+                    cancelled ||
+                    !mapRef.current
+                ) {
+                    return;
+                }
+
+                const maplibregl =
+                    (
+                        module.default ??
+                        module
+                    ) as typeof module;
+
+                const marker =
+                    new maplibregl.Marker({
+                        element:
+                            createFinishMarkerElement(
+                                false
+                            ),
+                    })
+                        .setLngLat([
+                            pendingFinishPoint.longitude,
+                            pendingFinishPoint.latitude,
+                        ])
+                        .addTo(
+                            mapRef.current
+                        );
+
+                pendingFinishMarkerRef.current =
+                    marker;
+            });
+
+            return () => {
+                cancelled = true;
+
+                pendingFinishMarkerRef.current
+                    ?.remove();
+
+                pendingFinishMarkerRef.current =
+                    null;
+            };
+        }, [
+            pendingFinishPoint?.latitude,
+            pendingFinishPoint?.longitude,
+        ]);
+        useEffect(() => {
+            finishMarkerRef.current
+                ?.remove();
+
+            finishMarkerRef.current =
+                null;
+
+            if (
+                !finishPoint ||
+                !mapRef.current
+            ) {
+                return;
+            }
+
+            let cancelled = false;
+
+            void import(
+                'maplibre-gl'
+            ).then((module) => {
+                if (
+                    cancelled ||
+                    !mapRef.current
+                ) {
+                    return;
+                }
+
+                const maplibregl =
+                    (
+                        module.default ??
+                        module
+                    ) as typeof module;
+
+                const marker =
+                    new maplibregl.Marker({
+                        element:
+                            createFinishMarkerElement(
+                                true
+                            ),
+                    })
+                        .setLngLat([
+                            finishPoint.longitude,
+                            finishPoint.latitude,
+                        ])
+                        .addTo(
+                            mapRef.current
+                        );
+
+                finishMarkerRef.current =
+                    marker;
+            });
+
+            return () => {
+                cancelled = true;
+
+                finishMarkerRef.current
+                    ?.remove();
+
+                finishMarkerRef.current =
+                    null;
+            };
+        }, [
+            finishPoint?.latitude,
+            finishPoint?.longitude,
+        ]);
         /*
          * 1. Crear mapa solamente una vez.
          *
@@ -145,6 +384,57 @@ const LiveRunMapWeb = forwardRef<any, Props>(
                 localMap = map;
                 mapRef.current = map;
                 map.on('load', () => {
+                    if (
+                        !map.getSource(
+                            'planned-route'
+                        )
+                    ) {
+                        map.addSource(
+                            'planned-route',
+                            {
+                                type: 'geojson',
+
+                                data:
+                                    buildPlannedRouteGeoJson(
+                                        null
+                                    ) as any,
+                            }
+                        );
+                    }
+
+                    if (
+                        !map.getLayer(
+                            'planned-route-line'
+                        )
+                    ) {
+                        map.addLayer({
+                            id:
+                                'planned-route-line',
+
+                            type: 'line',
+
+                            source:
+                                'planned-route',
+
+                            layout: {
+                                'line-cap':
+                                    'round',
+
+                                'line-join':
+                                    'round',
+                            },
+
+                            paint: {
+                                'line-color':
+                                    '#3A3A3A',
+
+                                'line-width': 5,
+
+                                'line-opacity':
+                                    0.95,
+                            },
+                        });
+                    }
                     if (!map.getSource('run-route')) {
                         map.addSource('run-route', {
                             type: 'geojson',
@@ -230,9 +520,11 @@ const LiveRunMapWeb = forwardRef<any, Props>(
                  * para el futuro punto de llegada.
                  */
                 map.on('click', (event) => {
-                    onMapPress?.({
-                        latitude: event.lngLat.lat,
-                        longitude: event.lngLat.lng,
+                    onMapPressRef.current?.({
+                        latitude:
+                            event.lngLat.lat,
+                        longitude:
+                            event.lngLat.lng,
                     });
                 });
 
@@ -259,6 +551,43 @@ const LiveRunMapWeb = forwardRef<any, Props>(
          * 2. Cada vez que cambia el GPS,
          * mover el marcador.
          */
+        useEffect(() => {
+            const map =
+                mapRef.current;
+
+            if (!map) return;
+
+            const updatePlannedRoute =
+                () => {
+                    const source =
+                        map.getSource(
+                            'planned-route'
+                        ) as any;
+
+                    if (!source) {
+                        return;
+                    }
+
+                    source.setData(
+                        buildPlannedRouteGeoJson(
+                            plannedRouteGeometry
+                        ) as any
+                    );
+                };
+
+            if (
+                map.isStyleLoaded()
+            ) {
+                updatePlannedRoute();
+            } else {
+                map.once(
+                    'load',
+                    updatePlannedRoute
+                );
+            }
+        }, [
+            plannedRouteGeometry,
+        ]);
         useEffect(() => {
             if (!currentPosition) return;
 

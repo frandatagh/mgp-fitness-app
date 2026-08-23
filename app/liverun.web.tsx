@@ -20,14 +20,17 @@ import {
 import {
     createRunSession,
     getMyRunSessions,
+    deleteRunSession,
+    rateRunSession,
     type RunSession,
 } from '../lib/runSessions';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
+import { getWalkingRoute } from '../lib/routing';
 import { COLORS } from '../constants/colors';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import LiveRunMap from '../components/LiveRunMap.web';
 import AppHeader from '@/components/AppHeader';
 
@@ -50,6 +53,8 @@ const MAX_START_ACCURACY_METERS =
 
 const MAX_ROUTE_ACCURACY_METERS =
     IS_LOCAL_DEV ? 90000 : 35;
+
+
 
 function haversineDistanceMeters(a: RunPoint, b: RunPoint) {
     const toRad = (value: number) => (value * Math.PI) / 180;
@@ -543,7 +548,7 @@ function HistorySessionMapPreview({
         return (
             <View
                 style={{
-                    height: 200,
+                    height: 180,
                     borderRadius: 18,
                     backgroundColor:
                         '#111111',
@@ -695,6 +700,41 @@ export default function LiveRunWeb() {
     const [savingSession, setSavingSession] =
         useState(false);
 
+    const [summaryVisible, setSummaryVisible] =
+        useState(false);
+
+    const [lastSessionSummary, setLastSessionSummary] =
+        useState<{
+            session: RunSession;
+            gpsBreakCount: number;
+        } | null>(null);
+
+    const [runSessionRating, setRunSessionRating] =
+        useState<number | null>(null);
+
+    const [
+        runSessionRatingLoading,
+        setRunSessionRatingLoading,
+    ] = useState(false);
+
+    const [
+        runSessionRatingSaved,
+        setRunSessionRatingSaved,
+    ] = useState(false);
+
+    const runSessionRatingSavedRef =
+        useRef(false);
+
+    const [
+        confirmDeleteSummary,
+        setConfirmDeleteSummary,
+    ] = useState(false);
+
+    const [
+        deletingSummarySession,
+        setDeletingSummarySession,
+    ] = useState(false);
+
     const [historyVisible, setHistoryVisible] =
         useState(false);
 
@@ -709,6 +749,72 @@ export default function LiveRunWeb() {
         setSelectedHistorySession,
     ] =
         useState<RunSession | null>(null);
+
+    const mapRef = useRef<any>(null);
+
+    const [isSelectingFinishPoint, setIsSelectingFinishPoint] =
+        useState(false);
+
+    const [pendingFinishPoint, setPendingFinishPoint] =
+        useState<{
+            latitude: number;
+            longitude: number;
+        } | null>(null);
+
+    const [finishPoint, setFinishPoint] =
+        useState<{
+            latitude: number;
+            longitude: number;
+        } | null>(null);
+
+    const [showPendingFinishCard, setShowPendingFinishCard] =
+        useState(false);
+
+    const [confirmClearFinishVisible, setConfirmClearFinishVisible] =
+        useState(false);
+
+    const [arrivalModalVisible, setArrivalModalVisible] =
+        useState(false);
+
+    const [routeLoading, setRouteLoading] =
+        useState(false);
+
+    const [plannedRouteGeometry, setPlannedRouteGeometry] =
+        useState<any | null>(null);
+
+    const [
+        plannedRouteDistanceMeters,
+        setPlannedRouteDistanceMeters,
+    ] = useState<number | null>(null);
+
+    const [
+        plannedRouteDurationSeconds,
+        setPlannedRouteDurationSeconds,
+    ] = useState<number | null>(null);
+
+    const [
+        remainingRouteDistanceMeters,
+        setRemainingRouteDistanceMeters,
+    ] = useState<number | null>(null);
+
+    const [
+        remainingRouteDurationSeconds,
+        setRemainingRouteDurationSeconds,
+    ] = useState<number | null>(null);
+
+    const lastRouteRefreshAtRef =
+        useRef(0);
+
+    const lastRouteRefreshPositionRef =
+        useRef<{
+            latitude: number;
+            longitude: number;
+        } | null>(null);
+
+    const arrivalHandledRef =
+        useRef(false);
+
+    const routeRequestInFlightRef = useRef(false);
 
     const requestScreenWakeLock = async () => {
         if (typeof navigator === 'undefined') {
@@ -1282,6 +1388,85 @@ export default function LiveRunWeb() {
         };
     }, []);
 
+    const fetchRoute = async (
+
+        from: {
+            latitude: number;
+            longitude: number;
+        },
+        to: {
+            latitude: number;
+            longitude: number;
+        }
+    ) => {
+        try {
+            if (routeRequestInFlightRef.current) return;
+
+            routeRequestInFlightRef.current = true;
+            setRouteLoading(true);
+
+            const data =
+                await getWalkingRoute(
+                    {
+                        lat: from.latitude,
+                        lng: from.longitude,
+                    },
+                    {
+                        lat: to.latitude,
+                        lng: to.longitude,
+                    }
+                );
+
+            setPlannedRouteGeometry(
+                data.geometry
+            );
+
+            setPlannedRouteDistanceMeters(
+                data.distance ?? null
+            );
+
+            setPlannedRouteDurationSeconds(
+                data.duration ?? null
+            );
+
+            setRemainingRouteDistanceMeters(
+                data.distance ?? null
+            );
+
+            setRemainingRouteDurationSeconds(
+                data.duration ?? null
+            );
+
+            lastRouteRefreshAtRef.current =
+                Date.now();
+
+            lastRouteRefreshPositionRef.current = {
+                latitude: from.latitude,
+                longitude: from.longitude,
+            };
+        } catch (error) {
+            console.error(
+                'Error obteniendo ruta:',
+                error
+            );
+
+            setPlannedRouteGeometry(null);
+            setPlannedRouteDistanceMeters(null);
+            setPlannedRouteDurationSeconds(null);
+            setRemainingRouteDistanceMeters(null);
+            setRemainingRouteDurationSeconds(null);
+
+            Alert.alert(
+                'Ruta no disponible',
+                'No se pudo calcular una ruta hasta ese punto.'
+            );
+        } finally {
+            setRouteLoading(false);
+            routeRequestInFlightRef.current = false;
+            setRouteLoading(false);
+        }
+    };
+
     const startRun = () => {
         if (!currentPosition) return;
 
@@ -1401,6 +1586,66 @@ export default function LiveRunWeb() {
         setIsPaused(false);
     };
 
+    const handleRateLastRunSession =
+        async (rating: number) => {
+            if (
+                runSessionRatingLoading ||
+                runSessionRatingSaved
+            ) {
+                return;
+            }
+
+            const session =
+                lastSessionSummary?.session;
+
+            if (!session?.id) {
+                return;
+            }
+
+            try {
+                setRunSessionRating(rating);
+                setRunSessionRatingLoading(true);
+
+                await rateRunSession(
+                    session.id,
+                    rating
+                );
+
+                runSessionRatingSavedRef.current =
+                    true;
+
+                setRunSessionRatingSaved(true);
+            } catch (error) {
+                console.error(
+                    'Error guardando valoración:',
+                    error
+                );
+
+                Alert.alert(
+                    'Error',
+                    'No se pudo guardar la valoración.'
+                );
+            } finally {
+                setRunSessionRatingLoading(false);
+            }
+        };
+
+    const ensureRunSessionRatingBeforeClose =
+        async () => {
+            if (
+                runSessionRatingSavedRef.current
+            ) {
+                return;
+            }
+
+            /*
+             * Igual que en mobile:
+             * si no eligió una valoración,
+             * usamos 6 como valor neutral.
+             */
+            await handleRateLastRunSession(6);
+        };
+
     const finishRun = async () => {
         if (
             !isRunningRef.current ||
@@ -1519,23 +1764,41 @@ export default function LiveRunWeb() {
              * Actualizamos también el historial
              * local inmediatamente.
              */
-            if (created?.item) {
-                setRunHistory(
-                    (current) => [
-                        created.item,
-                        ...current.filter(
-                            (session) =>
-                                session.id !==
-                                created.item.id
-                        ),
-                    ]
+            if (!created?.item) {
+                throw new Error(
+                    'El servidor no devolvió la sesión creada.'
                 );
             }
 
-            Alert.alert(
-                'Sesión guardada',
-                'La carrera fue guardada correctamente.'
+            setRunHistory(
+                (current) => [
+                    created.item,
+                    ...current.filter(
+                        (session) =>
+                            session.id !==
+                            created.item.id
+                    ),
+                ]
             );
+
+            /*
+             * Preparamos el resumen.
+             */
+            setRunSessionRating(null);
+            setRunSessionRatingLoading(false);
+            setRunSessionRatingSaved(false);
+
+            runSessionRatingSavedRef.current =
+                false;
+
+            setConfirmDeleteSummary(false);
+
+            setLastSessionSummary({
+                session: created.item,
+                gpsBreakCount,
+            });
+
+            setSummaryVisible(true);
         } catch (error) {
             console.error(
                 'Error guardando sesión web:',
@@ -1565,6 +1828,7 @@ export default function LiveRunWeb() {
             startedAtMsRef.current =
                 null;
         }
+        clearFinishGoalState();
     };
 
     const resetRun = async () => {
@@ -1629,6 +1893,7 @@ export default function LiveRunWeb() {
         setRecenterTick(
             (current) => current + 1
         );
+        clearFinishGoalState();
     };
 
     const toggleHistory =
@@ -1703,8 +1968,8 @@ export default function LiveRunWeb() {
 
                     height:
                         large
-                            ? 62
-                            : 56,
+                            ? 70
+                            : 65,
 
                     borderRadius: 17,
 
@@ -1722,7 +1987,7 @@ export default function LiveRunWeb() {
                                         ? '#333333'
                                         : '#242424',
 
-                    borderWidth: 1,
+                    borderWidth: 3,
 
                     borderColor:
                         primary
@@ -1743,8 +2008,8 @@ export default function LiveRunWeb() {
                     name={icon}
                     size={
                         large
-                            ? 25
-                            : 21
+                            ? 35
+                            : 29
                     }
                     color={
                         primary
@@ -1765,8 +2030,8 @@ export default function LiveRunWeb() {
                                     ? '#FF9999'
                                     : '#DADADA',
 
-                        fontSize: 8,
-                        fontWeight: '700',
+                        fontSize: 12,
+                        fontWeight: '600',
                         marginTop: 3,
                     }}
                 >
@@ -1845,6 +2110,361 @@ export default function LiveRunWeb() {
         );
     }
 
+    const fitMapToRoute = (
+        from: {
+            latitude: number;
+            longitude: number;
+        },
+        to: {
+            latitude: number;
+            longitude: number;
+        }
+    ) => {
+        if (!mapRef.current) return;
+
+        const north =
+            Math.max(
+                from.latitude,
+                to.latitude
+            );
+
+        const south =
+            Math.min(
+                from.latitude,
+                to.latitude
+            );
+
+        const east =
+            Math.max(
+                from.longitude,
+                to.longitude
+            );
+
+        const west =
+            Math.min(
+                from.longitude,
+                to.longitude
+            );
+
+        mapRef.current.fitBounds(
+            [east, north],
+            [west, south],
+            70,
+            650
+        );
+    };
+
+    const handleToggleFinishSelection = () => {
+        /*
+         * Si ya existe un destino,
+         * tocar la bandera significa
+         * querer eliminarlo.
+         */
+        if (finishPoint) {
+            setConfirmClearFinishVisible(true);
+            return;
+        }
+
+        const next =
+            !isSelectingFinishPoint;
+
+        setIsSelectingFinishPoint(next);
+
+        if (!next) {
+            setPendingFinishPoint(null);
+            setShowPendingFinishCard(false);
+
+            setPlannedRouteGeometry(null);
+            setPlannedRouteDistanceMeters(null);
+            setPlannedRouteDurationSeconds(null);
+
+            setRemainingRouteDistanceMeters(null);
+            setRemainingRouteDurationSeconds(null);
+        }
+    };
+
+    const handleMapPressForFinishPoint =
+        async (point: {
+            latitude: number;
+            longitude: number;
+        }) => {
+            if (!isSelectingFinishPoint) {
+                return;
+            }
+
+            if (finishPoint) {
+                return;
+            }
+
+            setPendingFinishPoint(point);
+            setShowPendingFinishCard(true);
+
+            if (currentPosition) {
+                await fetchRoute(
+                    currentPosition,
+                    point
+                );
+
+                setTimeout(() => {
+                    fitMapToRoute(
+                        currentPosition,
+                        point
+                    );
+                }, 100);
+            }
+        };
+
+    const handleConfirmFinishPoint = () => {
+        if (
+            !pendingFinishPoint ||
+            !currentPosition
+        ) {
+            return;
+        }
+
+        const confirmedPoint =
+            pendingFinishPoint;
+
+        setFinishPoint(
+            confirmedPoint
+        );
+
+        setPendingFinishPoint(null);
+
+        setShowPendingFinishCard(false);
+
+        setIsSelectingFinishPoint(false);
+
+        arrivalHandledRef.current =
+            false;
+
+        setTimeout(() => {
+            fitMapToRoute(
+                currentPosition,
+                confirmedPoint
+            );
+        }, 100);
+    };
+
+    const handleCancelPendingFinishPoint = () => {
+        setPendingFinishPoint(null);
+
+        setShowPendingFinishCard(false);
+
+        setPlannedRouteGeometry(null);
+        setPlannedRouteDistanceMeters(null);
+        setPlannedRouteDurationSeconds(null);
+
+        setRemainingRouteDistanceMeters(null);
+        setRemainingRouteDurationSeconds(null);
+
+        setTimeout(() => {
+            setRecenterTick(
+                (current) =>
+                    current + 1
+            );
+        }, 100);
+    };
+
+    const clearFinishGoalState = () => {
+        setFinishPoint(null);
+        setPendingFinishPoint(null);
+
+        setShowPendingFinishCard(false);
+        setIsSelectingFinishPoint(false);
+
+        setConfirmClearFinishVisible(false);
+
+        setPlannedRouteGeometry(null);
+
+        setPlannedRouteDistanceMeters(null);
+        setPlannedRouteDurationSeconds(null);
+
+        setRemainingRouteDistanceMeters(null);
+        setRemainingRouteDurationSeconds(null);
+
+        setArrivalModalVisible(false);
+
+        arrivalHandledRef.current =
+            false;
+    };
+
+    const handleConfirmClearFinishPoint = () => {
+        clearFinishGoalState();
+
+        setTimeout(() => {
+            setRecenterTick(
+                (current) =>
+                    current + 1
+            );
+        }, 100);
+    };
+
+    useEffect(() => {
+        if (!isRunning) return;
+        if (isPaused) return;
+        if (!currentPosition) return;
+        if (!finishPoint) return;
+        if (arrivalModalVisible) return;
+
+        const now =
+            Date.now();
+
+        const previousPosition =
+            lastRouteRefreshPositionRef.current;
+
+        const movedEnough =
+            previousPosition
+                ? haversineDistanceMeters(
+                    {
+                        latitude:
+                            previousPosition.latitude,
+                        longitude:
+                            previousPosition.longitude,
+                        timestamp: 0,
+                    },
+                    {
+                        latitude:
+                            currentPosition.latitude,
+                        longitude:
+                            currentPosition.longitude,
+                        timestamp: 0,
+                    }
+                ) >= 35
+                : true;
+
+        const waitedEnough =
+            now -
+            lastRouteRefreshAtRef.current >=
+            20000;
+
+        if (
+            movedEnough ||
+            waitedEnough
+        ) {
+            void fetchRoute(
+                currentPosition,
+                finishPoint
+            );
+        }
+    }, [
+        currentPosition,
+        finishPoint,
+        isRunning,
+        isPaused,
+        arrivalModalVisible,
+    ]);
+
+    useEffect(() => {
+        if (!isRunning) return;
+        if (!finishPoint) return;
+
+        if (
+            arrivalHandledRef.current
+        ) {
+            return;
+        }
+
+        if (
+            remainingRouteDistanceMeters ==
+            null
+        ) {
+            return;
+        }
+
+        if (
+            remainingRouteDistanceMeters <=
+            25
+        ) {
+            arrivalHandledRef.current =
+                true;
+
+            setArrivalModalVisible(
+                true
+            );
+        }
+    }, [
+        remainingRouteDistanceMeters,
+        finishPoint,
+        isRunning,
+    ]);
+
+    const closeSessionSummary =
+        async () => {
+            await ensureRunSessionRatingBeforeClose();
+
+            setSummaryVisible(false);
+            setConfirmDeleteSummary(false);
+
+            setLastSessionSummary(null);
+        };
+
+    const openStatisticsFromSummary =
+        async () => {
+            await ensureRunSessionRatingBeforeClose();
+
+            setSummaryVisible(false);
+            setLastSessionSummary(null);
+
+            router.push('/statistics');
+        };
+
+    const deleteLastCompletedSession =
+        async () => {
+            const session =
+                lastSessionSummary?.session;
+
+            if (
+                !session ||
+                deletingSummarySession
+            ) {
+                return;
+            }
+
+            try {
+                setDeletingSummarySession(true);
+
+                await deleteRunSession(
+                    session.id
+                );
+
+                /*
+                 * La quitamos también del
+                 * historial que ya está en memoria.
+                 */
+                setRunHistory(
+                    (current) =>
+                        current.filter(
+                            (item) =>
+                                item.id !==
+                                session.id
+                        )
+                );
+
+                setSummaryVisible(false);
+                setLastSessionSummary(null);
+                setConfirmDeleteSummary(false);
+
+                /*
+                 * Limpiamos la sesión visual
+                 * que acaba de borrarse.
+                 */
+                await resetRun();
+            } catch (error) {
+                console.error(
+                    'Error borrando sesión:',
+                    error
+                );
+
+                Alert.alert(
+                    'Error',
+                    'No se pudo borrar la sesión.'
+                );
+            } finally {
+                setDeletingSummarySession(false);
+            }
+        };
+
     return (
         <SafeAreaView
             style={{
@@ -1863,7 +2483,7 @@ export default function LiveRunWeb() {
             >
                 {/* Logo */}
 
-                <AppHeader profileGreeting={`A correr`} />
+                <AppHeader profileGreeting={`Mar del Plata`} />
 
                 {/* Mapa */}
 
@@ -1876,7 +2496,7 @@ export default function LiveRunWeb() {
                         borderRadius: 24,
                         marginTop: 15,
                         overflow: 'hidden',
-                        borderWidth: 2,
+                        borderWidth: 3,
                         borderColor: COLORS.primary,
                         backgroundColor: '#111111',
                     }}
@@ -1930,15 +2550,138 @@ export default function LiveRunWeb() {
                         currentPosition && (
                             <>
                                 <LiveRunMap
-                                    currentPosition={currentPosition}
-                                    routePoints={routePoints}
-                                    shouldFollowUser={isRunning &&
-                                        !isPaused}
+                                    ref={mapRef}
+
+                                    currentPosition={
+                                        currentPosition
+                                    }
+
+                                    routePoints={
+                                        routePoints
+                                    }
+
+                                    shouldFollowUser={
+                                        isRunning &&
+                                        !isPaused &&
+                                        !isSelectingFinishPoint &&
+                                        !pendingFinishPoint
+                                    }
+
                                     zoomLevel={16}
-                                    recenterTick={recenterTick}
+
+                                    recenterTick={
+                                        recenterTick
+                                    }
+
+                                    onMapPress={
+                                        handleMapPressForFinishPoint
+                                    }
+
+                                    pendingFinishPoint={
+                                        pendingFinishPoint
+                                    }
+
+                                    finishPoint={
+                                        finishPoint
+                                    }
+
+                                    plannedRouteGeometry={
+                                        plannedRouteGeometry
+                                    }
                                 />
 
 
+                                <Pressable
+                                    onPress={
+                                        handleToggleFinishSelection
+                                    }
+                                    style={({ pressed }) => ({
+                                        position: 'absolute',
+
+                                        right: 14,
+
+                                        // ARRIBA DE LA BRÚJULA
+                                        bottom: 112,
+
+                                        width: 46,
+                                        height: 46,
+                                        borderRadius: 23,
+
+                                        backgroundColor:
+                                            isSelectingFinishPoint ||
+                                                finishPoint
+                                                ? COLORS.primary
+                                                : pressed
+                                                    ? '#333333'
+                                                    : 'rgba(17,17,17,0.92)',
+
+                                        borderWidth: 1,
+                                        borderColor:
+                                            COLORS.primary,
+
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+
+                                        zIndex: 30,
+
+                                        shadowColor: '#000000',
+                                        shadowOpacity: 0.25,
+                                        shadowRadius: 5,
+                                        elevation: 5,
+                                    })}
+                                >
+                                    <View
+                                        style={{
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <FontAwesome6
+                                            name="flag-checkered"
+                                            size={18}
+                                            color={
+                                                isSelectingFinishPoint ||
+                                                    finishPoint
+                                                    ? '#111111'
+                                                    : COLORS.primary
+                                            }
+                                        />
+
+                                        {finishPoint && (
+                                            <View
+                                                style={{
+                                                    position: 'absolute',
+
+                                                    top: -9,
+                                                    right: -10,
+
+                                                    width: 17,
+                                                    height: 17,
+                                                    borderRadius: 9,
+
+                                                    backgroundColor:
+                                                        '#111111',
+
+                                                    borderWidth: 1,
+                                                    borderColor:
+                                                        COLORS.primary,
+
+                                                    alignItems: 'center',
+                                                    justifyContent:
+                                                        'center',
+                                                }}
+                                            >
+                                                <Ionicons
+                                                    name="close"
+                                                    size={11}
+                                                    color={
+                                                        COLORS.primary
+                                                    }
+                                                />
+                                            </View>
+                                        )}
+                                    </View>
+                                </Pressable>
                                 <Pressable
                                     onPress={() =>
                                         setRecenterTick(
@@ -1985,6 +2728,181 @@ export default function LiveRunWeb() {
                                         />
                                     )}
                                 </Pressable>
+                                {pendingFinishPoint &&
+                                    showPendingFinishCard && (
+                                        <View
+                                            style={{
+                                                position: 'absolute',
+
+                                                top: 92,
+                                                left: 30,
+                                                right: 30,
+
+                                                backgroundColor:
+                                                    'rgba(17,17,17,0.96)',
+
+                                                borderWidth: 1,
+                                                borderColor:
+                                                    COLORS.primary,
+
+                                                borderRadius: 16,
+
+                                                padding: 12,
+
+                                                zIndex: 40,
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    color:
+                                                        COLORS.textLight,
+                                                    fontSize: 13,
+                                                    fontWeight: '800',
+                                                    textAlign: 'center',
+                                                }}
+                                            >
+                                                ¿Usar este punto como llegada?
+                                            </Text>
+
+                                            <Text
+                                                style={{
+                                                    color:
+                                                        COLORS.textMuted,
+                                                    fontSize: 11,
+                                                    textAlign: 'center',
+                                                    marginTop: 5,
+                                                }}
+                                            >
+                                                {routeLoading
+                                                    ? 'Calculando ruta...'
+                                                    : plannedRouteDistanceMeters !=
+                                                        null
+                                                        ? `${formatDistance(
+                                                            plannedRouteDistanceMeters
+                                                        )} hasta el destino`
+                                                        : 'Toca confirmar para continuar'}
+                                            </Text>
+
+                                            <View
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    gap: 8,
+                                                    marginTop: 10,
+                                                }}
+                                            >
+                                                <Pressable
+                                                    onPress={
+                                                        handleCancelPendingFinishPoint
+                                                    }
+                                                    style={{
+                                                        flex: 1,
+
+                                                        paddingVertical: 10,
+
+                                                        borderRadius: 12,
+
+                                                        backgroundColor:
+                                                            '#292929',
+
+                                                        alignItems:
+                                                            'center',
+                                                    }}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#FFFFFF',
+                                                            fontWeight:
+                                                                '700',
+                                                        }}
+                                                    >
+                                                        Cancelar
+                                                    </Text>
+                                                </Pressable>
+
+                                                <Pressable
+                                                    onPress={
+                                                        handleConfirmFinishPoint
+                                                    }
+                                                    disabled={
+                                                        routeLoading
+                                                    }
+                                                    style={{
+                                                        flex: 1,
+
+                                                        paddingVertical: 10,
+
+                                                        borderRadius: 12,
+
+                                                        backgroundColor:
+                                                            COLORS.primary,
+
+                                                        alignItems:
+                                                            'center',
+
+                                                        opacity:
+                                                            routeLoading
+                                                                ? 0.5
+                                                                : 1,
+                                                    }}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#111111',
+                                                            fontWeight:
+                                                                '900',
+                                                        }}
+                                                    >
+                                                        Seleccionar
+                                                    </Text>
+                                                </Pressable>
+                                            </View>
+                                        </View>
+                                    )}
+                                {finishPoint &&
+                                    remainingRouteDistanceMeters !=
+                                    null && (
+                                        <View
+                                            pointerEvents="none"
+                                            style={{
+                                                position: 'absolute',
+
+                                                top: 88,
+
+                                                alignSelf: 'center',
+
+                                                backgroundColor:
+                                                    'rgba(17,17,17,0.92)',
+
+                                                borderWidth: 1,
+                                                borderColor:
+                                                    COLORS.primary,
+
+                                                borderRadius: 999,
+
+                                                paddingHorizontal: 14,
+                                                paddingVertical: 7,
+
+                                                zIndex: 25,
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    color:
+                                                        COLORS.textLight,
+                                                    fontSize: 11,
+                                                    fontWeight: '800',
+                                                }}
+                                            >
+                                                🏁{' '}
+                                                {formatDistance(
+                                                    remainingRouteDistanceMeters
+                                                )}{' '}
+                                                restantes
+                                            </Text>
+                                        </View>
+                                    )}
                                 <View
                                     pointerEvents="none"
                                     style={{
@@ -2010,7 +2928,7 @@ export default function LiveRunWeb() {
                                         style={{
                                             color:
                                                 COLORS.textLight,
-                                            fontSize: 12,
+                                            fontSize: 14,
                                             fontWeight: '800',
                                             marginBottom: 8,
                                         }}
@@ -2025,6 +2943,7 @@ export default function LiveRunWeb() {
                                     <View
                                         style={{
                                             flexDirection: 'row',
+
                                         }}
                                     >
                                         <Metric
@@ -2242,7 +3161,7 @@ export default function LiveRunWeb() {
                     {/* 1 — HOME */}
                     <BottomActionButton
                         icon="home-outline"
-                        label="Home"
+                        label="Volver"
                         onPress={() =>
                             router.replace('/home')
                         }
@@ -2297,7 +3216,7 @@ export default function LiveRunWeb() {
                     {!isRunning ? (
                         <BottomActionButton
                             icon="stats-chart-outline"
-                            label="Estadísticas"
+                            label="Métricas"
                             onPress={() =>
                                 router.push('/statistics')
                             }
@@ -2620,192 +3539,565 @@ export default function LiveRunWeb() {
                         </Text>
                     </View>
                 )}
-                <Modal
-                    visible={historyVisible}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={() => {
-                        setHistoryVisible(false);
-                        setSelectedHistorySession(
-                            null
-                        );
+
+            </View>
+            <Modal
+                visible={historyVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => {
+                    setHistoryVisible(false);
+                    setSelectedHistorySession(
+                        null
+                    );
+                }}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor:
+                            'rgba(0,0,0,0.78)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: 18,
                     }}
                 >
                     <View
                         style={{
-                            flex: 1,
+                            width: '100%',
+                            maxWidth: 420,
+                            maxHeight: '85%',
                             backgroundColor:
-                                'rgba(0,0,0,0.78)',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            padding: 18,
+                                '#101010',
+                            borderRadius: 24,
+                            borderWidth: 1,
+                            borderColor:
+                                COLORS.primary,
+                            padding: 16,
                         }}
                     >
                         <View
                             style={{
-                                width: '100%',
-                                maxWidth: 420,
-                                maxHeight: '85%',
-                                backgroundColor:
-                                    '#101010',
-                                borderRadius: 24,
-                                borderWidth: 1,
-                                borderColor:
-                                    COLORS.primary,
-                                padding: 16,
+                                flexDirection: 'row',
+                                justifyContent:
+                                    'space-between',
+                                alignItems: 'center',
+                                marginBottom: 12,
                             }}
                         >
-                            <View
+                            <Text
                                 style={{
-                                    flexDirection: 'row',
-                                    justifyContent:
-                                        'space-between',
+                                    color: '#FFFFFF',
+                                    fontSize: 18,
+                                    fontWeight: '900',
+                                }}
+                            >
+                                {selectedHistorySession
+                                    ? 'Detalle de carrera'
+                                    : 'Últimas carreras'}
+                            </Text>
+
+                            <Pressable
+                                onPress={() => {
+                                    if (
+                                        selectedHistorySession
+                                    ) {
+                                        setSelectedHistorySession(
+                                            null
+                                        );
+                                    } else {
+                                        setHistoryVisible(
+                                            false
+                                        );
+                                    }
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.primary,
+                                        fontWeight:
+                                            '900',
+                                    }}
+                                >
+                                    {selectedHistorySession
+                                        ? 'Volver'
+                                        : 'Cerrar'}
+                                </Text>
+                            </Pressable>
+                        </View>
+
+                        {!selectedHistorySession ? (
+                            <ScrollView
+                                showsVerticalScrollIndicator={
+                                    false
+                                }
+                            >
+                                {runHistory.length ===
+                                    0 ? (
+                                    <Text
+                                        style={{
+                                            color:
+                                                '#999999',
+                                            textAlign:
+                                                'center',
+                                            paddingVertical:
+                                                30,
+                                        }}
+                                    >
+                                        Todavía no hay
+                                        carreras guardadas.
+                                    </Text>
+                                ) : (
+                                    runHistory
+                                        .slice(0, 10)
+                                        .map(
+                                            (session) => (
+                                                <Pressable
+                                                    key={
+                                                        session.id
+                                                    }
+                                                    onPress={() =>
+                                                        setSelectedHistorySession(
+                                                            session
+                                                        )
+                                                    }
+                                                    style={{
+                                                        backgroundColor:
+                                                            '#181818',
+                                                        borderWidth:
+                                                            1,
+                                                        borderColor:
+                                                            '#303030',
+                                                        borderRadius:
+                                                            16,
+                                                        padding: 12,
+                                                        marginBottom:
+                                                            9,
+                                                    }}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#FFFFFF',
+                                                            fontWeight:
+                                                                '800',
+                                                        }}
+                                                    >
+                                                        {formatSessionDate(
+                                                            session.startedAt
+                                                        )}
+                                                        {' · '}
+                                                        {formatSessionTime(
+                                                            session.startedAt
+                                                        )}
+                                                    </Text>
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                COLORS.primary,
+                                                            marginTop:
+                                                                5,
+                                                            fontWeight:
+                                                                '800',
+                                                        }}
+                                                    >
+                                                        {formatDistance(
+                                                            session.distanceMeters
+                                                        )}
+                                                        {' · '}
+                                                        {formatDuration(
+                                                            session.durationSeconds
+                                                        )}
+                                                    </Text>
+                                                </Pressable>
+                                            )
+                                        )
+                                )}
+                            </ScrollView>
+                        ) : (
+                            <ScrollView
+                                showsVerticalScrollIndicator={
+                                    false
+                                }
+                            >
+                                <HistorySessionMapPreview
+                                    session={
+                                        selectedHistorySession
+                                    }
+                                />
+
+                                <View
+                                    style={{
+                                        flexDirection:
+                                            'row',
+                                        flexWrap:
+                                            'wrap',
+                                        marginTop: 14,
+                                        gap: 10,
+                                    }}
+                                >
+                                    <HistoryMetric
+                                        label="Distancia"
+                                        value={formatDistance(
+                                            selectedHistorySession.distanceMeters
+                                        )}
+                                    />
+
+                                    <HistoryMetric
+                                        label="Tiempo"
+                                        value={formatDuration(
+                                            selectedHistorySession.durationSeconds
+                                        )}
+                                    />
+
+                                    <HistoryMetric
+                                        label="Ritmo"
+                                        value={
+                                            selectedHistorySession.avgPaceSecPerKm !=
+                                                null
+                                                ? formatPace(
+                                                    selectedHistorySession.distanceMeters,
+                                                    selectedHistorySession.durationSeconds
+                                                )
+                                                : '--'
+                                        }
+                                    />
+
+                                    <HistoryMetric
+                                        label="Vel. máx."
+                                        value={formatSpeed(
+                                            selectedHistorySession.maxSpeedMps
+                                        )}
+                                    />
+                                </View>
+                            </ScrollView>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                visible={
+                    confirmClearFinishVisible
+                }
+                transparent
+                animationType="fade"
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor:
+                            'rgba(0,0,0,0.70)',
+                        justifyContent:
+                            'center',
+                        alignItems:
+                            'center',
+                        padding: 24,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 330,
+
+                            backgroundColor:
+                                '#101010',
+
+                            borderRadius: 22,
+
+                            borderWidth: 1,
+                            borderColor:
+                                COLORS.primary,
+
+                            padding: 18,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color: '#FFFFFF',
+                                fontSize: 17,
+                                fontWeight: '800',
+                                textAlign: 'center',
+                            }}
+                        >
+                            ¿Cancelar punto de llegada?
+                        </Text>
+
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                gap: 10,
+                                marginTop: 18,
+                            }}
+                        >
+                            <Pressable
+                                onPress={() =>
+                                    setConfirmClearFinishVisible(
+                                        false
+                                    )
+                                }
+                                style={{
+                                    flex: 1,
+                                    backgroundColor:
+                                        '#292929',
+                                    borderRadius: 14,
+                                    paddingVertical: 12,
                                     alignItems: 'center',
-                                    marginBottom: 12,
                                 }}
                             >
                                 <Text
                                     style={{
                                         color: '#FFFFFF',
-                                        fontSize: 18,
+                                        fontWeight: '700',
+                                    }}
+                                >
+                                    Mantener
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                onPress={
+                                    handleConfirmClearFinishPoint
+                                }
+                                style={{
+                                    flex: 1,
+                                    backgroundColor:
+                                        COLORS.primary,
+                                    borderRadius: 14,
+                                    paddingVertical: 12,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: '#111111',
                                         fontWeight: '900',
                                     }}
                                 >
-                                    {selectedHistorySession
-                                        ? 'Detalle de carrera'
-                                        : 'Últimas carreras'}
+                                    Eliminar
                                 </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                visible={
+                    arrivalModalVisible
+                }
+                transparent
+                animationType="fade"
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor:
+                            'rgba(0,0,0,0.72)',
+                        justifyContent:
+                            'center',
+                        alignItems:
+                            'center',
+                        padding: 24,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 340,
 
-                                <Pressable
-                                    onPress={() => {
-                                        if (
-                                            selectedHistorySession
-                                        ) {
-                                            setSelectedHistorySession(
-                                                null
-                                            );
-                                        } else {
-                                            setHistoryVisible(
-                                                false
-                                            );
-                                        }
+                            backgroundColor:
+                                '#101010',
+
+                            borderRadius: 22,
+
+                            borderWidth: 1,
+                            borderColor:
+                                COLORS.primary,
+
+                            padding: 18,
+                        }}
+                    >
+                        <Text
+                            style={{
+                                color:
+                                    COLORS.primary,
+                                fontSize: 21,
+                                fontWeight: '900',
+                                textAlign: 'center',
+                            }}
+                        >
+                            🏁 ¡Llegaste!
+                        </Text>
+
+                        <Text
+                            style={{
+                                color: '#AAAAAA',
+                                fontSize: 13,
+                                lineHeight: 19,
+                                textAlign: 'center',
+                                marginTop: 8,
+                            }}
+                        >
+                            Alcanzaste el punto de llegada seleccionado.
+                        </Text>
+
+                        <View
+                            style={{
+                                flexDirection: 'row',
+                                gap: 10,
+                                marginTop: 18,
+                            }}
+                        >
+                            <Pressable
+                                onPress={() => {
+                                    setArrivalModalVisible(
+                                        false
+                                    );
+
+                                    clearFinishGoalState();
+                                }}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor:
+                                        '#292929',
+                                    paddingVertical: 13,
+                                    borderRadius: 14,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: '#FFFFFF',
+                                        fontWeight: '700',
                                     }}
                                 >
-                                    <Text
-                                        style={{
-                                            color:
-                                                COLORS.primary,
-                                            fontWeight:
-                                                '900',
-                                        }}
-                                    >
-                                        {selectedHistorySession
-                                            ? 'Volver'
-                                            : 'Cerrar'}
-                                    </Text>
-                                </Pressable>
+                                    Continuar
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                onPress={async () => {
+                                    setArrivalModalVisible(
+                                        false
+                                    );
+
+                                    clearFinishGoalState();
+
+                                    await finishRun();
+                                }}
+                                style={{
+                                    flex: 1,
+                                    backgroundColor:
+                                        COLORS.primary,
+                                    paddingVertical: 13,
+                                    borderRadius: 14,
+                                    alignItems: 'center',
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: '#111111',
+                                        fontWeight: '900',
+                                    }}
+                                >
+                                    Finalizar
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                visible={summaryVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => {
+                    void closeSessionSummary();
+                }}
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor:
+                            'rgba(0,0,0,0.82)',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        padding: 16,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '95%',
+                            maxWidth: 420,
+                            maxHeight: '92%',
+
+                            backgroundColor:
+                                '#101010',
+
+                            borderRadius: 26,
+
+                            borderWidth: 3,
+                            borderColor:
+                                COLORS.primary,
+
+                            padding: 16,
+                        }}
+                    >
+                        <ScrollView
+                            showsVerticalScrollIndicator={
+                                false
+                            }
+                        >
+                            {/* ENCABEZADO */}
+
+                            <View
+                                style={{
+                                    alignItems: 'center',
+                                    marginBottom: 14,
+                                }}
+                            >
+                                <Ionicons
+                                    name="checkmark-circle"
+                                    size={34}
+                                    color={COLORS.primary}
+                                />
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textLight,
+                                        fontSize: 21,
+                                        fontWeight: '900',
+                                        marginTop: 6,
+                                    }}
+                                >
+                                    Sesión finalizada
+                                </Text>
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textMuted,
+                                        fontSize: 11,
+                                        marginTop: 3,
+                                    }}
+                                >
+                                    Carrera guardada correctamente
+                                </Text>
                             </View>
 
-                            {!selectedHistorySession ? (
-                                <ScrollView
-                                    showsVerticalScrollIndicator={
-                                        false
-                                    }
-                                >
-                                    {runHistory.length ===
-                                        0 ? (
-                                        <Text
-                                            style={{
-                                                color:
-                                                    '#999999',
-                                                textAlign:
-                                                    'center',
-                                                paddingVertical:
-                                                    30,
-                                            }}
-                                        >
-                                            Todavía no hay
-                                            carreras guardadas.
-                                        </Text>
-                                    ) : (
-                                        runHistory
-                                            .slice(0, 10)
-                                            .map(
-                                                (session) => (
-                                                    <Pressable
-                                                        key={
-                                                            session.id
-                                                        }
-                                                        onPress={() =>
-                                                            setSelectedHistorySession(
-                                                                session
-                                                            )
-                                                        }
-                                                        style={{
-                                                            backgroundColor:
-                                                                '#181818',
-                                                            borderWidth:
-                                                                1,
-                                                            borderColor:
-                                                                '#303030',
-                                                            borderRadius:
-                                                                16,
-                                                            padding: 12,
-                                                            marginBottom:
-                                                                9,
-                                                        }}
-                                                    >
-                                                        <Text
-                                                            style={{
-                                                                color:
-                                                                    '#FFFFFF',
-                                                                fontWeight:
-                                                                    '800',
-                                                            }}
-                                                        >
-                                                            {formatSessionDate(
-                                                                session.startedAt
-                                                            )}
-                                                            {' · '}
-                                                            {formatSessionTime(
-                                                                session.startedAt
-                                                            )}
-                                                        </Text>
+                            {lastSessionSummary && (
+                                <>
+                                    {/* MAPA */}
 
-                                                        <Text
-                                                            style={{
-                                                                color:
-                                                                    COLORS.primary,
-                                                                marginTop:
-                                                                    5,
-                                                                fontWeight:
-                                                                    '800',
-                                                            }}
-                                                        >
-                                                            {formatDistance(
-                                                                session.distanceMeters
-                                                            )}
-                                                            {' · '}
-                                                            {formatDuration(
-                                                                session.durationSeconds
-                                                            )}
-                                                        </Text>
-                                                    </Pressable>
-                                                )
-                                            )
-                                    )}
-                                </ScrollView>
-                            ) : (
-                                <ScrollView
-                                    showsVerticalScrollIndicator={
-                                        false
-                                    }
-                                >
                                     <HistorySessionMapPreview
                                         session={
-                                            selectedHistorySession
+                                            lastSessionSummary.session
                                         }
                                     />
+
+                                    {/* MÉTRICAS */}
 
                                     <View
                                         style={{
@@ -2813,50 +4105,543 @@ export default function LiveRunWeb() {
                                                 'row',
                                             flexWrap:
                                                 'wrap',
-                                            marginTop: 14,
                                             gap: 10,
+                                            marginTop: 14,
                                         }}
                                     >
                                         <HistoryMetric
-                                            label="Distancia"
-                                            value={formatDistance(
-                                                selectedHistorySession.distanceMeters
-                                            )}
-                                        />
-
-                                        <HistoryMetric
                                             label="Tiempo"
                                             value={formatDuration(
-                                                selectedHistorySession.durationSeconds
+                                                lastSessionSummary
+                                                    .session
+                                                    .durationSeconds
                                             )}
                                         />
 
                                         <HistoryMetric
-                                            label="Ritmo"
+                                            label="Distancia"
+                                            value={formatDistance(
+                                                lastSessionSummary
+                                                    .session
+                                                    .distanceMeters
+                                            )}
+                                        />
+
+                                        <HistoryMetric
+                                            label="Ritmo promedio"
                                             value={
-                                                selectedHistorySession.avgPaceSecPerKm !=
+                                                lastSessionSummary
+                                                    .session
+                                                    .avgPaceSecPerKm !=
                                                     null
                                                     ? formatPace(
-                                                        selectedHistorySession.distanceMeters,
-                                                        selectedHistorySession.durationSeconds
+                                                        lastSessionSummary
+                                                            .session
+                                                            .distanceMeters,
+
+                                                        lastSessionSummary
+                                                            .session
+                                                            .durationSeconds
                                                     )
                                                     : '--'
                                             }
                                         />
 
                                         <HistoryMetric
-                                            label="Vel. máx."
+                                            label="Vel. máxima"
                                             value={formatSpeed(
-                                                selectedHistorySession.maxSpeedMps
+                                                lastSessionSummary
+                                                    .session
+                                                    .maxSpeedMps
                                             )}
                                         />
                                     </View>
-                                </ScrollView>
+
+
+
+                                    {/* VALORACIÓN */}
+
+                                    <View
+                                        style={{
+                                            marginTop: 14,
+
+                                            backgroundColor:
+                                                '#151515',
+
+                                            borderWidth: 1,
+                                            borderColor:
+                                                '#303030',
+
+                                            borderRadius: 18,
+
+                                            padding: 12,
+                                        }}
+                                    >
+                                        {!runSessionRatingSaved && (
+                                            <Text
+                                                style={{
+                                                    color:
+                                                        COLORS.textLight,
+
+                                                    fontSize: 13,
+                                                    fontWeight: '800',
+                                                    textAlign: 'center',
+                                                    marginBottom: 10,
+                                                }}
+                                            >
+                                                ¿Cómo te fue en la carrera de hoy?
+                                            </Text>
+                                        )}
+
+                                        {runSessionRatingLoading ? (
+                                            <View
+                                                style={{
+                                                    alignItems:
+                                                        'center',
+                                                    paddingVertical:
+                                                        8,
+                                                }}
+                                            >
+                                                <ActivityIndicator
+                                                    size="small"
+                                                    color={
+                                                        COLORS.primary
+                                                    }
+                                                />
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.textMuted,
+                                                        fontSize: 10,
+                                                        marginTop: 5,
+                                                    }}
+                                                >
+                                                    Guardando valoración...
+                                                </Text>
+                                            </View>
+                                        ) : runSessionRatingSaved ? (
+                                            <View
+                                                style={{
+                                                    alignItems:
+                                                        'center',
+                                                    paddingVertical:
+                                                        6,
+                                                }}
+                                            >
+                                                <Ionicons
+                                                    name="checkmark-circle-outline"
+                                                    size={21}
+                                                    color={
+                                                        COLORS.primary
+                                                    }
+                                                />
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.primary,
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            '800',
+                                                        marginTop: 4,
+                                                    }}
+                                                >
+                                                    Valoración guardada
+                                                </Text>
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.textMuted,
+                                                        fontSize: 10,
+                                                        marginTop: 2,
+                                                    }}
+                                                >
+                                                    Esfuerzo: {
+                                                        runSessionRating
+                                                    }/10
+                                                </Text>
+                                            </View>
+                                        ) : (
+                                            <>
+                                                <View
+                                                    style={{
+                                                        flexDirection:
+                                                            'row',
+                                                        justifyContent:
+                                                            'center',
+                                                        flexWrap:
+                                                            'wrap',
+                                                        gap: 5,
+                                                    }}
+                                                >
+                                                    {Array.from(
+                                                        {
+                                                            length: 10,
+                                                        },
+                                                        (
+                                                            _,
+                                                            index
+                                                        ) => {
+                                                            const value =
+                                                                index +
+                                                                1;
+
+                                                            const selected =
+                                                                runSessionRating ===
+                                                                value;
+
+                                                            return (
+                                                                <Pressable
+                                                                    key={
+                                                                        value
+                                                                    }
+                                                                    onPress={() =>
+                                                                        void handleRateLastRunSession(
+                                                                            value
+                                                                        )
+                                                                    }
+                                                                    style={{
+                                                                        width: 27,
+                                                                        height: 27,
+
+                                                                        borderRadius: 7,
+
+                                                                        alignItems:
+                                                                            'center',
+                                                                        justifyContent:
+                                                                            'center',
+
+                                                                        backgroundColor:
+                                                                            selected
+                                                                                ? COLORS.primary
+                                                                                : value <=
+                                                                                    3
+                                                                                    ? '#7F1D1D'
+                                                                                    : value <=
+                                                                                        7
+                                                                                        ? '#3F3F46'
+                                                                                        : '#3F6212',
+                                                                    }}
+                                                                >
+                                                                    <Text
+                                                                        style={{
+                                                                            color:
+                                                                                selected
+                                                                                    ? '#111111'
+                                                                                    : '#FFFFFF',
+
+                                                                            fontSize:
+                                                                                11,
+
+                                                                            fontWeight:
+                                                                                '900',
+                                                                        }}
+                                                                    >
+                                                                        {
+                                                                            value
+                                                                        }
+                                                                    </Text>
+                                                                </Pressable>
+                                                            );
+                                                        }
+                                                    )}
+                                                </View>
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.textMuted,
+
+                                                        fontSize: 9,
+
+                                                        textAlign:
+                                                            'center',
+
+                                                        marginTop: 8,
+                                                    }}
+                                                >
+                                                    Si no calificás, se guardará 6 automáticamente.
+                                                </Text>
+                                            </>
+                                        )}
+                                    </View>
+
+                                    {/* BORRADO */}
+
+                                    {confirmDeleteSummary ? (
+                                        <View
+                                            style={{
+                                                marginTop: 14,
+                                                backgroundColor:
+                                                    '#211111',
+
+                                                borderWidth: 1,
+                                                borderColor:
+                                                    '#7F1D1D',
+
+                                                borderRadius: 16,
+                                                padding: 12,
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    color:
+                                                        '#FFB4B4',
+
+                                                    textAlign:
+                                                        'center',
+
+                                                    fontSize: 12,
+                                                    fontWeight:
+                                                        '800',
+                                                }}
+                                            >
+                                                ¿Eliminar definitivamente esta sesión?
+                                            </Text>
+
+                                            <View
+                                                style={{
+                                                    flexDirection:
+                                                        'row',
+                                                    gap: 8,
+                                                    marginTop: 10,
+                                                }}
+                                            >
+                                                <Pressable
+                                                    onPress={() =>
+                                                        setConfirmDeleteSummary(
+                                                            false
+                                                        )
+                                                    }
+                                                    style={{
+                                                        flex: 1,
+                                                        backgroundColor:
+                                                            '#292929',
+
+                                                        paddingVertical:
+                                                            11,
+
+                                                        borderRadius:
+                                                            12,
+
+                                                        alignItems:
+                                                            'center',
+                                                    }}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#FFFFFF',
+
+                                                            fontWeight:
+                                                                '700',
+                                                        }}
+                                                    >
+                                                        Cancelar
+                                                    </Text>
+                                                </Pressable>
+
+                                                <Pressable
+                                                    onPress={() =>
+                                                        void deleteLastCompletedSession()
+                                                    }
+                                                    disabled={
+                                                        deletingSummarySession
+                                                    }
+                                                    style={{
+                                                        flex: 1,
+
+                                                        backgroundColor:
+                                                            '#7F1D1D',
+
+                                                        paddingVertical:
+                                                            11,
+
+                                                        borderRadius:
+                                                            12,
+
+                                                        alignItems:
+                                                            'center',
+
+                                                        opacity:
+                                                            deletingSummarySession
+                                                                ? 0.6
+                                                                : 1,
+                                                    }}
+                                                >
+                                                    {deletingSummarySession ? (
+                                                        <ActivityIndicator
+                                                            size="small"
+                                                            color="#FFFFFF"
+                                                        />
+                                                    ) : (
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    '#FFFFFF',
+
+                                                                fontWeight:
+                                                                    '900',
+                                                            }}
+                                                        >
+                                                            Eliminar
+                                                        </Text>
+                                                    )}
+                                                </Pressable>
+                                            </View>
+                                        </View>
+                                    ) : (
+                                        <>
+                                            {/* ACCIONES */}
+
+                                            <View
+                                                style={{
+                                                    flexDirection:
+                                                        'row',
+                                                    gap: 9,
+                                                    marginTop: 14,
+                                                }}
+                                            >
+                                                <Pressable
+                                                    onPress={() =>
+                                                        setConfirmDeleteSummary(
+                                                            true
+                                                        )
+                                                    }
+                                                    style={{
+                                                        flex: 1,
+
+                                                        backgroundColor:
+                                                            '#211111',
+
+                                                        borderWidth: 1,
+                                                        borderColor:
+                                                            '#633333',
+
+                                                        paddingVertical:
+                                                            12,
+
+                                                        borderRadius:
+                                                            14,
+
+                                                        alignItems:
+                                                            'center',
+                                                    }}
+                                                >
+                                                    <Ionicons
+                                                        name="trash-outline"
+                                                        size={18}
+                                                        color="#FF9999"
+                                                    />
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#FF9999',
+
+                                                            fontSize: 11,
+                                                            fontWeight:
+                                                                '800',
+                                                            marginTop: 3,
+                                                        }}
+                                                    >
+                                                        Borrar
+                                                    </Text>
+                                                </Pressable>
+
+                                                <Pressable
+                                                    onPress={() =>
+                                                        void openStatisticsFromSummary()
+                                                    }
+                                                    style={{
+                                                        flex: 1,
+
+                                                        backgroundColor:
+                                                            '#202020',
+
+                                                        borderWidth: 1,
+                                                        borderColor:
+                                                            '#383838',
+
+                                                        paddingVertical:
+                                                            12,
+
+                                                        borderRadius:
+                                                            14,
+
+                                                        alignItems:
+                                                            'center',
+                                                    }}
+                                                >
+                                                    <Ionicons
+                                                        name="stats-chart-outline"
+                                                        size={18}
+                                                        color={
+                                                            COLORS.primary
+                                                        }
+                                                    />
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                COLORS.textLight,
+
+                                                            fontSize: 11,
+                                                            fontWeight:
+                                                                '800',
+
+                                                            marginTop: 3,
+                                                        }}
+                                                    >
+                                                        Ver métricas
+                                                    </Text>
+                                                </Pressable>
+                                            </View>
+
+                                            {/* CERRAR */}
+
+                                            <Pressable
+                                                onPress={() =>
+                                                    void closeSessionSummary()
+                                                }
+                                                style={{
+                                                    marginTop: 10,
+
+                                                    backgroundColor:
+                                                        COLORS.primary,
+
+                                                    paddingVertical: 14,
+
+                                                    borderRadius: 16,
+
+                                                    alignItems:
+                                                        'center',
+                                                }}
+                                            >
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            '#111111',
+
+                                                        fontSize: 14,
+
+                                                        fontWeight:
+                                                            '900',
+                                                    }}
+                                                >
+                                                    Cerrar
+                                                </Text>
+                                            </Pressable>
+                                        </>
+                                    )}
+                                </>
                             )}
-                        </View>
+                        </ScrollView>
                     </View>
-                </Modal>
-            </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }

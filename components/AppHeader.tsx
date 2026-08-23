@@ -231,7 +231,7 @@ export default function AppHeader({ showProfile = true, profileGreeting = null }
                             <View
                                 style={{
                                     marginTop: 23,
-                                    right: -5,
+                                    right: -10,
                                     width: 60,
                                     height: 60,
                                     borderRadius: 100,
@@ -270,13 +270,13 @@ export default function AppHeader({ showProfile = true, profileGreeting = null }
                                 <View
                                     style={{
                                         marginTop: -5,
-                                        right: -5,
+                                        right: -10,
                                         backgroundColor: COLORS.primary,
                                         borderRadius: 999,
                                         borderWidth: 2,
                                         borderColor: '#444444',
                                         paddingHorizontal: 7,
-                                        paddingVertical: 2,
+                                        paddingVertical: 1,
                                         maxWidth: 95,
                                     }}
                                 >

@@ -507,8 +507,10 @@ function getRouteBounds(
 
 function HistorySessionMapPreview({
     session,
+    height = 240,
 }: {
     session: RunSession;
+    height?: number;
 }) {
     const mapRef =
         useRef<any>(null);
@@ -548,7 +550,7 @@ function HistorySessionMapPreview({
         return (
             <View
                 style={{
-                    height: 180,
+                    height,
                     borderRadius: 18,
                     backgroundColor:
                         '#111111',
@@ -572,7 +574,7 @@ function HistorySessionMapPreview({
     return (
         <View
             style={{
-                height: 240,
+                height,
                 borderRadius: 18,
                 overflow: 'hidden',
                 borderWidth: 1,
@@ -752,6 +754,19 @@ export default function LiveRunWeb() {
 
     const mapRef = useRef<any>(null);
 
+    const [historyError, setHistoryError] =
+        useState<string | null>(null);
+
+    const [
+        historyDeleteConfirm,
+        setHistoryDeleteConfirm,
+    ] = useState(false);
+
+    const [
+        historyDeleting,
+        setHistoryDeleting,
+    ] = useState(false);
+
     const [isSelectingFinishPoint, setIsSelectingFinishPoint] =
         useState(false);
 
@@ -815,6 +830,68 @@ export default function LiveRunWeb() {
         useRef(false);
 
     const routeRequestInFlightRef = useRef(false);
+
+    const [deletePromptLoading, setDeletePromptLoading] =
+        useState(false);
+
+    const deletePromptTimerRef =
+        useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    type DangerousRunAction =
+        | 'home'
+        | 'reset'
+        | 'finish';
+
+    const [
+        dangerLoadingAction,
+        setDangerLoadingAction,
+    ] =
+        useState<DangerousRunAction | null>(
+            null
+        );
+
+    const [
+        dangerActionToConfirm,
+        setDangerActionToConfirm,
+    ] =
+        useState<DangerousRunAction | null>(
+            null
+        );
+
+    const dangerActionTimerRef =
+        useRef<ReturnType<typeof setTimeout> | null>(
+            null
+        );
+
+    const pendingHomeAfterFinishRef =
+        useRef(false);
+
+    const requestDeleteSummaryConfirmation = () => {
+        if (
+            deletePromptLoading ||
+            deletingSummarySession
+        ) {
+            return;
+        }
+
+        setDeletePromptLoading(true);
+
+        if (deletePromptTimerRef.current) {
+            clearTimeout(
+                deletePromptTimerRef.current
+            );
+        }
+
+        deletePromptTimerRef.current =
+            setTimeout(() => {
+                deletePromptTimerRef.current =
+                    null;
+
+                setDeletePromptLoading(false);
+
+                setConfirmDeleteSummary(true);
+            }, 2000);
+    };
 
     const requestScreenWakeLock = async () => {
         if (typeof navigator === 'undefined') {
@@ -1804,6 +1881,8 @@ export default function LiveRunWeb() {
                 'Error guardando sesión web:',
                 error
             );
+            pendingHomeAfterFinishRef.current =
+                false;
 
             Alert.alert(
                 'Error',
@@ -1896,39 +1975,142 @@ export default function LiveRunWeb() {
         clearFinishGoalState();
     };
 
-    const toggleHistory =
-        async () => {
-            if (historyVisible) {
-                setHistoryVisible(false);
-                setSelectedHistorySession(
-                    null
+    const toggleHistory = async () => {
+        /*
+         * Si ya está abierto,
+         * simplemente cerramos.
+         */
+        if (historyVisible) {
+            setHistoryVisible(false);
+            setSelectedHistorySession(null);
+            setHistoryDeleteConfirm(false);
+            return;
+        }
+
+        /*
+         * Abrimos el modal inmediatamente.
+         * Adentro aparecerá el spinner.
+         */
+        setSelectedHistorySession(null);
+        setHistoryDeleteConfirm(false);
+
+        setHistoryError(null);
+        setHistoryVisible(true);
+        setHistoryLoading(true);
+
+        try {
+            /*
+             * Queremos mostrar el spinner
+             * como mínimo 1 segundo.
+             *
+             * Si el servidor tarda 2 segundos,
+             * entonces dura 2 segundos.
+             */
+            const minimumLoadingTime =
+                new Promise<void>(
+                    (resolve) => {
+                        setTimeout(
+                            resolve,
+                            1000
+                        );
+                    }
                 );
+
+            const [
+                data,
+            ] = await Promise.all([
+                getMyRunSessions(),
+                minimumLoadingTime,
+            ]);
+
+            /*
+             * El modal rápido muestra
+             * solamente las últimas 10.
+             */
+            setRunHistory(
+                (data.items ?? []).slice(
+                    0,
+                    10
+                )
+            );
+        } catch (error) {
+            console.error(
+                'Error cargando historial:',
+                error
+            );
+
+            setHistoryError(
+                'No pudimos cargar las sesiones.'
+            );
+        } finally {
+            setHistoryLoading(false);
+        }
+    };
+
+    const closeHistoryModal = () => {
+        setHistoryVisible(false);
+
+        setSelectedHistorySession(null);
+
+        setHistoryDeleteConfirm(false);
+
+        setHistoryError(null);
+    };
+
+    const deleteSelectedHistorySession =
+        async () => {
+            const session =
+                selectedHistorySession;
+
+            if (
+                !session ||
+                historyDeleting
+            ) {
                 return;
             }
 
             try {
-                setHistoryLoading(true);
+                setHistoryDeleting(true);
 
-                const data =
-                    await getMyRunSessions();
-
-                setRunHistory(
-                    data.items ?? []
+                await deleteRunSession(
+                    session.id
                 );
 
-                setHistoryVisible(true);
+                /*
+                 * La eliminamos también
+                 * del listado local.
+                 */
+                setRunHistory(
+                    (current) =>
+                        current.filter(
+                            (item) =>
+                                item.id !==
+                                session.id
+                        )
+                );
+
+                /*
+                 * Regresamos a la lista.
+                 */
+                setSelectedHistorySession(
+                    null
+                );
+
+                setHistoryDeleteConfirm(
+                    false
+                );
             } catch (error) {
                 console.error(
-                    'Error cargando historial web:',
+                    'Error eliminando sesión:',
                     error
                 );
 
                 Alert.alert(
                     'Error',
-                    'No se pudo cargar el historial.'
+                    'No se pudo eliminar la sesión.'
                 );
             } finally {
-                setHistoryLoading(false);
+                setHistoryDeleting(false);
             }
         };
 
@@ -1945,6 +2127,7 @@ export default function LiveRunWeb() {
         danger = false,
         large = false,
         disabled = false,
+        loading = false,
     }: {
         icon: IoniconName;
         label: string;
@@ -1953,10 +2136,14 @@ export default function LiveRunWeb() {
         danger?: boolean;
         large?: boolean;
         disabled?: boolean;
+        loading?: boolean;
     }) {
         return (
             <Pressable
-                disabled={disabled}
+                disabled={
+                    disabled ||
+                    loading
+                }
                 onPress={onPress}
                 style={({ pressed }) => ({
                     flex:
@@ -2004,21 +2191,34 @@ export default function LiveRunWeb() {
                                 : 1,
                 })}
             >
-                <Ionicons
-                    name={icon}
-                    size={
-                        large
-                            ? 35
-                            : 29
-                    }
-                    color={
-                        primary
-                            ? '#111111'
-                            : danger
-                                ? '#FF7777'
-                                : '#FFFFFF'
-                    }
-                />
+                {loading ? (
+                    <ActivityIndicator
+                        size="small"
+                        color={
+                            primary
+                                ? '#111111'
+                                : danger
+                                    ? '#FF7777'
+                                    : COLORS.primary
+                        }
+                    />
+                ) : (
+                    <Ionicons
+                        name={icon}
+                        size={
+                            large
+                                ? 35
+                                : 29
+                        }
+                        color={
+                            primary
+                                ? '#111111'
+                                : danger
+                                    ? '#FF7777'
+                                    : '#FFFFFF'
+                        }
+                    />
+                )}
 
                 <Text
                     numberOfLines={1}
@@ -2035,7 +2235,7 @@ export default function LiveRunWeb() {
                         marginTop: 3,
                     }}
                 >
-                    {label}
+                    {loading ? '...' : label}
                 </Text>
             </Pressable>
         );
@@ -2080,7 +2280,8 @@ export default function LiveRunWeb() {
         return (
             <View
                 style={{
-                    width: '47%',
+                    flexBasis: '47%',
+                    flexGrow: 1,
                     backgroundColor:
                         '#181818',
                     borderRadius: 14,
@@ -2389,19 +2590,51 @@ export default function LiveRunWeb() {
         isRunning,
     ]);
 
+    useEffect(() => {
+        return () => {
+            if (
+                deletePromptTimerRef.current
+            ) {
+                clearTimeout(
+                    deletePromptTimerRef.current
+                );
+            }
+
+            if (
+                dangerActionTimerRef.current
+            ) {
+                clearTimeout(
+                    dangerActionTimerRef.current
+                );
+            }
+        };
+    }, []);
+
     const closeSessionSummary =
         async () => {
             await ensureRunSessionRatingBeforeClose();
 
             setSummaryVisible(false);
             setConfirmDeleteSummary(false);
-
             setLastSessionSummary(null);
+
+            const shouldGoHome =
+                pendingHomeAfterFinishRef.current;
+
+            pendingHomeAfterFinishRef.current =
+                false;
+
+            if (shouldGoHome) {
+                router.replace('/home');
+            }
         };
 
     const openStatisticsFromSummary =
         async () => {
             await ensureRunSessionRatingBeforeClose();
+
+            pendingHomeAfterFinishRef.current =
+                false;
 
             setSummaryVisible(false);
             setLastSessionSummary(null);
@@ -2464,6 +2697,91 @@ export default function LiveRunWeb() {
                 setDeletingSummarySession(false);
             }
         };
+
+    const requestDangerousRunAction = (
+        action: DangerousRunAction
+    ) => {
+        /*
+         * Si no hay carrera activa,
+         * Home y Reset funcionan normalmente.
+         */
+        if (!isRunningRef.current) {
+            if (action === 'home') {
+                router.replace('/home');
+                return;
+            }
+
+            if (action === 'reset') {
+                void resetRun();
+                return;
+            }
+        }
+
+        /*
+         * Evitamos dos acciones simultáneas.
+         */
+        if (
+            dangerLoadingAction ||
+            dangerActionToConfirm
+        ) {
+            return;
+        }
+
+        setDangerLoadingAction(action);
+
+        if (dangerActionTimerRef.current) {
+            clearTimeout(
+                dangerActionTimerRef.current
+            );
+        }
+
+        dangerActionTimerRef.current =
+            setTimeout(() => {
+                dangerActionTimerRef.current =
+                    null;
+
+                setDangerLoadingAction(null);
+
+                setDangerActionToConfirm(
+                    action
+                );
+            }, 1000);
+    };
+
+    const confirmDangerousRunAction =
+        async () => {
+            const action =
+                dangerActionToConfirm;
+
+            if (!action) return;
+
+            setDangerActionToConfirm(null);
+
+            if (action === 'reset') {
+                await resetRun();
+                return;
+            }
+
+            if (action === 'finish') {
+                await finishRun();
+                return;
+            }
+
+            if (action === 'home') {
+                /*
+                 * No abandonamos la carrera.
+                 * Primero la finalizamos y guardamos.
+                 */
+                pendingHomeAfterFinishRef.current =
+                    true;
+
+                await finishRun();
+            }
+        };
+
+    const cancelDangerousRunAction = () => {
+        setDangerActionToConfirm(null);
+    };
 
     return (
         <SafeAreaView
@@ -2589,6 +2907,88 @@ export default function LiveRunWeb() {
                                         plannedRouteGeometry
                                     }
                                 />
+
+                                {isPaused && (
+                                    <View
+                                        pointerEvents="none"
+                                        style={{
+                                            position: 'absolute',
+                                            top: 0,
+                                            bottom: 0,
+                                            left: 0,
+                                            right: 0,
+
+                                            backgroundColor:
+                                                'rgba(0,0,0,0.46)',
+
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+
+                                            zIndex: 20,
+                                        }}
+                                    >
+                                        <View
+                                            style={{
+                                                backgroundColor:
+                                                    'rgba(15,15,15,0.94)',
+
+                                                borderWidth: 1,
+                                                borderColor: '#FFD36A',
+
+                                                borderRadius: 22,
+
+                                                paddingHorizontal: 28,
+                                                paddingVertical: 18,
+
+                                                alignItems: 'center',
+
+                                                shadowColor: '#000000',
+                                                shadowOpacity: 0.35,
+                                                shadowRadius: 12,
+                                            }}
+                                        >
+                                            <Ionicons
+                                                name="pause-circle"
+                                                size={46}
+                                                color="#FFD36A"
+                                            />
+
+                                            <Text
+                                                style={{
+                                                    color: '#FFD36A',
+                                                    fontSize: 22,
+                                                    fontWeight: '900',
+                                                    marginTop: 7,
+                                                    letterSpacing: 1.2,
+                                                }}
+                                            >
+                                                PAUSADO
+                                            </Text>
+
+                                            <Text
+                                                style={{
+                                                    color: '#BBBBBB',
+                                                    fontSize: 11,
+                                                    marginTop: 5,
+                                                    textAlign: 'center',
+                                                }}
+                                            >
+                                                Tiempo y recorrido detenidos
+                                            </Text>
+
+                                            <Text
+                                                style={{
+                                                    color: '#777777',
+                                                    fontSize: 10,
+                                                    marginTop: 3,
+                                                    textAlign: 'center',
+                                                }}
+                                            >
+                                                Tocá ▶ Reanudar para continuar
+                                            </Text>
+                                        </View>
+                                    </View>
+                                )}
 
 
                                 <Pressable
@@ -3162,8 +3562,14 @@ export default function LiveRunWeb() {
                     <BottomActionButton
                         icon="home-outline"
                         label="Volver"
+                        loading={
+                            dangerLoadingAction ===
+                            'home'
+                        }
                         onPress={() =>
-                            router.replace('/home')
+                            requestDangerousRunAction(
+                                'home'
+                            )
                         }
                     />
 
@@ -3171,8 +3577,14 @@ export default function LiveRunWeb() {
                     <BottomActionButton
                         icon="refresh"
                         label="Reiniciar"
+                        loading={
+                            dangerLoadingAction ===
+                            'reset'
+                        }
                         onPress={() =>
-                            void resetRun()
+                            requestDangerousRunAction(
+                                'reset'
+                            )
                         }
                     />
 
@@ -3226,8 +3638,14 @@ export default function LiveRunWeb() {
                             icon="stop"
                             label="Finalizar"
                             danger
+                            loading={
+                                dangerLoadingAction ===
+                                'finish'
+                            }
                             onPress={() =>
-                                void finishRun()
+                                requestDangerousRunAction(
+                                    'finish'
+                                )
                             }
                         />
                     )}
@@ -3545,143 +3963,381 @@ export default function LiveRunWeb() {
                 visible={historyVisible}
                 transparent
                 animationType="fade"
-                onRequestClose={() => {
-                    setHistoryVisible(false);
-                    setSelectedHistorySession(
-                        null
-                    );
-                }}
+                onRequestClose={
+                    closeHistoryModal
+                }
             >
                 <View
                     style={{
                         flex: 1,
+
                         backgroundColor:
                             'rgba(0,0,0,0.78)',
+
                         justifyContent: 'center',
                         alignItems: 'center',
+
                         padding: 18,
                     }}
                 >
                     <View
                         style={{
                             width: '100%',
-                            maxWidth: 420,
-                            maxHeight: '85%',
+                            maxWidth: 390,
+
+                            maxHeight: '82%',
+
                             backgroundColor:
                                 '#101010',
-                            borderRadius: 24,
+
+                            borderRadius: 22,
+
                             borderWidth: 1,
                             borderColor:
-                                COLORS.primary,
-                            padding: 16,
+                                '#303030',
+
+                            paddingHorizontal: 14,
+                            paddingTop: 12,
+                            paddingBottom: 12,
+
+                            overflow: 'hidden',
                         }}
                     >
+                        {/* PEQUEÑO INDICADOR SUPERIOR */}
+
+                        <View
+                            style={{
+                                width: 40,
+                                height: 4,
+
+                                backgroundColor:
+                                    '#3A3A3A',
+
+                                borderRadius: 999,
+
+                                alignSelf: 'center',
+
+                                marginBottom: 11,
+                            }}
+                        />
+
+                        {/* HEADER */}
+
                         <View
                             style={{
                                 flexDirection: 'row',
-                                justifyContent:
-                                    'space-between',
                                 alignItems: 'center',
+
                                 marginBottom: 12,
                             }}
                         >
-                            <Text
-                                style={{
-                                    color: '#FFFFFF',
-                                    fontSize: 18,
-                                    fontWeight: '900',
-                                }}
-                            >
-                                {selectedHistorySession
-                                    ? 'Detalle de carrera'
-                                    : 'Últimas carreras'}
-                            </Text>
-
-                            <Pressable
-                                onPress={() => {
-                                    if (
-                                        selectedHistorySession
-                                    ) {
+                            {selectedHistorySession && (
+                                <Pressable
+                                    onPress={() => {
                                         setSelectedHistorySession(
                                             null
                                         );
-                                    } else {
-                                        setHistoryVisible(
+
+                                        setHistoryDeleteConfirm(
                                             false
                                         );
-                                    }
+                                    }}
+                                    style={{
+                                        width: 36,
+                                        height: 36,
+
+                                        borderRadius: 18,
+
+                                        backgroundColor:
+                                            '#1D1D1D',
+
+                                        alignItems:
+                                            'center',
+
+                                        justifyContent:
+                                            'center',
+
+                                        marginRight: 9,
+                                    }}
+                                >
+                                    <Ionicons
+                                        name="arrow-back"
+                                        size={19}
+                                        color="#CCCCCC"
+                                    />
+                                </Pressable>
+                            )}
+
+                            <View
+                                style={{
+                                    flex: 1,
                                 }}
                             >
                                 <Text
                                     style={{
-                                        color:
-                                            COLORS.primary,
-                                        fontWeight:
-                                            '900',
+                                        color: '#FFFFFF',
+
+                                        fontSize: 17,
+
+                                        fontWeight: '900',
                                     }}
                                 >
                                     {selectedHistorySession
-                                        ? 'Volver'
-                                        : 'Cerrar'}
+                                        ? 'Detalle de sesión'
+                                        : 'Historial de carreras'}
                                 </Text>
-                            </Pressable>
+
+                                <Text
+                                    style={{
+                                        color: '#777777',
+
+                                        fontSize: 10,
+
+                                        marginTop: 2,
+                                    }}
+                                >
+                                    {selectedHistorySession
+                                        ? formatSessionDate(
+                                            selectedHistorySession
+                                                .startedAt
+                                        )
+                                        : 'Últimas 10 sesiones'}
+                                </Text>
+                            </View>
+
+                            {!selectedHistorySession &&
+                                !historyLoading && (
+                                    <View
+                                        style={{
+                                            minWidth: 27,
+                                            height: 27,
+
+                                            borderRadius:
+                                                999,
+
+                                            backgroundColor:
+                                                '#1C1C1C',
+
+                                            alignItems:
+                                                'center',
+
+                                            justifyContent:
+                                                'center',
+
+                                            paddingHorizontal:
+                                                7,
+                                        }}
+                                    >
+                                        <Text
+                                            style={{
+                                                color:
+                                                    COLORS.primary,
+
+                                                fontSize:
+                                                    10,
+
+                                                fontWeight:
+                                                    '900',
+                                            }}
+                                        >
+                                            {
+                                                runHistory.length
+                                            }
+                                        </Text>
+                                    </View>
+                                )}
                         </View>
 
-                        {!selectedHistorySession ? (
+                        {/* CONTENIDO */}
+
+                        {historyLoading ? (
+                            <View
+                                style={{
+                                    minHeight: 160,
+
+                                    alignItems: 'center',
+
+                                    justifyContent:
+                                        'center',
+                                }}
+                            >
+                                <ActivityIndicator
+                                    size="large"
+                                    color={
+                                        COLORS.primary
+                                    }
+                                />
+
+                                <Text
+                                    style={{
+                                        color: '#999999',
+
+                                        fontSize: 11,
+
+                                        marginTop: 10,
+                                    }}
+                                >
+                                    Cargando sesiones...
+                                </Text>
+                            </View>
+                        ) : historyError ? (
+                            <View
+                                style={{
+                                    minHeight: 130,
+
+                                    alignItems: 'center',
+
+                                    justifyContent:
+                                        'center',
+
+                                    paddingHorizontal:
+                                        20,
+                                }}
+                            >
+                                <Ionicons
+                                    name="alert-circle-outline"
+                                    size={28}
+                                    color="#FF9999"
+                                />
+
+                                <Text
+                                    style={{
+                                        color: '#BBBBBB',
+
+                                        fontSize: 11,
+
+                                        textAlign:
+                                            'center',
+
+                                        marginTop: 8,
+                                    }}
+                                >
+                                    {historyError}
+                                </Text>
+                            </View>
+                        ) : !selectedHistorySession ? (
+                            /*
+                             * LISTADO COMPACTO
+                             */
                             <ScrollView
                                 showsVerticalScrollIndicator={
                                     false
                                 }
+                                style={{
+                                    maxHeight: 390,
+                                }}
                             >
                                 {runHistory.length ===
                                     0 ? (
-                                    <Text
+                                    <View
                                         style={{
-                                            color:
-                                                '#999999',
-                                            textAlign:
+                                            minHeight:
+                                                130,
+
+                                            alignItems:
                                                 'center',
-                                            paddingVertical:
-                                                30,
+
+                                            justifyContent:
+                                                'center',
                                         }}
                                     >
-                                        Todavía no hay
-                                        carreras guardadas.
-                                    </Text>
+                                        <Ionicons
+                                            name="walk-outline"
+                                            size={28}
+                                            color="#666666"
+                                        />
+
+                                        <Text
+                                            style={{
+                                                color:
+                                                    '#888888',
+
+                                                fontSize:
+                                                    11,
+
+                                                marginTop:
+                                                    8,
+                                            }}
+                                        >
+                                            Todavía no hay
+                                            sesiones guardadas.
+                                        </Text>
+                                    </View>
                                 ) : (
-                                    runHistory
-                                        .slice(0, 10)
-                                        .map(
-                                            (session) => (
-                                                <Pressable
-                                                    key={
-                                                        session.id
-                                                    }
-                                                    onPress={() =>
-                                                        setSelectedHistorySession(
-                                                            session
-                                                        )
-                                                    }
+                                    runHistory.map(
+                                        (
+                                            session,
+                                            index
+                                        ) => (
+                                            <Pressable
+                                                key={
+                                                    session.id
+                                                }
+                                                onPress={() =>
+                                                    setSelectedHistorySession(
+                                                        session
+                                                    )
+                                                }
+                                                style={({
+                                                    pressed,
+                                                }) => ({
+                                                    height:
+                                                        48,
+
+                                                    flexDirection:
+                                                        'row',
+
+                                                    alignItems:
+                                                        'center',
+
+                                                    paddingHorizontal:
+                                                        10,
+
+                                                    borderRadius:
+                                                        12,
+
+                                                    backgroundColor:
+                                                        pressed
+                                                            ? '#252525'
+                                                            : index %
+                                                                2 ===
+                                                                0
+                                                                ? '#181818'
+                                                                : '#151515',
+
+                                                    marginBottom:
+                                                        5,
+
+                                                    borderWidth:
+                                                        1,
+
+                                                    borderColor:
+                                                        '#252525',
+                                                })}
+                                            >
+                                                {/* FECHA */}
+
+                                                <View
                                                     style={{
-                                                        backgroundColor:
-                                                            '#181818',
-                                                        borderWidth:
-                                                            1,
-                                                        borderColor:
-                                                            '#303030',
-                                                        borderRadius:
-                                                            16,
-                                                        padding: 12,
-                                                        marginBottom:
-                                                            9,
+                                                        flex: 1,
+
+                                                        minWidth:
+                                                            0,
                                                     }}
                                                 >
                                                     <Text
+                                                        numberOfLines={
+                                                            1
+                                                        }
                                                         style={{
                                                             color:
-                                                                '#FFFFFF',
+                                                                '#E5E5E5',
+
+                                                            fontSize:
+                                                                11,
+
                                                             fontWeight:
-                                                                '800',
+                                                                '700',
                                                         }}
                                                     >
                                                         {formatSessionDate(
@@ -3692,74 +4348,140 @@ export default function LiveRunWeb() {
                                                             session.startedAt
                                                         )}
                                                     </Text>
+                                                </View>
 
-                                                    <Text
-                                                        style={{
-                                                            color:
-                                                                COLORS.primary,
-                                                            marginTop:
-                                                                5,
-                                                            fontWeight:
-                                                                '800',
-                                                        }}
-                                                    >
-                                                        {formatDistance(
-                                                            session.distanceMeters
-                                                        )}
-                                                        {' · '}
-                                                        {formatDuration(
-                                                            session.durationSeconds
-                                                        )}
-                                                    </Text>
-                                                </Pressable>
-                                            )
+                                                {/* DISTANCIA */}
+
+                                                <Text
+                                                    numberOfLines={
+                                                        1
+                                                    }
+                                                    style={{
+                                                        width: 70,
+
+                                                        color:
+                                                            COLORS.primary,
+
+                                                        fontSize:
+                                                            10,
+
+                                                        fontWeight:
+                                                            '800',
+
+                                                        textAlign:
+                                                            'right',
+                                                    }}
+                                                >
+                                                    {formatDistance(
+                                                        session.distanceMeters
+                                                    )}
+                                                </Text>
+
+                                                {/* TIEMPO */}
+
+                                                <Text
+                                                    numberOfLines={
+                                                        1
+                                                    }
+                                                    style={{
+                                                        width: 68,
+
+                                                        color:
+                                                            '#AAAAAA',
+
+                                                        fontSize:
+                                                            10,
+
+                                                        fontWeight:
+                                                            '700',
+
+                                                        textAlign:
+                                                            'right',
+
+                                                        marginLeft:
+                                                            5,
+                                                    }}
+                                                >
+                                                    {formatDuration(
+                                                        session.durationSeconds
+                                                    )}
+                                                </Text>
+
+                                                <Ionicons
+                                                    name="chevron-forward"
+                                                    size={15}
+                                                    color="#666666"
+
+                                                    style={{
+                                                        marginLeft:
+                                                            5,
+                                                    }}
+                                                />
+                                            </Pressable>
                                         )
+                                    )
                                 )}
                             </ScrollView>
                         ) : (
+                            /*
+                             * DETALLE
+                             */
                             <ScrollView
                                 showsVerticalScrollIndicator={
                                     false
                                 }
+                                style={{
+                                    maxHeight: 475,
+                                }}
                             >
                                 <HistorySessionMapPreview
                                     session={
                                         selectedHistorySession
                                     }
+                                    height={185}
                                 />
 
                                 <View
                                     style={{
                                         flexDirection:
                                             'row',
+
                                         flexWrap:
                                             'wrap',
-                                        marginTop: 14,
-                                        gap: 10,
+
+                                        marginTop: 10,
+
+                                        gap: 8,
                                     }}
                                 >
                                     <HistoryMetric
                                         label="Distancia"
                                         value={formatDistance(
-                                            selectedHistorySession.distanceMeters
+                                            selectedHistorySession
+                                                .distanceMeters
                                         )}
                                     />
 
                                     <HistoryMetric
                                         label="Tiempo"
                                         value={formatDuration(
-                                            selectedHistorySession.durationSeconds
+                                            selectedHistorySession
+                                                .durationSeconds
                                         )}
                                     />
 
                                     <HistoryMetric
                                         label="Ritmo"
                                         value={
-                                            selectedHistorySession.avgPaceSecPerKm !=
+                                            selectedHistorySession
+                                                .avgPaceSecPerKm !=
                                                 null
                                                 ? formatPace(
-                                                    selectedHistorySession.distanceMeters,
-                                                    selectedHistorySession.durationSeconds
+                                                    selectedHistorySession
+                                                        .distanceMeters,
+
+                                                    selectedHistorySession
+                                                        .durationSeconds
                                                 )
                                                 : '--'
                                         }
@@ -3768,12 +4490,283 @@ export default function LiveRunWeb() {
                                     <HistoryMetric
                                         label="Vel. máx."
                                         value={formatSpeed(
-                                            selectedHistorySession.maxSpeedMps
+                                            selectedHistorySession
+                                                .maxSpeedMps
                                         )}
                                     />
                                 </View>
+
+                                {/* BORRAR SESIÓN */}
+
+                                {!historyDeleteConfirm ? (
+                                    <Pressable
+                                        onPress={() =>
+                                            setHistoryDeleteConfirm(
+                                                true
+                                            )
+                                        }
+                                        style={{
+                                            marginTop: 10,
+
+                                            height: 42,
+
+                                            borderRadius: 12,
+
+                                            backgroundColor:
+                                                '#1E1515',
+
+                                            borderWidth: 1,
+
+                                            borderColor:
+                                                '#4B2B2B',
+
+                                            flexDirection:
+                                                'row',
+
+                                            alignItems:
+                                                'center',
+
+                                            justifyContent:
+                                                'center',
+
+                                            gap: 7,
+                                        }}
+                                    >
+                                        <Ionicons
+                                            name="trash-outline"
+                                            size={16}
+                                            color="#D98C8C"
+                                        />
+
+                                        <Text
+                                            style={{
+                                                color:
+                                                    '#D98C8C',
+
+                                                fontSize:
+                                                    11,
+
+                                                fontWeight:
+                                                    '800',
+                                            }}
+                                        >
+                                            Eliminar sesión
+                                        </Text>
+                                    </Pressable>
+                                ) : (
+                                    <View
+                                        style={{
+                                            marginTop: 10,
+
+                                            backgroundColor:
+                                                '#201313',
+
+                                            borderWidth: 1,
+
+                                            borderColor:
+                                                '#543030',
+
+                                            borderRadius:
+                                                14,
+
+                                            padding: 11,
+                                        }}
+                                    >
+                                        <Text
+                                            style={{
+                                                color:
+                                                    '#E0B0B0',
+
+                                                textAlign:
+                                                    'center',
+
+                                                fontSize:
+                                                    11,
+
+                                                fontWeight:
+                                                    '700',
+                                            }}
+                                        >
+                                            ¿Eliminar definitivamente esta sesión?
+                                        </Text>
+
+                                        <View
+                                            style={{
+                                                flexDirection:
+                                                    'row',
+
+                                                gap: 8,
+
+                                                marginTop:
+                                                    9,
+                                            }}
+                                        >
+                                            <Pressable
+                                                onPress={() =>
+                                                    setHistoryDeleteConfirm(
+                                                        false
+                                                    )
+                                                }
+                                                style={{
+                                                    flex: 1,
+
+                                                    height:
+                                                        38,
+
+                                                    borderRadius:
+                                                        11,
+
+                                                    backgroundColor:
+                                                        '#282828',
+
+                                                    alignItems:
+                                                        'center',
+
+                                                    justifyContent:
+                                                        'center',
+                                                }}
+                                            >
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            '#CCCCCC',
+
+                                                        fontSize:
+                                                            11,
+
+                                                        fontWeight:
+                                                            '700',
+                                                    }}
+                                                >
+                                                    Cancelar
+                                                </Text>
+                                            </Pressable>
+
+                                            <Pressable
+                                                onPress={() =>
+                                                    void deleteSelectedHistorySession()
+                                                }
+                                                disabled={
+                                                    historyDeleting
+                                                }
+                                                style={{
+                                                    flex: 1,
+
+                                                    height:
+                                                        38,
+
+                                                    borderRadius:
+                                                        11,
+
+                                                    backgroundColor:
+                                                        '#6F2020',
+
+                                                    alignItems:
+                                                        'center',
+
+                                                    justifyContent:
+                                                        'center',
+
+                                                    opacity:
+                                                        historyDeleting
+                                                            ? 0.6
+                                                            : 1,
+                                                }}
+                                            >
+                                                {historyDeleting ? (
+                                                    <ActivityIndicator
+                                                        size="small"
+                                                        color="#FFFFFF"
+                                                    />
+                                                ) : (
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#FFFFFF',
+
+                                                            fontSize:
+                                                                11,
+
+                                                            fontWeight:
+                                                                '900',
+                                                        }}
+                                                    >
+                                                        Eliminar
+                                                    </Text>
+                                                )}
+                                            </Pressable>
+                                        </View>
+                                    </View>
+                                )}
                             </ScrollView>
                         )}
+
+                        {/* FOOTER */}
+
+                        <View
+                            style={{
+                                borderTopWidth: 1,
+
+                                borderTopColor:
+                                    '#252525',
+
+                                marginTop: 11,
+
+                                paddingTop: 10,
+                            }}
+                        >
+                            <Pressable
+                                onPress={
+                                    closeHistoryModal
+                                }
+                                style={({
+                                    pressed,
+                                }) => ({
+                                    height: 42,
+
+                                    borderRadius: 13,
+
+                                    backgroundColor:
+                                        pressed
+                                            ? '#292929'
+                                            : '#1C1C1C',
+
+                                    borderWidth: 1,
+
+                                    borderColor:
+                                        '#303030',
+
+                                    flexDirection:
+                                        'row',
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+
+                                    gap: 6,
+                                })}
+                            >
+                                <Ionicons
+                                    name="close"
+                                    size={17}
+                                    color="#888888"
+                                />
+
+                                <Text
+                                    style={{
+                                        color: '#AAAAAA',
+
+                                        fontSize: 11,
+
+                                        fontWeight: '700',
+                                    }}
+                                >
+                                    Cerrar
+                                </Text>
+                            </Pressable>
+                        </View>
                     </View>
                 </View>
             </Modal>
@@ -4505,11 +5498,10 @@ export default function LiveRunWeb() {
                                                 }}
                                             >
                                                 <Pressable
-                                                    onPress={() =>
-                                                        setConfirmDeleteSummary(
-                                                            true
-                                                        )
+                                                    onPress={
+                                                        requestDeleteSummaryConfirmation
                                                     }
+                                                    disabled={deletePromptLoading}
                                                     style={{
                                                         flex: 1,
 
@@ -4530,25 +5522,44 @@ export default function LiveRunWeb() {
                                                             'center',
                                                     }}
                                                 >
-                                                    <Ionicons
-                                                        name="trash-outline"
-                                                        size={18}
-                                                        color="#FF9999"
-                                                    />
+                                                    {deletePromptLoading ? (
+                                                        <>
+                                                            <ActivityIndicator
+                                                                size="small"
+                                                                color="#FF9999"
+                                                            />
 
-                                                    <Text
-                                                        style={{
-                                                            color:
-                                                                '#FF9999',
+                                                            <Text
+                                                                style={{
+                                                                    color: '#FF9999',
+                                                                    fontSize: 10,
+                                                                    fontWeight: '800',
+                                                                    marginTop: 4,
+                                                                }}
+                                                            >
+                                                                Preparando...
+                                                            </Text>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Ionicons
+                                                                name="trash-outline"
+                                                                size={18}
+                                                                color="#FF9999"
+                                                            />
 
-                                                            fontSize: 11,
-                                                            fontWeight:
-                                                                '800',
-                                                            marginTop: 3,
-                                                        }}
-                                                    >
-                                                        Borrar
-                                                    </Text>
+                                                            <Text
+                                                                style={{
+                                                                    color: '#FF9999',
+                                                                    fontSize: 11,
+                                                                    fontWeight: '800',
+                                                                    marginTop: 3,
+                                                                }}
+                                                            >
+                                                                Borrar
+                                                            </Text>
+                                                        </>
+                                                    )}
                                                 </Pressable>
 
                                                 <Pressable
@@ -4639,6 +5650,206 @@ export default function LiveRunWeb() {
                                 </>
                             )}
                         </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                visible={
+                    dangerActionToConfirm != null
+                }
+                transparent
+                animationType="fade"
+                onRequestClose={
+                    cancelDangerousRunAction
+                }
+            >
+                <View
+                    style={{
+                        flex: 1,
+                        backgroundColor:
+                            'rgba(0,0,0,0.78)',
+
+                        justifyContent:
+                            'center',
+
+                        alignItems:
+                            'center',
+
+                        padding: 22,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 350,
+
+                            backgroundColor:
+                                '#101010',
+
+                            borderWidth: 1,
+                            borderColor:
+                                dangerActionToConfirm ===
+                                    'finish'
+                                    ? '#704040'
+                                    : COLORS.primary,
+
+                            borderRadius: 24,
+
+                            padding: 18,
+                        }}
+                    >
+                        <View
+                            style={{
+                                alignItems: 'center',
+                            }}
+                        >
+                            <Ionicons
+                                name={
+                                    dangerActionToConfirm ===
+                                        'home'
+                                        ? 'home-outline'
+                                        : dangerActionToConfirm ===
+                                            'reset'
+                                            ? 'refresh'
+                                            : 'stop-circle-outline'
+                                }
+                                size={34}
+                                color={
+                                    dangerActionToConfirm ===
+                                        'finish'
+                                        ? '#FF7777'
+                                        : COLORS.primary
+                                }
+                            />
+
+                            <Text
+                                style={{
+                                    color: '#FFFFFF',
+
+                                    fontSize: 18,
+
+                                    fontWeight: '900',
+
+                                    textAlign: 'center',
+
+                                    marginTop: 10,
+                                }}
+                            >
+                                {dangerActionToConfirm ===
+                                    'home'
+                                    ? 'Carrera en curso'
+                                    : dangerActionToConfirm ===
+                                        'reset'
+                                        ? '¿Reiniciar carrera?'
+                                        : '¿Finalizar carrera?'}
+                            </Text>
+
+                            <Text
+                                style={{
+                                    color:
+                                        COLORS.textMuted,
+
+                                    fontSize: 12,
+
+                                    lineHeight: 18,
+
+                                    textAlign: 'center',
+
+                                    marginTop: 8,
+                                }}
+                            >
+                                {dangerActionToConfirm ===
+                                    'home'
+                                    ? 'Antes de volver al Home vamos a finalizar y guardar la sesión actual.'
+                                    : dangerActionToConfirm ===
+                                        'reset'
+                                        ? 'Se borrarán el tiempo, la distancia y la ruta actuales. La carrera continuará nuevamente desde cero.'
+                                        : 'Se detendrá el registro GPS, se guardará la sesión y aparecerá el resumen final.'}
+                            </Text>
+                        </View>
+
+                        <View
+                            style={{
+                                flexDirection: 'row',
+
+                                gap: 10,
+
+                                marginTop: 20,
+                            }}
+                        >
+                            <Pressable
+                                onPress={
+                                    cancelDangerousRunAction
+                                }
+                                style={{
+                                    flex: 1,
+
+                                    backgroundColor:
+                                        '#292929',
+
+                                    borderRadius: 14,
+
+                                    paddingVertical: 13,
+
+                                    alignItems:
+                                        'center',
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: '#FFFFFF',
+
+                                        fontWeight:
+                                            '800',
+                                    }}
+                                >
+                                    Continuar
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                onPress={() =>
+                                    void confirmDangerousRunAction()
+                                }
+                                style={{
+                                    flex: 1,
+
+                                    backgroundColor:
+                                        dangerActionToConfirm ===
+                                            'finish'
+                                            ? '#7F1D1D'
+                                            : COLORS.primary,
+
+                                    borderRadius: 14,
+
+                                    paddingVertical: 13,
+
+                                    alignItems:
+                                        'center',
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color:
+                                            dangerActionToConfirm ===
+                                                'finish'
+                                                ? '#FFFFFF'
+                                                : '#111111',
+
+                                        fontWeight:
+                                            '900',
+                                    }}
+                                >
+                                    {dangerActionToConfirm ===
+                                        'home'
+                                        ? 'Finalizar y salir'
+                                        : dangerActionToConfirm ===
+                                            'reset'
+                                            ? 'Reiniciar'
+                                            : 'Finalizar'}
+                                </Text>
+                            </Pressable>
+                        </View>
                     </View>
                 </View>
             </Modal>

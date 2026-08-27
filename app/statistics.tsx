@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
-import { Image, Pressable, ScrollView, Text, View, ActivityIndicator, Modal } from 'react-native';
+import { Pressable, ScrollView, Text, View, ActivityIndicator, Modal, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 import { LineChart } from 'react-native-chart-kit';
@@ -22,6 +21,10 @@ import {
 } from '../lib/statisticsHistory';
 import { useRouter } from 'expo-router';
 import AppHeader from '../components/AppHeader';
+import {
+    getRoutines,
+    type Routine,
+} from '../lib/routines';
 
 
 
@@ -71,13 +74,19 @@ function Section({
     title,
     icon,
     children,
+    onLayout,
 }: {
     title?: string;
     icon?: React.ReactNode;
     children: React.ReactNode;
+    onLayout?: (
+        event: LayoutChangeEvent
+    ) => void;
 }) {
     return (
-        <View style={{ marginBottom: 10 }}>
+        <View
+            onLayout={onLayout}
+            style={{ marginBottom: 10 }}>
             {(title || icon) && (
                 <View className="flex-row items-center mb-2">
                     {icon}
@@ -349,6 +358,179 @@ function AdviceCard({
     );
 }
 
+function getRoutineLastActivityTime(
+    routine: Routine
+) {
+    const dateString =
+        routine.lastDoneAt ??
+        routine.updatedAt ??
+        routine.createdAt ??
+        '';
+
+    return dateString
+        ? new Date(dateString).getTime()
+        : 0;
+}
+
+function StatisticsNavButton({
+    icon,
+    onPress,
+    disabled = false,
+}: {
+    icon: React.ReactNode;
+    onPress: () => void;
+    disabled?: boolean;
+}) {
+    return (
+        <Pressable
+            onPress={onPress}
+            disabled={disabled}
+            style={({ pressed }) => ({
+                flex: 1,
+                minWidth: 0,
+
+                height: 58,
+
+                borderRadius: 17,
+
+                alignItems: 'center',
+                justifyContent: 'center',
+
+                backgroundColor:
+                    pressed
+                        ? '#333333'
+                        : '#242424',
+
+                borderWidth: 2,
+                borderColor: '#353535',
+
+                opacity:
+                    disabled
+                        ? 0.45
+                        : pressed
+                            ? 0.8
+                            : 1,
+            })}
+        >
+            {icon}
+        </Pressable>
+    );
+}
+
+type StatisticsSectionKey =
+    | 'insights'
+    | 'running'
+    | 'times'
+    | 'routines'
+    | 'exercises'
+    | 'advice';
+
+function StatisticsQuickButton({
+    icon,
+    label,
+    onPress,
+    active = false,
+    twoRows = false,
+}: {
+    icon: React.ReactNode;
+    label: string;
+    onPress: () => void;
+    active?: boolean;
+    twoRows?: boolean;
+}) {
+    return (
+        <View
+            style={{
+                flexBasis:
+                    twoRows
+                        ? '31%'
+                        : 0,
+
+                flexGrow: 1,
+
+                minWidth:
+                    twoRows
+                        ? 82
+                        : 46,
+
+                alignItems: 'center',
+
+                marginBottom:
+                    twoRows
+                        ? 8
+                        : 0,
+            }}
+        >
+            <Pressable
+                onPress={onPress}
+                style={({ pressed }) => ({
+                    width: 46,
+                    height: 46,
+
+                    borderRadius: 23,
+
+                    alignItems: 'center',
+                    justifyContent: 'center',
+
+                    backgroundColor:
+                        active
+                            ? 'rgba(198,255,0,0.18)'
+                            : pressed
+                                ? '#292929'
+                                : '#1B1B1B',
+
+                    borderWidth:
+                        active
+                            ? 2
+                            : 1,
+
+                    borderColor:
+                        active
+                            ? COLORS.primary
+                            : '#343434',
+
+                    opacity:
+                        pressed
+                            ? 0.82
+                            : 1,
+
+                    transform: [
+                        {
+                            scale:
+                                active
+                                    ? 0.94
+                                    : 1,
+                        },
+                    ],
+                })}
+            >
+                {icon}
+            </Pressable>
+
+            {/* LABEL FUERA DEL CÍRCULO */}
+
+            <Text
+                numberOfLines={1}
+                style={{
+                    color:
+                        active
+                            ? COLORS.primary
+                            : '#BDBDBD',
+
+                    fontSize: 10,
+                    fontWeight: '700',
+
+                    marginTop: 5,
+
+                    textAlign: 'center',
+                }}
+            >
+                {label}
+            </Text>
+        </View>
+    );
+}
+
 export default function StatisticsScreen() {
     const { isAuthenticated, isLoading } = useAuth();
     const router = useRouter();
@@ -403,6 +585,79 @@ export default function StatisticsScreen() {
     const [infoModalVisible, setInfoModalVisible] = React.useState(false);
     const [infoModalTitle, setInfoModalTitle] = React.useState('');
     const [infoModalText, setInfoModalText] = React.useState('');
+
+    const statsScrollRef =
+        React.useRef<ScrollView | null>(
+            null
+        );
+
+    const sectionPositionsRef =
+        React.useRef<
+            Partial<
+                Record<
+                    StatisticsSectionKey,
+                    number
+                >
+            >
+        >({});
+
+    const [
+        activeQuickSection,
+        setActiveQuickSection,
+    ] =
+        React.useState<
+            StatisticsSectionKey | null
+        >(null);
+
+    const quickAccessTimerRef =
+        React.useRef<
+            ReturnType<typeof setTimeout> | null
+        >(null);
+
+    const [
+        quickAccessWidth,
+        setQuickAccessWidth,
+    ] = React.useState(0);
+
+    const [navRoutines, setNavRoutines] =
+        React.useState<Routine[]>([]);
+
+    useEffect(() => {
+        if (!isAuthenticated) {
+            return;
+        }
+
+        let active = true;
+
+        const loadNavigationRoutines =
+            async () => {
+                try {
+                    const data =
+                        await getRoutines();
+
+                    if (!active) return;
+
+                    setNavRoutines(
+                        data ?? []
+                    );
+                } catch (error) {
+                    console.log(
+                        'No se pudo cargar la rutina reciente:',
+                        error
+                    );
+
+                    if (active) {
+                        setNavRoutines([]);
+                    }
+                }
+            };
+
+        void loadNavigationRoutines();
+
+        return () => {
+            active = false;
+        };
+    }, [isAuthenticated]);
 
 
 
@@ -466,9 +721,101 @@ export default function StatisticsScreen() {
         loadStats();
     }, [isAuthenticated]);
 
+    const handleQuickAccess = (
+        key: StatisticsSectionKey
+    ) => {
+        /*
+         * Feedback visual inmediato.
+         */
+        setActiveQuickSection(key);
 
+        /*
+         * Navegamos a la sección.
+         */
+        scrollToStatisticsSection(key);
 
+        /*
+         * Si había otro timer,
+         * lo reiniciamos.
+         */
+        if (
+            quickAccessTimerRef.current
+        ) {
+            clearTimeout(
+                quickAccessTimerRef.current
+            );
+        }
 
+        /*
+         * Después de 1 segundo
+         * vuelve al color normal.
+         */
+        quickAccessTimerRef.current =
+            setTimeout(() => {
+                setActiveQuickSection(null);
+
+                quickAccessTimerRef.current =
+                    null;
+            }, 1000);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (
+                quickAccessTimerRef.current
+            ) {
+                clearTimeout(
+                    quickAccessTimerRef.current
+                );
+            }
+        };
+    }, []);
+
+    const quickAccessTwoRows =
+        quickAccessWidth > 0 &&
+        quickAccessWidth < 330;
+
+    const latestRoutineId =
+        React.useMemo(() => {
+            if (
+                navRoutines.length === 0
+            ) {
+                return null;
+            }
+
+            const sorted = [
+                ...navRoutines,
+            ].sort(
+                (a, b) =>
+                    getRoutineLastActivityTime(
+                        b
+                    ) -
+                    getRoutineLastActivityTime(
+                        a
+                    )
+            );
+
+            return sorted[0]?.id ?? null;
+        }, [navRoutines]);
+
+    const openLatestRoutine = () => {
+        /*
+         * Si todavía no existe ninguna rutina,
+         * volvemos a Home, donde el usuario
+         * puede crearla.
+         */
+        if (!latestRoutineId) {
+            router.replace('/home');
+            return;
+        }
+
+        router.push({
+            pathname: '/routine/[id]',
+            params: {
+                id: latestRoutineId,
+            },
+        });
+    };
 
 
     const openInfoModal = (title: string, text: string) => {
@@ -947,6 +1294,33 @@ export default function StatisticsScreen() {
         );
     }
 
+    const registerSectionPosition = (
+        key: StatisticsSectionKey,
+        event: LayoutChangeEvent
+    ) => {
+        sectionPositionsRef.current[key] =
+            event.nativeEvent.layout.y;
+    };
+
+    const scrollToStatisticsSection = (
+        key: StatisticsSectionKey
+    ) => {
+        const y =
+            sectionPositionsRef.current[key];
+
+        if (y == null) {
+            return;
+        }
+
+        statsScrollRef.current?.scrollTo({
+            y: Math.max(
+                0,
+                y - 10
+            ),
+            animated: true,
+        });
+    };
+
     if (!isAuthenticated) {
         return (
             <SafeAreaView
@@ -996,6 +1370,7 @@ export default function StatisticsScreen() {
                     }}
                 >
                     <ScrollView
+                        ref={statsScrollRef}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{
                             padding: 18,
@@ -1029,6 +1404,188 @@ export default function StatisticsScreen() {
                                     También podrás acceder al historial completo de registros para revisar o eliminar sesiones si lo deseas.
                                 </Text>
 
+                                <View
+                                    style={{
+                                        marginBottom: 30,
+                                    }}
+                                >
+
+
+                                    <View
+                                        onLayout={(event) => {
+                                            setQuickAccessWidth(
+                                                event.nativeEvent.layout.width
+                                            );
+                                        }}
+                                        style={{
+                                            flexDirection: 'row',
+                                            flexWrap:
+                                                quickAccessTwoRows
+                                                    ? 'wrap'
+                                                    : 'nowrap',
+
+                                            alignItems: 'flex-start',
+
+                                            justifyContent:
+                                                'space-between',
+
+                                            gap: 5,
+
+                                            paddingHorizontal: 2,
+                                        }}
+                                    >
+                                        {/* INSIGHT */}
+
+                                        <StatisticsQuickButton
+                                            label="Insights"
+                                            active={
+                                                activeQuickSection ===
+                                                'insights'
+                                            }
+                                            twoRows={
+                                                quickAccessTwoRows
+                                            }
+                                            onPress={() =>
+                                                handleQuickAccess(
+                                                    'insights'
+                                                )
+                                            }
+                                            icon={
+                                                <Ionicons
+                                                    name="bulb-outline"
+                                                    size={21}
+                                                    color={COLORS.primary}
+                                                />
+                                            }
+                                        />
+
+                                        {/* RUNNING */}
+
+                                        <StatisticsQuickButton
+                                            label="Running"
+                                            active={
+                                                activeQuickSection ===
+                                                'running'
+                                            }
+                                            twoRows={
+                                                quickAccessTwoRows
+                                            }
+                                            onPress={() =>
+                                                handleQuickAccess(
+                                                    'running'
+                                                )
+                                            }
+                                            icon={
+                                                <Ionicons
+                                                    name="analytics-outline"
+                                                    size={21}
+                                                    color={COLORS.primary}
+                                                />
+                                            }
+                                        />
+
+                                        {/* TIEMPOS */}
+
+                                        <StatisticsQuickButton
+                                            label="Tiempos"
+                                            active={
+                                                activeQuickSection ===
+                                                'times'
+                                            }
+                                            twoRows={
+                                                quickAccessTwoRows
+                                            }
+                                            onPress={() =>
+                                                handleQuickAccess(
+                                                    'times'
+                                                )
+                                            }
+                                            icon={
+                                                <Ionicons
+                                                    name="stopwatch-outline"
+                                                    size={21}
+                                                    color={COLORS.primary}
+                                                />
+                                            }
+                                        />
+
+                                        {/* RUTINAS */}
+
+                                        <StatisticsQuickButton
+                                            label="Rutinas"
+                                            active={
+                                                activeQuickSection ===
+                                                'routines'
+                                            }
+                                            twoRows={
+                                                quickAccessTwoRows
+                                            }
+                                            onPress={() =>
+                                                handleQuickAccess(
+                                                    'routines'
+                                                )
+                                            }
+                                            icon={
+                                                <Ionicons
+                                                    name="trending-up-outline"
+                                                    size={21}
+                                                    color={COLORS.primary}
+                                                />
+                                            }
+                                        />
+
+                                        {/* EJERCICIOS */}
+
+                                        <StatisticsQuickButton
+                                            label="Ejercicios"
+                                            active={
+                                                activeQuickSection ===
+                                                'exercises'
+                                            }
+                                            twoRows={
+                                                quickAccessTwoRows
+                                            }
+                                            onPress={() =>
+                                                handleQuickAccess(
+                                                    'exercises'
+                                                )
+                                            }
+                                            icon={
+                                                <FontAwesome6
+                                                    name="dumbbell"
+                                                    size={19}
+                                                    color={COLORS.primary}
+                                                />
+                                            }
+                                        />
+
+                                        {/* CONSEJOS */}
+
+                                        <StatisticsQuickButton
+                                            label="Consejos"
+                                            active={
+                                                activeQuickSection ===
+                                                'advice'
+                                            }
+                                            twoRows={
+                                                quickAccessTwoRows
+                                            }
+                                            onPress={() =>
+                                                handleQuickAccess(
+                                                    'advice'
+                                                )
+                                            }
+                                            icon={
+                                                <Ionicons
+                                                    name="compass-outline"
+                                                    size={21}
+                                                    color={COLORS.primary}
+                                                />
+                                            }
+                                        />
+                                    </View>
+                                </View>
+
 
                                 <Section>
                                     <Text className="ml-2 mb-2 text-md font-bold" style={{ color: '#fff' }}>
@@ -1060,7 +1617,14 @@ export default function StatisticsScreen() {
                                     </View>
                                 </Section>
 
-                                <Section>
+                                <Section
+                                    onLayout={(event) =>
+                                        registerSectionPosition(
+                                            'insights',
+                                            event
+                                        )
+                                    }
+                                >
                                     <View
                                         style={{
                                             flexDirection: 'row',
@@ -1163,14 +1727,23 @@ export default function StatisticsScreen() {
                                     )}
                                 </Section>
 
-                                <Section>
+                                <Section
+                                    onLayout={(event) =>
+                                        registerSectionPosition(
+                                            'running',
+                                            event
+                                        )
+                                    }
+                                >
                                     <View className="flex-row m-2 pb-2 items-center justify-between">
                                         <View className="flex-row items-center">
-                                            <FontAwesome6
-                                                className="mr-2"
-                                                name="chart-simple"
-                                                size={18}
+                                            <Ionicons
+                                                name="analytics-outline"
+                                                size={21}
                                                 color={COLORS.primary}
+                                                style={{
+                                                    marginRight: 10,
+                                                }}
                                             />
 
                                             <Text className="text-md font-bold" style={{ color: '#fff' }}>
@@ -1333,7 +1906,14 @@ export default function StatisticsScreen() {
                                         </View>
                                     </View>
                                 </Section>
-                                <Section>
+                                <Section
+                                    onLayout={(event) =>
+                                        registerSectionPosition(
+                                            'times',
+                                            event
+                                        )
+                                    }
+                                >
                                     <View
                                         style={{
                                             flexDirection: 'row',
@@ -1345,11 +1925,13 @@ export default function StatisticsScreen() {
                                         }}
                                     >
                                         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                                            <FontAwesome6
-                                                name="person-running"
-                                                size={20}
+                                            <Ionicons
+                                                name="stopwatch-outline"
+                                                size={21}
                                                 color={COLORS.primary}
-                                                style={{ marginRight: 10 }}
+                                                style={{
+                                                    marginRight: 10,
+                                                }}
                                             />
 
                                             <View style={{ flex: 1 }}>
@@ -1442,14 +2024,23 @@ export default function StatisticsScreen() {
                                     </View>
                                 </Section>
 
-                                <Section>
+                                <Section
+                                    onLayout={(event) =>
+                                        registerSectionPosition(
+                                            'routines',
+                                            event
+                                        )
+                                    }
+                                >
                                     <View className="flex-row m-2 pb-2 items-center justify-between">
                                         <View className="flex-row items-center">
-                                            <FontAwesome6
-                                                className="mr-2"
-                                                name="chart-simple"
-                                                size={18}
+                                            <Ionicons
+                                                name="trending-up-outline"
+                                                size={21}
                                                 color={COLORS.primary}
+                                                style={{
+                                                    marginRight: 10,
+                                                }}
                                             />
 
                                             <Text className="text-md font-bold" style={{ color: '#fff' }}>
@@ -1603,7 +2194,14 @@ export default function StatisticsScreen() {
                                     </View>
                                 </Section>
 
-                                <Section >
+                                <Section
+                                    onLayout={(event) =>
+                                        registerSectionPosition(
+                                            'exercises',
+                                            event
+                                        )
+                                    }
+                                >
                                     <View className='flex-row m-2 pb-2 items-center justify-between'>
                                         <View className='flex-row items-center'>
                                             <FontAwesome6 className='mr-2' name="dumbbell" size={18} color={COLORS.primary} />
@@ -1671,7 +2269,14 @@ export default function StatisticsScreen() {
                                     </View>
 
                                 </Section>
-                                <Section>
+                                <Section
+                                    onLayout={(event) =>
+                                        registerSectionPosition(
+                                            'advice',
+                                            event
+                                        )
+                                    }
+                                >
                                     <View
                                         style={{
                                             flexDirection: 'row',
@@ -1803,32 +2408,99 @@ export default function StatisticsScreen() {
 
 
                 <View
-                    className="m-2 flex-row justify-between px-2"
+                    style={{
+                        flexDirection: 'row',
+
+                        alignItems: 'center',
+
+                        justifyContent:
+                            'space-between',
+
+                        gap: 8,
+
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        marginBottom: 10,
+                    }}
                 >
-                    <Pressable
-                        onPress={() => router.replace('/home')}
-                        className="flex-1 mr-2 px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
-                    >
-                        <Text
-                            className="text-[14px] font-normal"
-                            style={{ color: COLORS.textLight }}>
-                            Regresar al home
-                        </Text>
-                    </Pressable>
+                    {/* 1 — HOME */}
 
-                    <Pressable
-                        onPress={() => router.push('/statistics-history')}
-                        className="flex-1  px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
-                    >
-                        <Text
+                    <StatisticsNavButton
+                        onPress={() =>
+                            router.replace('/home')
+                        }
+                        icon={
+                            <Ionicons
+                                name="home-outline"
+                                size={27}
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
 
-                            className="text-[14px] font-normal"
-                            style={{ color: COLORS.textLight }}>
-                            Ver historial
-                        </Text>
-                    </Pressable>
+                    {/* 2 — PERFIL */}
+
+                    <StatisticsNavButton
+                        onPress={() =>
+                            router.push('/profile')
+                        }
+                        icon={
+                            <Ionicons
+                                name="person-circle-outline"
+                                size={32}
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
+
+                    {/* 3 — RUTINA RECIENTE */}
+
+                    <StatisticsNavButton
+                        onPress={
+                            openLatestRoutine
+                        }
+                        icon={
+                            <Ionicons
+                                name="list-outline"
+                                size={34}
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
+
+                    {/* 4 — RUNNING */}
+
+                    <StatisticsNavButton
+                        onPress={() =>
+                            router.push('/liverun')
+                        }
+                        icon={
+                            <FontAwesome6
+                                name="person-running"
+                                size={25}
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
+
+                    {/* 5 — HISTORIAL GENERAL */}
+
+                    <StatisticsNavButton
+                        onPress={() =>
+                            router.push(
+                                '/statistics-history'
+                            )
+                        }
+                        icon={
+                            <Ionicons
+                                name="document-text-outline"
+                                size={27}
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
                 </View>
             </View>
             <Modal

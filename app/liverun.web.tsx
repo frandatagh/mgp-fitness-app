@@ -224,13 +224,18 @@ function Metric({
             style={{
                 flex: 1,
                 alignItems: 'center',
-                paddingHorizontal: 2,
+                justifyContent: 'center',
+                paddingHorizontal: 3,
             }}
         >
             <Text
+                numberOfLines={1}
                 style={{
-                    color: '#999999',
-                    fontSize: 9,
+                    color: '#B5B5B5',
+                    fontSize: 13,
+                    fontWeight: '700',
+                    letterSpacing: 0.2,
+                    marginBottom: 4,
                 }}
             >
                 {label}
@@ -242,7 +247,6 @@ function Metric({
                     color: '#FFFFFF',
                     fontSize: 12,
                     fontWeight: '800',
-                    marginTop: 2,
                 }}
             >
                 {value}
@@ -825,6 +829,9 @@ export default function LiveRunWeb() {
             latitude: number;
             longitude: number;
         } | null>(null);
+
+    const routeRequestIdRef =
+        useRef(0);
 
     const arrivalHandledRef =
         useRef(false);
@@ -1465,8 +1472,18 @@ export default function LiveRunWeb() {
         };
     }, []);
 
-    const fetchRoute = async (
+    const invalidateRouteRequests = () => {
+        /*
+         * Incrementar el ID hace que cualquier
+         * petición anterior deje automáticamente
+         * de ser considerada válida.
+         */
+        routeRequestIdRef.current += 1;
 
+        setRouteLoading(false);
+    };
+
+    const fetchRoute = async (
         from: {
             latitude: number;
             longitude: number;
@@ -1476,12 +1493,31 @@ export default function LiveRunWeb() {
             longitude: number;
         }
     ) => {
+        /*
+         * Cada nueva petición obtiene
+         * un número único.
+         */
+        const requestId =
+            ++routeRequestIdRef.current;
+
+        /*
+         * Marcamos desde AHORA cuándo
+         * comenzamos la actualización.
+         *
+         * Esto también evita lanzar muchas
+         * peticiones mientras ORS responde.
+         */
+        lastRouteRefreshAtRef.current =
+            Date.now();
+
+        lastRouteRefreshPositionRef.current = {
+            latitude: from.latitude,
+            longitude: from.longitude,
+        };
+
+        setRouteLoading(true);
+
         try {
-            if (routeRequestInFlightRef.current) return;
-
-            routeRequestInFlightRef.current = true;
-            setRouteLoading(true);
-
             const data =
                 await getWalkingRoute(
                     {
@@ -1493,6 +1529,19 @@ export default function LiveRunWeb() {
                         lng: to.longitude,
                     }
                 );
+
+            /*
+             * MUY IMPORTANTE:
+             *
+             * si entretanto comenzó otra petición,
+             * esta respuesta ya es antigua.
+             */
+            if (
+                requestId !==
+                routeRequestIdRef.current
+            ) {
+                return;
+            }
 
             setPlannedRouteGeometry(
                 data.geometry
@@ -1513,15 +1562,18 @@ export default function LiveRunWeb() {
             setRemainingRouteDurationSeconds(
                 data.duration ?? null
             );
-
-            lastRouteRefreshAtRef.current =
-                Date.now();
-
-            lastRouteRefreshPositionRef.current = {
-                latitude: from.latitude,
-                longitude: from.longitude,
-            };
         } catch (error) {
+            /*
+             * Si falló una petición que ya
+             * quedó obsoleta, la ignoramos.
+             */
+            if (
+                requestId !==
+                routeRequestIdRef.current
+            ) {
+                return;
+            }
+
             console.error(
                 'Error obteniendo ruta:',
                 error
@@ -1530,6 +1582,7 @@ export default function LiveRunWeb() {
             setPlannedRouteGeometry(null);
             setPlannedRouteDistanceMeters(null);
             setPlannedRouteDurationSeconds(null);
+
             setRemainingRouteDistanceMeters(null);
             setRemainingRouteDurationSeconds(null);
 
@@ -1538,9 +1591,16 @@ export default function LiveRunWeb() {
                 'No se pudo calcular una ruta hasta ese punto.'
             );
         } finally {
-            setRouteLoading(false);
-            routeRequestInFlightRef.current = false;
-            setRouteLoading(false);
+            /*
+             * Una petición vieja tampoco puede
+             * apagar el spinner de una petición nueva.
+             */
+            if (
+                requestId ===
+                routeRequestIdRef.current
+            ) {
+                setRouteLoading(false);
+            }
         }
     };
 
@@ -2372,6 +2432,8 @@ export default function LiveRunWeb() {
         setIsSelectingFinishPoint(next);
 
         if (!next) {
+            invalidateRouteRequests();
+
             setPendingFinishPoint(null);
             setShowPendingFinishCard(false);
 
@@ -2448,6 +2510,8 @@ export default function LiveRunWeb() {
     };
 
     const handleCancelPendingFinishPoint = () => {
+        invalidateRouteRequests();
+
         setPendingFinishPoint(null);
 
         setShowPendingFinishCard(false);
@@ -2468,6 +2532,8 @@ export default function LiveRunWeb() {
     };
 
     const clearFinishGoalState = () => {
+        invalidateRouteRequests();
+
         setFinishPoint(null);
         setPendingFinishPoint(null);
 
@@ -3330,7 +3396,8 @@ export default function LiveRunWeb() {
                                                 COLORS.textLight,
                                             fontSize: 14,
                                             fontWeight: '800',
-                                            marginBottom: 8,
+                                            marginBottom: 5,
+                                            paddingLeft: 10,
                                         }}
                                     >
                                         {isPaused

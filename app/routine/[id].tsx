@@ -7,7 +7,6 @@ import {
     View,
     Pressable,
     Modal,
-    Image,
     Animated,
     Easing,
     Linking,
@@ -18,12 +17,16 @@ import { COLORS } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
 import { getRoutine, Routine, RoutineExercise, markRoutineDone, saveExerciseCheckin, saveRoutineCheckin } from '../../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
-import { cssInterop } from 'nativewind';
 import {
     saveExerciseCheckinWithOfflineSupport,
     saveRoutineCheckinWithOfflineSupport,
 } from '../../lib/offlineActions';
 import AppHeader from '../../components/AppHeader';
+import {
+    getRoutineViewMode,
+    saveRoutineViewMode,
+    type RoutineViewMode,
+} from '../../lib/uiPreferences';
 
 
 // Columnas alineadas para la “tabla”
@@ -31,6 +34,186 @@ const colName = { flex: 4 };   // nombre ejercicio
 const colSets = { flex: 1.2 }; // series
 const colReps = { flex: 1.2 }; // reps
 const colNotes = { flex: 3 };  // notas
+
+function RoutineNavButton({
+    icon,
+    onPress,
+    active = false,
+    disabled = false,
+}: {
+    icon: React.ReactNode;
+    onPress: () => void;
+    active?: boolean;
+    disabled?: boolean;
+}) {
+    return (
+        <Pressable
+            onPress={onPress}
+            disabled={disabled}
+            style={({ pressed }) => ({
+                flex: 1,
+                minWidth: 0,
+                height: 58,
+
+                borderRadius: 17,
+
+                alignItems: 'center',
+                justifyContent: 'center',
+
+                backgroundColor:
+                    active
+                        ? 'rgba(198,255,0,0.12)'
+                        : pressed
+                            ? '#333333'
+                            : '#242424',
+
+                borderWidth: 3,
+
+                borderColor:
+                    active
+                        ? COLORS.primary
+                        : '#353535',
+
+                opacity:
+                    disabled
+                        ? 0.45
+                        : pressed
+                            ? 0.8
+                            : 1,
+            })}
+        >
+            {icon}
+        </Pressable>
+    );
+}
+
+function ScoreSelector({
+    value,
+    disabled = false,
+    onSelect,
+}: {
+    value: number | null;
+    disabled?: boolean;
+    onSelect: (score: number) => void;
+}) {
+    return (
+        <View>
+            <View
+                style={{
+                    flexDirection: 'row',
+                    width: '100%',
+                    gap: 3,
+                }}
+            >
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(
+                    (score) => {
+                        const selected =
+                            value === score;
+
+                        const backgroundColor =
+                            score <= 3
+                                ? '#EF5350'
+                                : score <= 7
+                                    ? '#6F6F6F'
+                                    : COLORS.primary;
+
+                        return (
+                            <Pressable
+                                key={score}
+                                disabled={disabled}
+                                onPress={() =>
+                                    onSelect(score)
+                                }
+                                style={({ pressed }) => ({
+                                    flex: 1,
+                                    minWidth: 0,
+
+                                    height: 31,
+
+                                    borderRadius: 7,
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+
+                                    backgroundColor,
+
+                                    opacity:
+                                        disabled &&
+                                            !selected
+                                            ? 0.3
+                                            : pressed
+                                                ? 0.75
+                                                : 1,
+
+                                    borderWidth:
+                                        selected
+                                            ? 2
+                                            : 0,
+
+                                    borderColor:
+                                        '#FFFFFF',
+
+                                    transform: [
+                                        {
+                                            scale:
+                                                selected
+                                                    ? 1.06
+                                                    : 1,
+                                        },
+                                    ],
+                                })}
+                            >
+                                <Text
+                                    style={{
+                                        color:
+                                            score >= 8
+                                                ? '#111111'
+                                                : '#FFFFFF',
+
+                                        fontSize: 10,
+                                        fontWeight: '900',
+                                    }}
+                                >
+                                    {score}
+                                </Text>
+                            </Pressable>
+                        );
+                    }
+                )}
+            </View>
+
+            <View
+                style={{
+                    flexDirection: 'row',
+                    justifyContent:
+                        'space-between',
+                    marginTop: 7,
+                }}
+            >
+                <Text
+                    style={{
+                        color: '#777777',
+                        fontSize: 8,
+                    }}
+                >
+                    Mayor dificultad
+                </Text>
+
+                <Text
+                    style={{
+                        color: '#777777',
+                        fontSize: 8,
+                    }}
+                >
+                    Muy bien
+                </Text>
+            </View>
+        </View>
+    );
+}
 
 export default function RoutineDetailScreen() {
     const { isAuthenticated } = useAuth();
@@ -45,9 +228,14 @@ export default function RoutineDetailScreen() {
 
     const [routineSurveyVisible, setRoutineSurveyVisible] = useState(false);
     const [routineScore, setRoutineScore] = useState<number | null>(null);
-    const [routineUiPhase, setRoutineUiPhase] = useState<
-        'idle' | 'survey' | 'savingAnswer' | 'successLoading' | 'saved'
-    >('idle');
+    const [
+        routineUiPhase,
+        setRoutineUiPhase,
+    ] = useState<
+        | 'survey'
+        | 'savingAnswer'
+        | 'saved'
+    >('survey');
     const [editModalVisible, setEditModalVisible] = useState(false);
 
     const [exerciseModalVisible, setExerciseModalVisible] = useState(false);
@@ -56,23 +244,142 @@ export default function RoutineDetailScreen() {
     const surveyAnim = React.useRef(new Animated.Value(0)).current;
     const successAnim = React.useRef(new Animated.Value(0)).current;
     const successIconAnim = React.useRef(new Animated.Value(0.85)).current;
+    const routineModalAnim =
+        React.useRef(
+            new Animated.Value(0)
+        ).current;
+
+    const routineModalAnimatedStyle:
+        Animated.WithAnimatedObject<any> = {
+        opacity: routineModalAnim,
+
+        transform: [
+            {
+                translateY:
+                    routineModalAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [28, 0],
+                    }),
+            },
+            {
+                scale:
+                    routineModalAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.96, 1],
+                    }),
+            },
+        ],
+    };
 
 
     const [exerciseScore, setExerciseScore] = useState<number | null>(null);
 
-    const [exerciseUiPhase, setExerciseUiPhase] = useState<
-        'idle' | 'openingSurvey' | 'survey' | 'savingAnswer' | 'successLoading' | 'saved'
+    const [
+        exerciseUiPhase,
+        setExerciseUiPhase,
+    ] = useState<
+        | 'idle'
+        | 'survey'
+        | 'savingAnswer'
+        | 'saved'
     >('idle');
 
     const [doneMarked, setDoneMarked] = useState(false);
 
-    const routineSuccessAnim = React.useRef(new Animated.Value(0)).current;
     const routineSuccessIconAnim = React.useRef(new Animated.Value(0.85)).current;
+    const exerciseModalAnim =
+        React.useRef(
+            new Animated.Value(0)
+        ).current;
 
-    const AnimatedView = cssInterop(Animated.View, {
-        className: "style",
-    });
+    const exerciseModalAnimatedStyle:
+        Animated.WithAnimatedObject<any> = {
+        opacity: exerciseModalAnim,
 
+        transform: [
+            {
+                translateY:
+                    exerciseModalAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [28, 0],
+                    }),
+            },
+            {
+                scale:
+                    exerciseModalAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.96, 1],
+                    }),
+            },
+        ],
+    };
+
+
+    const [
+        routineViewMode,
+        setRoutineViewMode,
+    ] = useState<RoutineViewMode>(
+        'table'
+    );
+
+    const [
+        viewPreferenceLoaded,
+        setViewPreferenceLoaded,
+    ] = useState(false);
+
+
+
+    useEffect(() => {
+        let active = true;
+
+        const loadViewPreference =
+            async () => {
+                try {
+                    const savedMode =
+                        await getRoutineViewMode();
+
+                    if (!active) {
+                        return;
+                    }
+
+                    setRoutineViewMode(
+                        savedMode
+                    );
+                } finally {
+                    if (active) {
+                        setViewPreferenceLoaded(
+                            true
+                        );
+                    }
+                }
+            };
+
+        void loadViewPreference();
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
+    const handleToggleRoutineView = () => {
+        const nextMode: RoutineViewMode =
+            routineViewMode === 'table'
+                ? 'cards'
+                : 'table';
+
+        /*
+         * El cambio visual ocurre
+         * inmediatamente.
+         */
+        setRoutineViewMode(nextMode);
+
+        /*
+         * La preferencia se guarda
+         * en segundo plano.
+         * NO esperamos el resultado.
+         */
+        void saveRoutineViewMode(nextMode);
+    };
 
 
 
@@ -121,8 +428,34 @@ export default function RoutineDetailScreen() {
 
     const handleDonePress = () => {
         setRoutineScore(null);
-        setRoutineUiPhase('idle');
-        setRoutineSurveyVisible(true);
+
+        setRoutineUiPhase(
+            'survey'
+        );
+
+        routineModalAnim.setValue(0);
+
+        setRoutineSurveyVisible(
+            true
+        );
+
+        requestAnimationFrame(() => {
+            Animated.timing(
+                routineModalAnim,
+                {
+                    toValue: 1,
+                    duration: 240,
+
+                    easing:
+                        Easing.out(
+                            Easing.cubic
+                        ),
+
+                    useNativeDriver:
+                        false,
+                }
+            ).start();
+        });
     };
 
 
@@ -135,7 +468,7 @@ export default function RoutineDetailScreen() {
                 toValue: 1.12,
                 duration: 180,
                 easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
             Animated.spring(successIconAnim, {
                 toValue: 1,
@@ -154,7 +487,7 @@ export default function RoutineDetailScreen() {
                 toValue: 1.12,
                 duration: 180,
                 easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
             Animated.spring(routineSuccessIconAnim, {
                 toValue: 1,
@@ -165,91 +498,137 @@ export default function RoutineDetailScreen() {
         ]).start();
     };
 
-    const routineSuccessAnimatedStyle: Animated.WithAnimatedObject<any> = {
-        opacity: routineSuccessAnim,
-        transform: [
-            {
-                translateY: routineSuccessAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [18, 0],
-                }),
-            },
-            {
-                scale: routineSuccessAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.97, 1],
-                }),
-            },
-        ],
-    };
 
 
 
 
 
-    const handleOpenRoutineSurvey = () => {
-        setRoutineUiPhase('survey');
-    };
 
 
-    const handleSelectRoutineScore = async (score: number) => {
-        if (!routine?.id) return;
 
-        try {
-            setRoutineScore(score);
-            setRoutineUiPhase('savingAnswer');
 
-            await wait(2000);
+    const handleSelectRoutineScore =
+        async (score: number) => {
+            if (!routine?.id) {
+                return;
+            }
 
-            const updatedRoutine = await markRoutineDone(routine.id);
-            const result = await saveRoutineCheckinWithOfflineSupport(routine.id, { score });
-            console.log('Resultado checkin rutina:', result);
+            try {
+                setRoutineScore(
+                    score
+                );
 
-            setRoutine(updatedRoutine);
-            setDoneMarked(true);
+                setRoutineUiPhase(
+                    'savingAnswer'
+                );
 
-            routineSuccessAnim.setValue(0);
-            setRoutineUiPhase('successLoading');
+                /*
+                 * Ejecutamos inmediatamente
+                 * las operaciones reales.
+                 */
+                const updatedRoutine =
+                    await markRoutineDone(
+                        routine.id
+                    );
 
-            requestAnimationFrame(() => {
-                animateIn(routineSuccessAnim);
-            });
+                const result =
+                    await saveRoutineCheckinWithOfflineSupport(
+                        routine.id,
+                        {
+                            score,
+                        }
+                    );
 
-            await wait(2000);
+                console.log(
+                    'Resultado checkin rutina:',
+                    result
+                );
 
-            setRoutineUiPhase('saved');
+                setRoutine(
+                    updatedRoutine
+                );
 
-            requestAnimationFrame(() => {
-                animateRoutineSuccessIcon();
-            });
-        } catch (error) {
-            console.error('Error guardando feedback de la rutina:', error);
-            setRoutineUiPhase('survey');
-        }
-    };
+                setDoneMarked(
+                    true
+                );
 
-    const closeRoutineSurveyModal = () => {
-        if (routineUiPhase === 'saved' || routineUiPhase === 'successLoading') {
-            animateOut(routineSuccessAnim, () => {
-                setRoutineSurveyVisible(false);
+                setRoutineUiPhase(
+                    'saved'
+                );
 
-                setTimeout(() => {
-                    routineSuccessAnim.setValue(0);
-                    routineSuccessIconAnim.setValue(0.85);
-                    setRoutineScore(null);
-                    setRoutineUiPhase('idle');
-                }, 220);
-            });
-            return;
-        }
+                requestAnimationFrame(
+                    () => {
+                        animateRoutineSuccessIcon();
+                    }
+                );
+            } catch (error) {
+                console.error(
+                    'Error guardando feedback de la rutina:',
+                    error
+                );
 
-        setRoutineSurveyVisible(false);
+                /*
+                 * Volvemos a permitir
+                 * seleccionar una nota.
+                 */
+                setRoutineUiPhase(
+                    'survey'
+                );
+            }
+        };
 
-        setTimeout(() => {
-            setRoutineScore(null);
-            setRoutineUiPhase('idle');
-        }, 0);
-    };
+    const closeRoutineSurveyModal =
+        () => {
+            /*
+             * Evitamos cerrar mientras
+             * estamos guardando.
+             */
+            if (
+                routineUiPhase ===
+                'savingAnswer'
+            ) {
+                return;
+            }
+
+            Animated.timing(
+                routineModalAnim,
+                {
+                    toValue: 0,
+
+                    duration: 180,
+
+                    easing:
+                        Easing.in(
+                            Easing.cubic
+                        ),
+
+                    useNativeDriver:
+                        false,
+                }
+            ).start(
+                ({ finished }) => {
+                    if (!finished) {
+                        return;
+                    }
+
+                    setRoutineSurveyVisible(
+                        false
+                    );
+
+                    setRoutineScore(
+                        null
+                    );
+
+                    setRoutineUiPhase(
+                        'survey'
+                    );
+
+                    routineSuccessIconAnim.setValue(
+                        0.85
+                    );
+                }
+            );
+        };
 
     const handleEditPress = () => {
         setEditModalVisible(true);
@@ -269,12 +648,41 @@ export default function RoutineDetailScreen() {
         setEditModalVisible(false);
     };
 
-    const openExerciseModal = (exercise: RoutineExercise, day: string) => {
+    const openExerciseModal = (
+        exercise: RoutineExercise,
+        day: string
+    ) => {
         setSelectedExercise(exercise);
         setSelectedExerciseDay(day);
+
         setExerciseScore(null);
         setExerciseUiPhase('idle');
+
+        exerciseModalAnim.setValue(0);
+
         setExerciseModalVisible(true);
+
+        requestAnimationFrame(() => {
+            Animated.timing(
+                exerciseModalAnim,
+                {
+                    toValue: 1,
+
+                    duration: 240,
+
+                    easing:
+                        Easing.out(
+                            Easing.cubic
+                        ),
+
+                    /*
+                     * false evita el warning
+                     * de React Native Web.
+                     */
+                    useNativeDriver: false,
+                }
+            ).start();
+        });
     };
 
     const handleSearchExerciseOnYoutube = async () => {
@@ -296,15 +704,22 @@ export default function RoutineDetailScreen() {
         }
     };
 
-    const handleOpenExerciseSurvey = async () => {
-        setExerciseUiPhase('openingSurvey');
-        await wait(2000);
-        setExerciseUiPhase('survey');
+    const handleOpenExerciseSurvey =
+        () => {
+            setExerciseUiPhase(
+                'survey'
+            );
 
-        requestAnimationFrame(() => {
-            animateIn(surveyAnim);
-        });
-    };
+            surveyAnim.setValue(0);
+
+            requestAnimationFrame(
+                () => {
+                    animateIn(
+                        surveyAnim
+                    );
+                }
+            );
+        };
 
     const handleCancelExerciseSurvey = () => {
         animateOut(surveyAnim, () => {
@@ -313,72 +728,126 @@ export default function RoutineDetailScreen() {
         });
     };
 
-    const handleSelectExerciseScore = async (score: number) => {
-        if (!selectedExercise?.id || !routine?.id) return;
+    const handleSelectExerciseScore =
+        async (
+            score: number
+        ) => {
+            if (
+                !selectedExercise?.id ||
+                !routine?.id
+            ) {
+                return;
+            }
 
-        try {
-            setExerciseScore(score);
-            setExerciseUiPhase('savingAnswer');
+            try {
+                setExerciseScore(
+                    score
+                );
 
-            await wait(2000);
+                setExerciseUiPhase(
+                    'savingAnswer'
+                );
 
-            const result = await saveExerciseCheckinWithOfflineSupport(selectedExercise.id, {
-                routineId: routine.id,
-                score,
-            });
-            console.log('Resultado checkin ejercicio:', result);
+                /*
+                 * Guardamos inmediatamente.
+                 */
+                const result =
+                    await saveExerciseCheckinWithOfflineSupport(
+                        selectedExercise.id,
+                        {
+                            routineId:
+                                routine.id,
 
-            successAnim.setValue(0);
-            setExerciseUiPhase('successLoading');
+                            score,
+                        }
+                    );
 
-            requestAnimationFrame(() => {
-                animateIn(successAnim);
-            });
+                console.log(
+                    'Resultado checkin ejercicio:',
+                    result
+                );
 
-            await wait(2000);
+                successAnim.setValue(
+                    0
+                );
 
-            setExerciseUiPhase('saved');
+                setExerciseUiPhase(
+                    'saved'
+                );
 
-            requestAnimationFrame(() => {
-                animateSuccessIcon();
-            });
-        } catch (error) {
-            console.error('Error guardando feedback del ejercicio:', error);
-            setExerciseUiPhase('survey');
-        }
-    };
+                requestAnimationFrame(
+                    () => {
+                        animateIn(
+                            successAnim
+                        );
+
+                        animateSuccessIcon();
+                    }
+                );
+            } catch (error) {
+                console.error(
+                    'Error guardando feedback del ejercicio:',
+                    error
+                );
+
+                setExerciseUiPhase(
+                    'survey'
+                );
+            }
+        };
 
     const closeExerciseModal = () => {
-        if (exerciseUiPhase === 'survey') {
-            animateOut(surveyAnim, () => {
-                setExerciseModalVisible(false);
-                setSelectedExercise(null);
-                setSelectedExerciseDay(null);
-                setExerciseScore(null);
-                setExerciseUiPhase('idle');
-            });
+        /*
+         * Mientras realmente se está
+         * guardando evitamos un cierre
+         * accidental.
+         */
+        if (
+            exerciseUiPhase ===
+            'savingAnswer'
+        ) {
             return;
         }
 
-        if (exerciseUiPhase === 'saved' || exerciseUiPhase === 'successLoading') {
-            animateOut(successAnim, () => {
-                setExerciseModalVisible(false);
-                setSelectedExercise(null);
-                setSelectedExerciseDay(null);
-                setExerciseScore(null);
-                setExerciseUiPhase('idle');
-            });
-            return;
-        }
+        Animated.timing(
+            exerciseModalAnim,
+            {
+                toValue: 0,
 
-        setExerciseModalVisible(false);
-        setSelectedExercise(null);
-        setSelectedExerciseDay(null);
-        setExerciseScore(null);
-        setExerciseUiPhase('idle');
+                duration: 180,
+
+                easing:
+                    Easing.in(
+                        Easing.cubic
+                    ),
+
+                useNativeDriver: false,
+            }
+        ).start(({ finished }) => {
+            if (!finished) {
+                return;
+            }
+
+            setExerciseModalVisible(false);
+
+            setSelectedExercise(null);
+            setSelectedExerciseDay(null);
+
+            setExerciseScore(null);
+
+            setExerciseUiPhase(
+                'idle'
+            );
+
+            surveyAnim.setValue(0);
+            successAnim.setValue(0);
+
+            successIconAnim.setValue(
+                0.85
+            );
+        });
     };
 
-    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const animateIn = (animValue: Animated.Value) => {
         animValue.setValue(0);
@@ -388,7 +857,7 @@ export default function RoutineDetailScreen() {
                 toValue: 1,
                 duration: 220,
                 easing: Easing.out(Easing.cubic),
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
         ]).start();
     };
@@ -399,7 +868,7 @@ export default function RoutineDetailScreen() {
                 toValue: 0,
                 duration: 180,
                 easing: Easing.in(Easing.cubic),
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
         ]).start(({ finished }) => {
             if (finished && onEnd) onEnd();
@@ -495,6 +964,7 @@ export default function RoutineDetailScreen() {
         });
 
     const groupedByDay: Record<string, RoutineExercise[]> = {};
+
     for (const ex of exercises) {
         const key = ex.day || 'Sin día';
         if (!groupedByDay[key]) groupedByDay[key] = [];
@@ -582,364 +1052,1570 @@ export default function RoutineDetailScreen() {
                                 </Text>
                             )}
 
-                            {/* TABLA AGRUPADA POR DÍA */}
-                            <View className="mt-3 px-4">
-                                {Object.entries(groupedByDay).map(([day, exs]) => (
-                                    <View key={day} className="mb-3">
-                                        {/* Día */}
-                                        <View className="mb-1">
-                                            <Text
-                                                className="text-left text-[13px] font-bold text-gray-400"
-                                            >
-                                                {day}
-                                            </Text>
-                                        </View>
+                            {/* VISUALIZACIÓN DE LA RUTINA */}
 
-                                        {/* Encabezados */}
-                                        <View className="flex-row border-b border-lime-400 pb-1 mb-1">
-                                            <Text
-                                                style={colName}
-                                                className="text-[14px] font-semibold text-gray-100"
-                                            >
-                                                Ejercicios
-                                            </Text>
-                                            <Text
-                                                style={colSets}
-                                                className="text-[14px] font-semibold text-gray-100 text-center"
-                                            >
-                                                Series
-                                            </Text>
-                                            <Text
-                                                style={colReps}
-                                                className="text-[14px] font-semibold text-gray-100 text-center"
-                                            >
-                                                Reps.
-                                            </Text>
-                                            <Text
-                                                style={colNotes}
-                                                className="text-[14px] font-semibold text-gray-100 text-right"
-                                            >
-                                                Notas
-                                            </Text>
-                                        </View>
-
-                                        {/* Filas */}
-                                        {exs.map((ex, index) => (
-                                            <Pressable
-                                                key={ex.id ?? `${day}-${index}`}
-                                                className="flex-row py-1 border-b border-neutral-800"
-                                                onPress={() => openExerciseModal(ex, day)}
-                                            >
-                                                <Text
-                                                    style={colName}
-                                                    className="text-[14px] text-gray-200"
-                                                    numberOfLines={1}
+                            <View
+                                style={{
+                                    marginTop: 12,
+                                    paddingHorizontal: 16,
+                                }}
+                            >
+                                {routineViewMode ===
+                                    'table' ? (
+                                    /*
+                                     * =========================
+                                     * VISTA 1 — TABLA
+                                     * =========================
+                                     */
+                                    <>
+                                        {Object.entries(
+                                            groupedByDay
+                                        ).map(
+                                            ([day, exs]) => (
+                                                <View
+                                                    key={day}
+                                                    style={{
+                                                        marginBottom:
+                                                            12,
+                                                    }}
                                                 >
-                                                    {ex.name}
-                                                </Text>
+                                                    {/* DÍA */}
 
-                                                <Text
-                                                    style={colSets}
-                                                    className="text-[14px] text-gray-300 text-center"
+                                                    <View
+                                                        style={{
+                                                            marginBottom:
+                                                                4,
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    '#9CA3AF',
+
+                                                                fontSize:
+                                                                    13,
+
+                                                                fontWeight:
+                                                                    '800',
+                                                            }}
+                                                        >
+                                                            {day}
+                                                        </Text>
+                                                    </View>
+
+                                                    {/* ENCABEZADOS */}
+
+                                                    <View
+                                                        style={{
+                                                            flexDirection:
+                                                                'row',
+
+                                                            borderBottomWidth:
+                                                                1,
+
+                                                            borderBottomColor:
+                                                                COLORS.primary,
+
+                                                            paddingBottom:
+                                                                4,
+
+                                                            marginBottom:
+                                                                4,
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={[
+                                                                colName,
+                                                                {
+                                                                    color:
+                                                                        '#F3F4F6',
+
+                                                                    fontSize:
+                                                                        14,
+
+                                                                    fontWeight:
+                                                                        '700',
+                                                                },
+                                                            ]}
+                                                        >
+                                                            Ejercicios
+                                                        </Text>
+
+                                                        <Text
+                                                            style={[
+                                                                colSets,
+                                                                {
+                                                                    color:
+                                                                        '#F3F4F6',
+
+                                                                    fontSize:
+                                                                        14,
+
+                                                                    fontWeight:
+                                                                        '700',
+
+                                                                    textAlign:
+                                                                        'center',
+                                                                },
+                                                            ]}
+                                                        >
+                                                            Series
+                                                        </Text>
+
+                                                        <Text
+                                                            style={[
+                                                                colReps,
+                                                                {
+                                                                    color:
+                                                                        '#F3F4F6',
+
+                                                                    fontSize:
+                                                                        14,
+
+                                                                    fontWeight:
+                                                                        '700',
+
+                                                                    textAlign:
+                                                                        'center',
+                                                                },
+                                                            ]}
+                                                        >
+                                                            Reps.
+                                                        </Text>
+
+                                                        <Text
+                                                            style={[
+                                                                colNotes,
+                                                                {
+                                                                    color:
+                                                                        '#F3F4F6',
+
+                                                                    fontSize:
+                                                                        14,
+
+                                                                    fontWeight:
+                                                                        '700',
+
+                                                                    textAlign:
+                                                                        'right',
+                                                                },
+                                                            ]}
+                                                        >
+                                                            Notas
+                                                        </Text>
+                                                    </View>
+
+                                                    {/* FILAS */}
+
+                                                    {exs.map(
+                                                        (
+                                                            ex,
+                                                            index
+                                                        ) => (
+                                                            <Pressable
+                                                                key={
+                                                                    ex.id ??
+                                                                    `${day}-${index}`
+                                                                }
+                                                                onPress={() =>
+                                                                    openExerciseModal(
+                                                                        ex,
+                                                                        day
+                                                                    )
+                                                                }
+                                                                style={({
+                                                                    pressed,
+                                                                }) => ({
+                                                                    flexDirection:
+                                                                        'row',
+
+                                                                    paddingVertical:
+                                                                        6,
+
+                                                                    borderBottomWidth:
+                                                                        1,
+
+                                                                    borderBottomColor:
+                                                                        '#262626',
+
+                                                                    backgroundColor:
+                                                                        pressed
+                                                                            ? '#202020'
+                                                                            : 'transparent',
+                                                                })}
+                                                            >
+                                                                <Text
+                                                                    style={[
+                                                                        colName,
+                                                                        {
+                                                                            color:
+                                                                                '#E5E7EB',
+
+                                                                            fontSize:
+                                                                                14,
+                                                                        },
+                                                                    ]}
+                                                                    numberOfLines={
+                                                                        1
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        ex.name
+                                                                    }
+                                                                </Text>
+
+                                                                <Text
+                                                                    style={[
+                                                                        colSets,
+                                                                        {
+                                                                            color:
+                                                                                '#D1D5DB',
+
+                                                                            fontSize:
+                                                                                14,
+
+                                                                            textAlign:
+                                                                                'center',
+                                                                        },
+                                                                    ]}
+                                                                >
+                                                                    {ex.sets ??
+                                                                        '-'}
+                                                                </Text>
+
+                                                                <Text
+                                                                    style={[
+                                                                        colReps,
+                                                                        {
+                                                                            color:
+                                                                                '#D1D5DB',
+
+                                                                            fontSize:
+                                                                                14,
+
+                                                                            textAlign:
+                                                                                'center',
+                                                                        },
+                                                                    ]}
+                                                                >
+                                                                    {ex.reps ??
+                                                                        '-'}
+                                                                </Text>
+
+                                                                <Text
+                                                                    style={[
+                                                                        colNotes,
+                                                                        {
+                                                                            color:
+                                                                                '#D1D5DB',
+
+                                                                            fontSize:
+                                                                                14,
+
+                                                                            textAlign:
+                                                                                'right',
+                                                                        },
+                                                                    ]}
+                                                                    numberOfLines={
+                                                                        1
+                                                                    }
+                                                                >
+                                                                    {ex.notes ??
+                                                                        '-'}
+                                                                </Text>
+                                                            </Pressable>
+                                                        )
+                                                    )}
+                                                </View>
+                                            )
+                                        )}
+                                    </>
+                                ) : (
+                                    /*
+                                     * =========================
+                                     * VISTA 2 — TARJETAS
+                                     * =========================
+                                     */
+                                    <>
+                                        {Object.entries(
+                                            groupedByDay
+                                        ).map(
+                                            ([day, exs]) => (
+                                                <View
+                                                    key={day}
+                                                    style={{
+                                                        marginBottom:
+                                                            18,
+                                                    }}
                                                 >
-                                                    {ex.sets ?? '-'}
-                                                </Text>
+                                                    {/* CABECERA DEL DÍA */}
 
-                                                <Text
-                                                    style={colReps}
-                                                    className="text-[14px] text-gray-300 text-center"
-                                                >
-                                                    {ex.reps ?? '-'}
-                                                </Text>
+                                                    <View
+                                                        style={{
+                                                            flexDirection:
+                                                                'row',
 
-                                                <Text
-                                                    style={colNotes}
-                                                    className="text-[14px] text-gray-300 text-right"
-                                                    numberOfLines={1}
-                                                >
-                                                    {ex.notes ?? '-'}
-                                                </Text>
-                                            </Pressable>
-                                        ))}
+                                                            alignItems:
+                                                                'center',
 
-                                    </View>
-                                ))}
+                                                            marginBottom:
+                                                                9,
+                                                        }}
+                                                    >
+                                                        <View
+                                                            style={{
+                                                                width: 28,
+                                                                height: 28,
+
+                                                                borderRadius:
+                                                                    14,
+
+                                                                alignItems:
+                                                                    'center',
+
+                                                                justifyContent:
+                                                                    'center',
+
+                                                                backgroundColor:
+                                                                    'rgba(198,255,0,0.08)',
+
+                                                                borderWidth:
+                                                                    1,
+
+                                                                borderColor:
+                                                                    'rgba(198,255,0,0.30)',
+                                                            }}
+                                                        >
+                                                            <Ionicons
+                                                                name="calendar-outline"
+                                                                size={15}
+                                                                color={
+                                                                    COLORS.primary
+                                                                }
+                                                            />
+                                                        </View>
+
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    COLORS.textLight,
+
+                                                                fontSize:
+                                                                    14,
+
+                                                                fontWeight:
+                                                                    '900',
+
+                                                                marginLeft:
+                                                                    8,
+                                                            }}
+                                                        >
+                                                            {day}
+                                                        </Text>
+
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    COLORS.textMuted,
+
+                                                                fontSize:
+                                                                    10,
+
+                                                                marginLeft:
+                                                                    7,
+                                                            }}
+                                                        >
+                                                            {exs.length}{' '}
+                                                            {exs.length ===
+                                                                1
+                                                                ? 'ejercicio'
+                                                                : 'ejercicios'}
+                                                        </Text>
+                                                    </View>
+
+                                                    {/* TARJETAS */}
+
+                                                    {exs.map(
+                                                        (
+                                                            ex,
+                                                            index
+                                                        ) => {
+                                                            const hasNotes =
+                                                                Boolean(
+                                                                    ex.notes &&
+                                                                    ex.notes
+                                                                        .trim()
+                                                                        .length >
+                                                                    0
+                                                                );
+
+                                                            return (
+                                                                <Pressable
+                                                                    key={
+                                                                        ex.id ??
+                                                                        `${day}-${index}`
+                                                                    }
+                                                                    onPress={() =>
+                                                                        openExerciseModal(
+                                                                            ex,
+                                                                            day
+                                                                        )
+                                                                    }
+                                                                    style={({
+                                                                        pressed,
+                                                                    }) => ({
+                                                                        backgroundColor:
+                                                                            pressed
+                                                                                ? '#222222'
+                                                                                : '#181818',
+
+                                                                        borderWidth:
+                                                                            1,
+
+                                                                        borderColor:
+                                                                            pressed
+                                                                                ? 'rgba(198,255,0,0.55)'
+                                                                                : '#303030',
+
+                                                                        borderRadius:
+                                                                            18,
+
+                                                                        padding:
+                                                                            13,
+
+                                                                        marginBottom:
+                                                                            9,
+
+                                                                        transform: [
+                                                                            {
+                                                                                scale:
+                                                                                    pressed
+                                                                                        ? 0.99
+                                                                                        : 1,
+                                                                            },
+                                                                        ],
+                                                                    })}
+                                                                >
+                                                                    {/* CABECERA EJERCICIO */}
+
+                                                                    <View
+                                                                        style={{
+                                                                            flexDirection:
+                                                                                'row',
+
+                                                                            alignItems:
+                                                                                'center',
+                                                                        }}
+                                                                    >
+                                                                        {/* NÚMERO */}
+
+                                                                        <View
+                                                                            style={{
+                                                                                width:
+                                                                                    31,
+
+                                                                                height:
+                                                                                    31,
+
+                                                                                borderRadius:
+                                                                                    16,
+
+                                                                                backgroundColor:
+                                                                                    '#222222',
+
+                                                                                borderWidth:
+                                                                                    1,
+
+                                                                                borderColor:
+                                                                                    '#383838',
+
+                                                                                alignItems:
+                                                                                    'center',
+
+                                                                                justifyContent:
+                                                                                    'center',
+
+                                                                                marginRight:
+                                                                                    10,
+                                                                            }}
+                                                                        >
+                                                                            <Text
+                                                                                style={{
+                                                                                    color:
+                                                                                        COLORS.primary,
+
+                                                                                    fontSize:
+                                                                                        11,
+
+                                                                                    fontWeight:
+                                                                                        '900',
+                                                                                }}
+                                                                            >
+                                                                                {String(
+                                                                                    index +
+                                                                                    1
+                                                                                ).padStart(
+                                                                                    2,
+                                                                                    '0'
+                                                                                )}
+                                                                            </Text>
+                                                                        </View>
+
+                                                                        {/* NOMBRE */}
+
+                                                                        <Text
+                                                                            numberOfLines={
+                                                                                2
+                                                                            }
+                                                                            style={{
+                                                                                flex: 1,
+
+                                                                                color:
+                                                                                    COLORS.textLight,
+
+                                                                                fontSize:
+                                                                                    15,
+
+                                                                                fontWeight:
+                                                                                    '900',
+
+                                                                                lineHeight:
+                                                                                    19,
+                                                                            }}
+                                                                        >
+                                                                            {
+                                                                                ex.name
+                                                                            }
+                                                                        </Text>
+
+                                                                        <Ionicons
+                                                                            name="chevron-forward"
+                                                                            size={18}
+                                                                            color="#666666"
+                                                                            style={{
+                                                                                marginLeft:
+                                                                                    6,
+                                                                            }}
+                                                                        />
+                                                                    </View>
+
+                                                                    {/* SERIES Y REPS */}
+
+                                                                    <View
+                                                                        style={{
+                                                                            flexDirection:
+                                                                                'row',
+
+                                                                            marginTop:
+                                                                                12,
+
+                                                                            gap: 8,
+                                                                        }}
+                                                                    >
+                                                                        <View
+                                                                            style={{
+                                                                                flex: 1,
+
+                                                                                backgroundColor:
+                                                                                    '#111111',
+
+                                                                                borderRadius:
+                                                                                    12,
+
+                                                                                paddingVertical:
+                                                                                    8,
+
+                                                                                paddingHorizontal:
+                                                                                    10,
+
+                                                                                borderWidth:
+                                                                                    1,
+
+                                                                                borderColor:
+                                                                                    '#292929',
+                                                                            }}
+                                                                        >
+                                                                            <Text
+                                                                                style={{
+                                                                                    color:
+                                                                                        '#747474',
+
+                                                                                    fontSize:
+                                                                                        8,
+
+                                                                                    fontWeight:
+                                                                                        '900',
+
+                                                                                    letterSpacing:
+                                                                                        0.7,
+                                                                                }}
+                                                                            >
+                                                                                SERIES
+                                                                            </Text>
+
+                                                                            <Text
+                                                                                style={{
+                                                                                    color:
+                                                                                        '#E5E5E5',
+
+                                                                                    fontSize:
+                                                                                        15,
+
+                                                                                    fontWeight:
+                                                                                        '900',
+
+                                                                                    marginTop:
+                                                                                        2,
+                                                                                }}
+                                                                            >
+                                                                                {ex.sets ??
+                                                                                    '-'}
+                                                                            </Text>
+                                                                        </View>
+
+                                                                        <View
+                                                                            style={{
+                                                                                flex: 1,
+
+                                                                                backgroundColor:
+                                                                                    '#111111',
+
+                                                                                borderRadius:
+                                                                                    12,
+
+                                                                                paddingVertical:
+                                                                                    8,
+
+                                                                                paddingHorizontal:
+                                                                                    10,
+
+                                                                                borderWidth:
+                                                                                    1,
+
+                                                                                borderColor:
+                                                                                    '#292929',
+                                                                            }}
+                                                                        >
+                                                                            <Text
+                                                                                style={{
+                                                                                    color:
+                                                                                        '#747474',
+
+                                                                                    fontSize:
+                                                                                        8,
+
+                                                                                    fontWeight:
+                                                                                        '900',
+
+                                                                                    letterSpacing:
+                                                                                        0.7,
+                                                                                }}
+                                                                            >
+                                                                                REPETICIONES
+                                                                            </Text>
+
+                                                                            <Text
+                                                                                style={{
+                                                                                    color:
+                                                                                        '#E5E5E5',
+
+                                                                                    fontSize:
+                                                                                        15,
+
+                                                                                    fontWeight:
+                                                                                        '900',
+
+                                                                                    marginTop:
+                                                                                        2,
+                                                                                }}
+                                                                            >
+                                                                                {ex.reps ??
+                                                                                    '-'}
+                                                                            </Text>
+                                                                        </View>
+                                                                    </View>
+
+                                                                    {/* NOTAS */}
+
+                                                                    {hasNotes && (
+                                                                        <View
+                                                                            style={{
+                                                                                flexDirection:
+                                                                                    'row',
+
+                                                                                alignItems:
+                                                                                    'flex-start',
+
+                                                                                marginTop:
+                                                                                    10,
+
+                                                                                paddingTop:
+                                                                                    9,
+
+                                                                                borderTopWidth:
+                                                                                    1,
+
+                                                                                borderTopColor:
+                                                                                    '#292929',
+                                                                            }}
+                                                                        >
+                                                                            <Ionicons
+                                                                                name="document-text-outline"
+                                                                                size={14}
+                                                                                color="#777777"
+                                                                                style={{
+                                                                                    marginRight:
+                                                                                        6,
+
+                                                                                    marginTop:
+                                                                                        1,
+                                                                                }}
+                                                                            />
+
+                                                                            <Text
+                                                                                numberOfLines={
+                                                                                    2
+                                                                                }
+                                                                                style={{
+                                                                                    flex: 1,
+
+                                                                                    color:
+                                                                                        '#999999',
+
+                                                                                    fontSize:
+                                                                                        10,
+
+                                                                                    lineHeight:
+                                                                                        15,
+                                                                                }}
+                                                                            >
+                                                                                {
+                                                                                    ex.notes
+                                                                                }
+                                                                            </Text>
+                                                                        </View>
+                                                                    )}
+                                                                </Pressable>
+                                                            );
+                                                        }
+                                                    )}
+                                                </View>
+                                            )
+                                        )}
+                                    </>
+                                )}
                             </View>
                         </ScrollView>
                     </View>
                 </View>
 
 
-                {/* Modal: detalle de ejercicio + encuesta */}
+                {/* MODAL: DETALLE + VALORACIÓN DEL EJERCICIO */}
+
                 <Modal
                     visible={exerciseModalVisible}
                     transparent
-                    animationType="fade"
+                    animationType="none"
                     onRequestClose={closeExerciseModal}
                 >
                     <View
-                        className="flex-1 justify-center items-center px-4"
-                        style={{ backgroundColor: 'rgba(0,0,0,0.65)' }}
+                        style={{
+                            flex: 1,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            padding: 20,
+                        }}
                     >
+                        {/* FONDO OSCURO ANIMADO */}
 
-                        {/* ======================= */}
-                        {/* MODAL DE ÉXITO */}
-                        {/* ======================= */}
-                        {(exerciseUiPhase === 'successLoading' || exerciseUiPhase === 'saved') ? (
-                            <View style={{ width: '100%', maxWidth: 340, alignItems: 'center' }}>
-                                <Animated.View
-                                    style={[
-                                        {
-                                            width: '100%',
-                                            alignItems: 'center',
-                                        },
-                                        successAnimatedStyle,
-                                    ]}
-                                >
-                                    <Pressable
-                                        onPress={closeExerciseModal}
-                                        style={{ marginBottom: 10 }}
-                                        hitSlop={8}
-                                    >
-                                        <Ionicons name="close" size={28} color="#d1d5db" />
-                                    </Pressable>
+                        <Animated.View
+                            pointerEvents="none"
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+
+                                backgroundColor: '#000000',
+
+                                opacity: exerciseModalAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [0, 0.76],
+                                }),
+                            }}
+                        />
+
+                        {/* TARJETA PRINCIPAL */}
+
+                        <Animated.View
+                            style={[
+                                {
+                                    width: '100%',
+                                    maxWidth: 390,
+                                    maxHeight: '88%',
+
+                                    backgroundColor: '#101010',
+
+                                    borderRadius: 24,
+
+                                    borderWidth: 1,
+                                    borderColor: '#343434',
+
+                                    padding: 18,
+
+                                    shadowColor: '#000000',
+                                    shadowOpacity: 0.55,
+                                    shadowRadius: 24,
+
+                                    shadowOffset: {
+                                        width: 0,
+                                        height: 10,
+                                    },
+
+                                    elevation: 12,
+                                },
+
+                                exerciseModalAnimatedStyle,
+                            ]}
+                        >
+                            {selectedExercise &&
+                                exerciseUiPhase !== 'saved' ? (
+                                <>
+                                    {/* HEADER */}
 
                                     <View
-                                        className="w-full rounded-3xl px-5 py-6 items-center"
                                         style={{
-                                            backgroundColor: COLORS.background,
-                                            borderWidth: 2,
-                                            borderColor: '#C6FF00',
-                                            minHeight: 220,
-                                            justifyContent: 'center',
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            marginBottom: 16,
                                         }}
                                     >
-                                        {exerciseUiPhase === 'successLoading' ? (
-                                            <>
-                                                <ActivityIndicator size="large" color="#A3E635" />
-                                                <Text
-                                                    className="text-[16px] font-semibold mt-4"
-                                                    style={{ color: '#ffffff' }}
-                                                >
-                                                    Guardando resultado...
-                                                </Text>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Animated.View
-                                                    style={{
-                                                        transform: [{ scale: successIconAnim }],
-                                                    }}
-                                                >
-                                                    <Ionicons
-                                                        name="checkmark-circle-outline"
-                                                        size={72}
-                                                        color="#A3E635"
-                                                    />
-                                                </Animated.View>
-
-                                                <Text
-                                                    className="text-[22px] font-bold mt-3 mb-2"
-                                                    style={{ color: '#ffffff' }}
-                                                >
-                                                    ¡Muy bien!
-                                                </Text>
-
-                                                <Text
-                                                    className="text-center text-[13px]"
-                                                    style={{ color: '#f3f4f6' }}
-                                                >
-                                                    ¡Tus datos han sido guardados con éxito! Respira dos minutos y continúa con la rutina.
-                                                </Text>
-                                            </>
-                                        )}
-                                    </View>
-                                </Animated.View>
-                            </View>
-                        ) : (
-
-                            /* ======================= */
-                            /* MODAL NORMAL */
-                            /* ======================= */
-                            <View style={{ width: '100%', maxWidth: 340, alignItems: 'center' }}>
-
-                                {/* Cerrar */}
-                                <Pressable
-                                    onPress={closeExerciseModal}
-                                    style={{ marginBottom: 10 }}
-                                    hitSlop={8}
-                                >
-                                    <Ionicons name="close" size={28} color="#d1d5db" />
-                                </Pressable>
-
-                                {selectedExercise && (
-                                    <>
-                                        {/* Tarjeta principal */}
                                         <View
-                                            className="w-full rounded-3xl px-4 py-4 mb-4"
                                             style={{
-                                                backgroundColor: COLORS.background,
-                                                borderWidth: 2,
-                                                borderColor: '#C6FF00',
+                                                width: 46,
+                                                height: 46,
+
+                                                borderRadius: 23,
+
+                                                backgroundColor:
+                                                    'rgba(198,255,0,0.08)',
+
+                                                borderWidth: 1,
+                                                borderColor:
+                                                    'rgba(198,255,0,0.35)',
+
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}
+                                        >
+                                            <Ionicons
+                                                name="barbell-outline"
+                                                size={24}
+                                                color={COLORS.primary}
+                                            />
+                                        </View>
+
+                                        <View
+                                            style={{
+                                                flex: 1,
+                                                marginLeft: 12,
                                             }}
                                         >
                                             <Text
-                                                className="text-[28px] font-bold text-center underline mb-2"
-                                                style={{ color: '#ffffff' }}
                                                 numberOfLines={2}
+                                                style={{
+                                                    color:
+                                                        COLORS.textLight,
+
+                                                    fontSize: 18,
+                                                    lineHeight: 22,
+
+                                                    fontWeight: '900',
+                                                }}
                                             >
                                                 {selectedExercise.name}
                                             </Text>
 
-                                            <Pressable onPress={handleSearchExerciseOnYoutube}>
-                                                <Text
-                                                    className="text-center text-[11px] mb-2 underline"
-                                                    style={{ color: '#9ca3af' }}
-                                                >
-                                                    ¿Buscar cómo hacer ejercicio?
-                                                </Text>
-                                            </Pressable>
+                                            <Text
+                                                style={{
+                                                    color:
+                                                        COLORS.textMuted,
 
-                                            <View className="flex-row justify-between mb-2 px-4">
-                                                <Text className="text-[19px]" style={{ color: '#ffffff' }}>
-                                                    Series: {selectedExercise.sets ?? '-'}
-                                                </Text>
-                                                <Text className="text-[19px]" style={{ color: '#ffffff' }}>
-                                                    Repeticiones: {selectedExercise.reps ?? '-'}
+                                                    fontSize: 10,
+                                                    marginTop: 3,
+                                                }}
+                                            >
+                                                {selectedExerciseDay ??
+                                                    'Ejercicio de la rutina'}
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {/* CONTENIDO SCROLLEABLE */}
+
+                                    <ScrollView
+                                        showsVerticalScrollIndicator={
+                                            false
+                                        }
+                                        style={{
+                                            flexShrink: 1,
+                                        }}
+                                        contentContainerStyle={{
+                                            paddingBottom: 2,
+                                        }}
+                                    >
+                                        {/* SERIES + REPETICIONES */}
+
+                                        <View
+                                            style={{
+                                                flexDirection: 'row',
+                                                gap: 8,
+                                            }}
+                                        >
+                                            <View
+                                                style={{
+                                                    flex: 1,
+
+                                                    backgroundColor:
+                                                        '#181818',
+
+                                                    borderWidth: 1,
+                                                    borderColor:
+                                                        '#292929',
+
+                                                    borderRadius: 15,
+
+                                                    padding: 12,
+                                                }}
+                                            >
+                                                <View
+                                                    style={{
+                                                        flexDirection:
+                                                            'row',
+
+                                                        alignItems:
+                                                            'center',
+                                                    }}
+                                                >
+                                                    <Ionicons
+                                                        name="layers-outline"
+                                                        size={16}
+                                                        color={
+                                                            COLORS.primary
+                                                        }
+                                                    />
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#888888',
+
+                                                            fontSize: 9,
+
+                                                            fontWeight:
+                                                                '800',
+
+                                                            marginLeft: 6,
+                                                        }}
+                                                    >
+                                                        SERIES
+                                                    </Text>
+                                                </View>
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.textLight,
+
+                                                        fontSize: 20,
+
+                                                        fontWeight:
+                                                            '900',
+
+                                                        marginTop: 6,
+                                                    }}
+                                                >
+                                                    {selectedExercise.sets ??
+                                                        '-'}
                                                 </Text>
                                             </View>
 
                                             <View
-                                                className="rounded-2xl px-4 py-3 mb-2 mx-2"
-                                                style={{ backgroundColor: '#2a2a2a' }}
-                                            >
-                                                <Text className="text-[13px] mb-1" style={{ color: '#ffffff' }}>
-                                                    Notas:
-                                                </Text>
+                                                style={{
+                                                    flex: 1,
 
-                                                <Text className="text-[13px]" style={{ color: '#d1d5db' }}>
-                                                    {selectedExercise.notes && selectedExercise.notes.trim().length > 0
-                                                        ? selectedExercise.notes
-                                                        : 'Sin notas adicionales.'}
+                                                    backgroundColor:
+                                                        '#181818',
+
+                                                    borderWidth: 1,
+                                                    borderColor:
+                                                        '#292929',
+
+                                                    borderRadius: 15,
+
+                                                    padding: 12,
+                                                }}
+                                            >
+                                                <View
+                                                    style={{
+                                                        flexDirection:
+                                                            'row',
+
+                                                        alignItems:
+                                                            'center',
+                                                    }}
+                                                >
+                                                    <Ionicons
+                                                        name="repeat-outline"
+                                                        size={16}
+                                                        color={
+                                                            COLORS.primary
+                                                        }
+                                                    />
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#888888',
+
+                                                            fontSize: 9,
+
+                                                            fontWeight:
+                                                                '800',
+
+                                                            marginLeft: 6,
+                                                        }}
+                                                    >
+                                                        REPETICIONES
+                                                    </Text>
+                                                </View>
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.textLight,
+
+                                                        fontSize: 20,
+
+                                                        fontWeight:
+                                                            '900',
+
+                                                        marginTop: 6,
+                                                    }}
+                                                >
+                                                    {selectedExercise.reps ??
+                                                        '-'}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* NOTAS */}
+
+                                        <View
+                                            style={{
+                                                backgroundColor:
+                                                    '#181818',
+
+                                                borderWidth: 1,
+                                                borderColor:
+                                                    '#292929',
+
+                                                borderRadius: 15,
+
+                                                padding: 12,
+
+                                                marginTop: 9,
+                                            }}
+                                        >
+                                            <View
+                                                style={{
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    marginBottom: 6,
+                                                }}
+                                            >
+                                                <Ionicons
+                                                    name="document-text-outline"
+                                                    size={16}
+                                                    color="#C7C7C7"
+                                                />
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            '#888888',
+
+                                                        fontSize: 9,
+
+                                                        fontWeight:
+                                                            '800',
+
+                                                        marginLeft: 6,
+                                                    }}
+                                                >
+                                                    NOTAS
                                                 </Text>
                                             </View>
 
-                                            {/* Estados del botón */}
-                                            {exerciseUiPhase === 'idle' && (
-                                                <Pressable
-                                                    onPress={handleOpenExerciseSurvey}
-                                                    className="rounded-full py-3 items-center justify-center m-4"
-                                                    style={{ backgroundColor: '#6b7280' }}
-                                                >
-                                                    <Text className="text-[15px] font-semibold" style={{ color: '#ffffff' }}>
-                                                        Marcar como realizado
-                                                    </Text>
-                                                </Pressable>
-                                            )}
+                                            <Text
+                                                style={{
+                                                    color: '#C5C5C5',
 
-                                            {exerciseUiPhase === 'openingSurvey' && (
-                                                <View
-                                                    className="rounded-full py-3 items-center justify-center m-4 flex-row"
-                                                    style={{ backgroundColor: '#2a2a2a' }}
-                                                >
-                                                    <ActivityIndicator size="small" color="#ffffff" />
-                                                    <Text className="text-[15px] font-semibold ml-2" style={{ color: '#ffffff' }}>
-                                                        Cargando...
-                                                    </Text>
-                                                </View>
-                                            )}
-
-                                            {exerciseUiPhase === 'survey' && (
-                                                <Pressable
-                                                    onPress={handleCancelExerciseSurvey}
-                                                    className="rounded-full py-3 items-center justify-center m-4"
-                                                    style={{ backgroundColor: '#2a2a2a' }}
-                                                >
-                                                    <Text className="text-[15px] font-semibold" style={{ color: '#ffffff' }}>
-                                                        Cancelar estado
-                                                    </Text>
-                                                </Pressable>
-                                            )}
-
-                                            {exerciseUiPhase === 'savingAnswer' && (
-                                                <View
-                                                    className="rounded-full py-3 items-center justify-center m-4 flex-row"
-                                                    style={{ backgroundColor: '#2a2a2a' }}
-                                                >
-                                                    <ActivityIndicator size="small" color="#ffffff" />
-                                                    <Text className="text-[15px] font-semibold ml-2" style={{ color: '#ffffff' }}>
-                                                        Guardando...
-                                                    </Text>
-                                                </View>
-                                            )}
+                                                    fontSize: 11,
+                                                    lineHeight: 17,
+                                                }}
+                                            >
+                                                {selectedExercise.notes &&
+                                                    selectedExercise.notes
+                                                        .trim().length > 0
+                                                    ? selectedExercise.notes
+                                                    : 'Sin notas adicionales.'}
+                                            </Text>
                                         </View>
 
-                                        {/* Encuesta */}
-                                        {(exerciseUiPhase === 'survey' || exerciseUiPhase === 'savingAnswer') && (
-                                            <Animated.View
-                                                className="w-full rounded-2xl px-4 py-3"
-                                                style={[
-                                                    {
-                                                        backgroundColor: COLORS.background,
-                                                        borderWidth: 2,
-                                                        borderColor: '#C6FF00',
-                                                    },
-                                                    surveyAnimatedStyle,
-                                                ]}
+                                        {/* YOUTUBE */}
+
+                                        <Pressable
+                                            onPress={
+                                                handleSearchExerciseOnYoutube
+                                            }
+                                            style={({ pressed }) => ({
+                                                height: 42,
+
+                                                borderRadius: 13,
+
+                                                marginTop: 9,
+
+                                                borderWidth: 1,
+                                                borderColor:
+                                                    '#343434',
+
+                                                backgroundColor:
+                                                    pressed
+                                                        ? '#292929'
+                                                        : '#181818',
+
+                                                flexDirection: 'row',
+
+                                                alignItems: 'center',
+                                                justifyContent:
+                                                    'center',
+                                            })}
+                                        >
+                                            <Ionicons
+                                                name="logo-youtube"
+                                                size={18}
+                                                color="#C7C7C7"
+                                            />
+
+                                            <Text
+                                                style={{
+                                                    color: '#C7C7C7',
+
+                                                    fontSize: 11,
+
+                                                    fontWeight:
+                                                        '800',
+
+                                                    marginLeft: 7,
+                                                }}
                                             >
-                                                <Text
-                                                    className="text-[13px] text-center font-semibold mb-2"
-                                                    style={{ color: '#ffffff' }}
+                                                Buscar cómo hacer el ejercicio
+                                            </Text>
+                                        </Pressable>
+
+                                        {/* BOTÓN VALORAR */}
+
+                                        {exerciseUiPhase ===
+                                            'idle' && (
+                                                <Pressable
+                                                    onPress={
+                                                        handleOpenExerciseSurvey
+                                                    }
+                                                    style={({
+                                                        pressed,
+                                                    }) => ({
+                                                        height: 46,
+
+                                                        borderRadius:
+                                                            14,
+
+                                                        marginTop:
+                                                            12,
+
+                                                        alignItems:
+                                                            'center',
+
+                                                        justifyContent:
+                                                            'center',
+
+                                                        backgroundColor:
+                                                            pressed
+                                                                ? '#B4E800'
+                                                                : COLORS.primary,
+                                                    })}
                                                 >
-                                                    ¿Cómo te fue con este ejercicio?
-                                                </Text>
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#101010',
 
-                                                <View className="flex-row flex-wrap justify-between mb-2">
-                                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((value) => {
-                                                        const bg = value <= 3 ? '#ff4d4f' : value <= 7 ? '#8b8b8b' : '#7cb342';
+                                                            fontSize: 13,
 
-                                                        return (
-                                                            <Pressable
-                                                                key={value}
-                                                                onPress={() => handleSelectExerciseScore(value)}
+                                                            fontWeight:
+                                                                '900',
+                                                        }}
+                                                    >
+                                                        Valorar ejercicio
+                                                    </Text>
+                                                </Pressable>
+                                            )}
+
+                                        {/* ENCUESTA */}
+
+                                        {(exerciseUiPhase ===
+                                            'survey' ||
+                                            exerciseUiPhase ===
+                                            'savingAnswer') && (
+                                                <Animated.View
+                                                    style={[
+                                                        {
+                                                            width: '100%',
+
+                                                            backgroundColor:
+                                                                '#181818',
+
+                                                            borderWidth:
+                                                                1,
+
+                                                            borderColor:
+                                                                'rgba(198,255,0,0.35)',
+
+                                                            borderRadius:
+                                                                16,
+
+                                                            padding:
+                                                                13,
+
+                                                            marginTop:
+                                                                12,
+                                                        },
+
+                                                        surveyAnimatedStyle,
+                                                    ]}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                COLORS.textLight,
+
+                                                            fontSize: 13,
+
+                                                            fontWeight:
+                                                                '900',
+
+                                                            textAlign:
+                                                                'center',
+
+                                                            marginBottom:
+                                                                11,
+                                                        }}
+                                                    >
+                                                        ¿Cómo te fue con este ejercicio?
+                                                    </Text>
+
+                                                    {/* SELECTOR RESPONSIVE */}
+
+                                                    <ScoreSelector
+                                                        value={
+                                                            exerciseScore
+                                                        }
+                                                        disabled={
+                                                            exerciseUiPhase ===
+                                                            'savingAnswer'
+                                                        }
+                                                        onSelect={
+                                                            handleSelectExerciseScore
+                                                        }
+                                                    />
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#777777',
+
+                                                            fontSize: 9,
+
+                                                            lineHeight:
+                                                                14,
+
+                                                            textAlign:
+                                                                'center',
+
+                                                            marginTop:
+                                                                11,
+                                                        }}
+                                                    >
+                                                        Tu valoración se utilizará para actualizar tus estadísticas.
+                                                    </Text>
+
+                                                    {/* GUARDANDO */}
+
+                                                    {exerciseUiPhase ===
+                                                        'savingAnswer' && (
+                                                            <View
                                                                 style={{
-                                                                    width: 27,
-                                                                    height: 27,
-                                                                    borderRadius: 3,
-                                                                    backgroundColor: bg,
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                    marginBottom: 6,
-                                                                    opacity:
-                                                                        exerciseUiPhase === 'savingAnswer'
-                                                                            ? exerciseScore === value
-                                                                                ? 1
-                                                                                : 0.35
-                                                                            : 1,
-                                                                    borderWidth: exerciseScore === value ? 2 : 0,
-                                                                    borderColor: exerciseScore === value ? '#ffffff' : 'transparent',
+                                                                    flexDirection:
+                                                                        'row',
+
+                                                                    alignItems:
+                                                                        'center',
+
+                                                                    justifyContent:
+                                                                        'center',
+
+                                                                    marginTop:
+                                                                        13,
                                                                 }}
                                                             >
-                                                                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
-                                                                    {value}
-                                                                </Text>
-                                                            </Pressable>
-                                                        );
-                                                    })}
-                                                </View>
+                                                                <ActivityIndicator
+                                                                    size="small"
+                                                                    color={
+                                                                        COLORS.primary
+                                                                    }
+                                                                />
 
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            '#AAAAAA',
+
+                                                                        fontSize:
+                                                                            10,
+
+                                                                        fontWeight:
+                                                                            '700',
+
+                                                                        marginLeft:
+                                                                            7,
+                                                                    }}
+                                                                >
+                                                                    Guardando valoración...
+                                                                </Text>
+                                                            </View>
+                                                        )}
+                                                </Animated.View>
+                                            )}
+                                    </ScrollView>
+
+                                    {/* FOOTER */}
+
+                                    {exerciseUiPhase !==
+                                        'savingAnswer' && (
+                                            <Pressable
+                                                onPress={
+                                                    exerciseUiPhase ===
+                                                        'survey'
+                                                        ? handleCancelExerciseSurvey
+                                                        : closeExerciseModal
+                                                }
+                                                style={({ pressed }) => ({
+                                                    height: 43,
+
+                                                    borderRadius: 13,
+
+                                                    marginTop: 13,
+
+                                                    backgroundColor:
+                                                        pressed
+                                                            ? '#303030'
+                                                            : '#222222',
+
+                                                    borderWidth: 1,
+                                                    borderColor:
+                                                        '#343434',
+
+                                                    alignItems: 'center',
+                                                    justifyContent:
+                                                        'center',
+                                                })}
+                                            >
                                                 <Text
-                                                    className="text-center text-[10px] font-semibold"
-                                                    style={{ color: '#f3f4f6' }}
+                                                    style={{
+                                                        color: '#C7C7C7',
+
+                                                        fontSize: 11,
+
+                                                        fontWeight:
+                                                            '800',
+                                                    }}
                                                 >
-                                                    Al calificar aportas datos a tus estadísticas
+                                                    {exerciseUiPhase ===
+                                                        'survey'
+                                                        ? 'Cancelar valoración'
+                                                        : 'Cerrar'}
                                                 </Text>
-                                            </Animated.View>
+                                            </Pressable>
                                         )}
-                                    </>
-                                )}
-                            </View>
-                        )}
+                                </>
+                            ) : (
+                                /*
+                                 * ========================
+                                 * VALORACIÓN GUARDADA
+                                 * ========================
+                                 */
+
+                                <Animated.View
+                                    style={[
+                                        {
+                                            alignItems:
+                                                'center',
+
+                                            paddingVertical:
+                                                15,
+                                        },
+
+                                        successAnimatedStyle,
+                                    ]}
+                                >
+                                    <Animated.View
+                                        style={{
+                                            transform: [
+                                                {
+                                                    scale:
+                                                        successIconAnim,
+                                                },
+                                            ],
+                                        }}
+                                    >
+                                        <Ionicons
+                                            name="checkmark-circle"
+                                            size={76}
+                                            color={COLORS.primary}
+                                        />
+                                    </Animated.View>
+
+                                    <Text
+                                        style={{
+                                            color:
+                                                COLORS.textLight,
+
+                                            fontSize: 21,
+
+                                            fontWeight:
+                                                '900',
+
+                                            marginTop: 9,
+                                        }}
+                                    >
+                                        ¡Muy bien!
+                                    </Text>
+
+                                    {/* PUNTUACIÓN */}
+
+                                    {exerciseScore != null && (
+                                        <View
+                                            style={{
+                                                backgroundColor:
+                                                    'rgba(198,255,0,0.08)',
+
+                                                borderWidth: 1,
+
+                                                borderColor:
+                                                    'rgba(198,255,0,0.30)',
+
+                                                borderRadius:
+                                                    999,
+
+                                                paddingHorizontal:
+                                                    18,
+
+                                                paddingVertical:
+                                                    7,
+
+                                                marginTop: 11,
+                                            }}
+                                        >
+                                            <Text
+                                                style={{
+                                                    color:
+                                                        COLORS.primary,
+
+                                                    fontSize: 18,
+
+                                                    fontWeight:
+                                                        '900',
+                                                }}
+                                            >
+                                                {exerciseScore} / 10
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    <Text
+                                        style={{
+                                            color:
+                                                COLORS.textMuted,
+
+                                            fontSize: 12,
+
+                                            lineHeight: 18,
+
+                                            textAlign:
+                                                'center',
+
+                                            marginTop: 13,
+
+                                            maxWidth: 280,
+                                        }}
+                                    >
+                                        Tu valoración fue guardada correctamente y ya forma parte de tus estadísticas.
+                                    </Text>
+
+                                    {/* ÚNICA SALIDA DEL ÉXITO */}
+
+                                    <Pressable
+                                        onPress={
+                                            closeExerciseModal
+                                        }
+                                        style={({ pressed }) => ({
+                                            width: '100%',
+
+                                            height: 46,
+
+                                            borderRadius: 14,
+
+                                            marginTop: 20,
+
+                                            alignItems:
+                                                'center',
+
+                                            justifyContent:
+                                                'center',
+
+                                            backgroundColor:
+                                                pressed
+                                                    ? '#B4E800'
+                                                    : COLORS.primary,
+                                        })}
+                                    >
+                                        <Text
+                                            style={{
+                                                color: '#101010',
+
+                                                fontSize: 13,
+
+                                                fontWeight:
+                                                    '900',
+                                            }}
+                                        >
+                                            Entendido
+                                        </Text>
+                                    </Pressable>
+                                </Animated.View>
+                            )}
+                        </Animated.View>
                     </View>
                 </Modal>
 
@@ -1023,305 +2699,647 @@ export default function RoutineDetailScreen() {
 
 
                 {/* Botones inferiores */}
+                {/* NAVEGACIÓN INFERIOR */}
 
-                <View className="flex-row justify-between mb-2">
-                    {/* REALIZADA - más grande (2x) */}
-                    <Pressable
-                        onPress={handleDonePress}
-                        className="flex-1 mr-2 px-4 py-3 rounded-xl items-center justify-center"
-                        style={{
-                            backgroundColor: doneMarked ? COLORS.primary : '#444444',
-                        }}
-                    >
-                        <View className="flex-row items-center justify-center">
+                <View
+                    style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+
+                        gap: 8,
+
+                        marginTop: 4,
+                        marginBottom: 8,
+                    }}
+                >
+                    {/* 1 — HOME */}
+
+                    <RoutineNavButton
+                        onPress={() =>
+                            router.replace('/home')
+                        }
+                        icon={
                             <Ionicons
-                                name={doneMarked ? 'checkmark-circle' : 'checkmark'}
-                                size={18}
-                                color={doneMarked ? '#111111' : COLORS.textLight}
+                                name="home-outline"
+                                size={27}
+                                color="#FFFFFF"
                             />
-                            <Text
-                                className="text-[14px] font-normal ml-2"
-                                style={{ color: doneMarked ? '#111111' : COLORS.textLight }}
-                            >
-                                {doneMarked ? 'Rutina realizada' : 'Realizada'}
-                            </Text>
-                        </View>
-                    </Pressable>
+                        }
+                    />
 
-                    {/* EDITAR RUTINA */}
-                    <Pressable
+                    {/* 2 — ESTADÍSTICAS */}
+
+                    <RoutineNavButton
+                        onPress={() =>
+                            router.push(
+                                '/statistics'
+                            )
+                        }
+                        icon={
+                            <Ionicons
+                                name="stats-chart-outline"
+                                size={27}
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
+
+                    {/* 3 — VALORAR RUTINA */}
+
+                    <RoutineNavButton
+                        onPress={
+                            handleDonePress
+                        }
+                        active={
+                            doneMarked
+                        }
+                        icon={
+                            <Ionicons
+                                name={
+                                    doneMarked
+                                        ? 'checkbox'
+                                        : 'checkbox-outline'
+                                }
+                                size={29}
+                                color={
+                                    doneMarked
+                                        ? COLORS.primary
+                                        : '#FFFFFF'
+                                }
+                            />
+                        }
+                    />
+
+                    {/* 4 — CAMBIAR VISTA */}
+
+                    <RoutineNavButton
+                        onPress={handleToggleRoutineView}
+                        icon={
+                            <Ionicons
+                                name={
+                                    routineViewMode === 'table'
+                                        ? 'grid-outline'
+                                        : 'list-outline'
+                                }
+                                size={28}
+                                color="#C7C7C7"
+                            />
+                        }
+                    />
+
+                    {/* 5 — EDITAR */}
+
+                    <RoutineNavButton
                         onPress={handleEditPress}
-                        className="flex-1 mx-1 px-4 py-3 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
-                    >
-                        <View className="flex-row items-center justify-center">
-                            <Ionicons name="create-outline" size={18} style={{ color: COLORS.textLight }} />
-                            <Text
-                                className="text-[14px] font-normal ml-2"
-                                style={{ color: COLORS.textLight }}
-                            >
-                                Editar rutina
-                            </Text>
-                        </View>
-                    </Pressable>
-
-                    {/* VOLVER ATRÁS */}
-                    <Pressable
-                        onPress={handleBack}
-                        className="flex-1 ml-2 px-4 py-3 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
-                    >
-                        <Text
-                            className="text-[14px] font-normal"
-                            style={{ color: COLORS.textLight }}
-                        >
-                            Volver atrás
-                        </Text>
-                    </Pressable>
+                        icon={
+                            <Ionicons
+                                name="create-outline"
+                                size={28}
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
                 </View>
 
 
 
-                {/* Modal: rutina finalizada + encuesta + éxito */}
+                {/* MODAL: VALORACIÓN DE LA RUTINA */}
+
                 <Modal
-                    visible={routineSurveyVisible}
+                    visible={
+                        routineSurveyVisible
+                    }
                     transparent
-                    animationType="fade"
-                    onRequestClose={closeRoutineSurveyModal}
+                    animationType="none"
+                    onRequestClose={
+                        closeRoutineSurveyModal
+                    }
                 >
                     <View
-                        className="flex-1 justify-center items-center px-4"
-                        style={{ backgroundColor: 'rgba(0,0,0,0.65)' }}
+                        style={{
+                            flex: 1,
+
+                            justifyContent:
+                                'center',
+
+                            alignItems:
+                                'center',
+
+                            padding: 20,
+                        }}
                     >
-                        {(routineUiPhase === 'successLoading' || routineUiPhase === 'saved') ? (
-                            <View style={{ width: '100%', maxWidth: 340, alignItems: 'center' }}>
-                                <Animated.View
-                                    style={[
-                                        {
-                                            width: '100%',
-                                            alignItems: 'center',
-                                        },
-                                        routineSuccessAnimatedStyle,
-                                    ]}
-                                >
-                                    <Pressable
-                                        onPress={closeRoutineSurveyModal}
-                                        style={{ marginBottom: 10 }}
-                                        hitSlop={8}
-                                    >
-                                        <Ionicons name="close" size={28} color="#d1d5db" />
-                                    </Pressable>
+                        {/* FONDO */}
+
+                        <Animated.View
+                            pointerEvents="none"
+                            style={{
+                                position:
+                                    'absolute',
+
+                                top: 0,
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+
+                                backgroundColor:
+                                    '#000000',
+
+                                opacity:
+                                    routineModalAnim.interpolate({
+                                        inputRange: [
+                                            0,
+                                            1,
+                                        ],
+
+                                        outputRange: [
+                                            0,
+                                            0.76,
+                                        ],
+                                    }),
+                            }}
+                        />
+
+                        {/* TARJETA */}
+
+                        <Animated.View
+                            style={[
+                                {
+                                    width: '100%',
+                                    maxWidth: 390,
+
+                                    backgroundColor:
+                                        '#101010',
+
+                                    borderRadius:
+                                        24,
+
+                                    borderWidth:
+                                        1,
+
+                                    borderColor:
+                                        '#343434',
+
+                                    padding: 18,
+
+                                    shadowColor:
+                                        '#000000',
+
+                                    shadowOpacity:
+                                        0.55,
+
+                                    shadowRadius:
+                                        24,
+
+                                    shadowOffset: {
+                                        width: 0,
+                                        height: 10,
+                                    },
+
+                                    elevation: 12,
+                                },
+
+                                routineModalAnimatedStyle,
+                            ]}
+                        >
+                            {routineUiPhase !==
+                                'saved' ? (
+                                <>
+                                    {/* HEADER */}
 
                                     <View
-                                        className="w-full rounded-3xl px-5 py-6 items-center"
                                         style={{
-                                            backgroundColor: COLORS.background,
-                                            borderWidth: 2,
-                                            borderColor: '#C6FF00',
-                                            minHeight: 220,
-                                            justifyContent: 'center',
+                                            flexDirection:
+                                                'row',
+
+                                            alignItems:
+                                                'center',
+
+                                            marginBottom:
+                                                18,
                                         }}
                                     >
-                                        {routineUiPhase === 'successLoading' ? (
-                                            <>
-                                                <ActivityIndicator size="large" color="#A3E635" />
-                                                <Text
-                                                    className="text-[16px] font-semibold mt-4"
-                                                    style={{ color: '#ffffff' }}
-                                                >
-                                                    Guardando resultado...
-                                                </Text>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Animated.View
-                                                    style={{
-                                                        transform: [{ scale: routineSuccessIconAnim }],
-                                                    }}
-                                                >
-                                                    <Ionicons
-                                                        name="checkmark-circle-outline"
-                                                        size={72}
-                                                        color="#A3E635"
-                                                    />
-                                                </Animated.View>
-
-                                                <Text
-                                                    className="text-[22px] font-bold mt-3 mb-2"
-                                                    style={{ color: '#ffffff' }}
-                                                >
-                                                    ¡Muy bien!
-                                                </Text>
-
-                                                <Text
-                                                    className="text-center text-[13px]"
-                                                    style={{ color: '#f3f4f6' }}
-                                                >
-                                                    ¡Tu rutina fue guardada con éxito! Respira dos minutos y continúa.
-                                                </Text>
-                                            </>
-                                        )}
-                                    </View>
-                                </Animated.View>
-                            </View>
-                        ) : (
-                            <View style={{ width: '100%', maxWidth: 340, alignItems: 'center' }}>
-                                <Pressable
-                                    onPress={closeRoutineSurveyModal}
-                                    style={{ marginBottom: 10 }}
-                                    hitSlop={8}
-                                >
-                                    <Ionicons name="close" size={28} color="#d1d5db" />
-                                </Pressable>
-
-                                <View
-                                    className="w-full rounded-3xl px-4 py-4 mb-4"
-                                    style={{
-                                        backgroundColor: COLORS.background,
-                                        borderWidth: 2,
-                                        borderColor: '#C6FF00',
-                                    }}
-                                >
-                                    <Text
-                                        className="text-[22px] font-bold text-center mb-6"
-                                        style={{ color: '#ffffff' }}
-                                    >
-                                        ¿Rutina finalizada?
-                                    </Text>
-
-
-
-                                    <Text
-                                        className="text-[14px] text-center mb-3 px-6"
-                                        style={{ color: '#d1d5db' }}
-                                    >
-                                        Marca como hecho tu rutina y guárdalo para mantener tus estadísticas actualizadas.
-                                    </Text>
-
-                                    <Text
-                                        className="text-[12px] text-center mb-3 px-4"
-                                        style={{ color: '#6B7280' }}
-                                    >
-                                        (Se guardará el ultimo estado del dia)
-                                    </Text>
-
-                                    {routineUiPhase === 'idle' && (
-                                        <Pressable
-                                            onPress={handleOpenRoutineSurvey}
-                                            className="rounded-full py-3 items-center justify-center m-4"
-                                            style={{ backgroundColor: '#6b7280' }}
-                                        >
-                                            <Text
-                                                className="text-[15px] font-semibold"
-                                                style={{ color: '#ffffff' }}
-                                            >
-                                                Marcar como realizada
-                                            </Text>
-                                        </Pressable>
-                                    )}
-
-                                    {routineUiPhase === 'survey' && (
-                                        <Pressable
-                                            onPress={closeRoutineSurveyModal}
-                                            className="rounded-full py-3 items-center justify-center m-4"
-                                            style={{ backgroundColor: '#2a2a2a' }}
-                                        >
-                                            <Text
-                                                className="text-[15px] font-semibold"
-                                                style={{ color: '#ffffff' }}
-                                            >
-                                                Cancelar estado
-                                            </Text>
-                                        </Pressable>
-                                    )}
-
-                                    {routineUiPhase === 'savingAnswer' && (
                                         <View
-                                            className="rounded-full py-3 items-center justify-center m-4 flex-row"
-                                            style={{ backgroundColor: '#2a2a2a' }}
+                                            style={{
+                                                width: 46,
+                                                height: 46,
+
+                                                borderRadius:
+                                                    23,
+
+                                                backgroundColor:
+                                                    'rgba(198,255,0,0.08)',
+
+                                                borderWidth:
+                                                    1,
+
+                                                borderColor:
+                                                    'rgba(198,255,0,0.35)',
+
+                                                alignItems:
+                                                    'center',
+
+                                                justifyContent:
+                                                    'center',
+                                            }}
                                         >
-                                            <ActivityIndicator size="small" color="#ffffff" />
+                                            <Ionicons
+                                                name="checkbox-outline"
+                                                size={25}
+                                                color={
+                                                    COLORS.primary
+                                                }
+                                            />
+                                        </View>
+
+                                        <View
+                                            style={{
+                                                flex: 1,
+
+                                                marginLeft:
+                                                    12,
+                                            }}
+                                        >
                                             <Text
-                                                className="text-[15px] font-semibold ml-2"
-                                                style={{ color: '#ffffff' }}
+                                                style={{
+                                                    color:
+                                                        COLORS.textLight,
+
+                                                    fontSize:
+                                                        18,
+
+                                                    fontWeight:
+                                                        '900',
+                                                }}
                                             >
-                                                Guardando...
+                                                Valorar rutina
+                                            </Text>
+
+                                            <Text
+                                                numberOfLines={
+                                                    2
+                                                }
+                                                style={{
+                                                    color:
+                                                        COLORS.textMuted,
+
+                                                    fontSize:
+                                                        10,
+
+                                                    lineHeight:
+                                                        14,
+
+                                                    marginTop:
+                                                        3,
+                                                }}
+                                            >
+                                                {routine.title}
                                             </Text>
                                         </View>
-                                    )}
-                                </View>
+                                    </View>
 
-                                {(routineUiPhase === 'survey' || routineUiPhase === 'savingAnswer') && (
+                                    {/* PREGUNTA */}
+
                                     <View
-                                        className="w-full rounded-2xl px-4 py-3"
                                         style={{
-                                            backgroundColor: COLORS.background,
-                                            borderWidth: 2,
-                                            borderColor: '#C6FF00',
+                                            backgroundColor:
+                                                '#181818',
+
+                                            borderWidth:
+                                                1,
+
+                                            borderColor:
+                                                'rgba(198,255,0,0.30)',
+
+                                            borderRadius:
+                                                17,
+
+                                            padding:
+                                                14,
                                         }}
                                     >
                                         <Text
-                                            className="text-[13px] text-center font-semibold mb-2"
-                                            style={{ color: '#ffffff' }}
+                                            style={{
+                                                color:
+                                                    COLORS.textLight,
+
+                                                fontSize:
+                                                    14,
+
+                                                fontWeight:
+                                                    '900',
+
+                                                textAlign:
+                                                    'center',
+
+                                                marginBottom:
+                                                    13,
+                                            }}
                                         >
                                             ¿Cómo terminaste la rutina?
                                         </Text>
 
-                                        <View className="flex-row flex-wrap justify-between mb-2">
-                                            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((value) => {
-                                                const bg =
-                                                    value <= 3 ? '#ff4d4f' : value <= 7 ? '#8b8b8b' : '#7cb342';
-
-                                                return (
-                                                    <Pressable
-                                                        key={value}
-                                                        disabled={routineUiPhase === 'savingAnswer'}
-                                                        onPress={() => handleSelectRoutineScore(value)}
-                                                        style={{
-                                                            width: 27,
-                                                            height: 27,
-                                                            borderRadius: 3,
-                                                            backgroundColor: bg,
-                                                            alignItems: 'center',
-                                                            justifyContent: 'center',
-                                                            marginBottom: 6,
-                                                            opacity:
-                                                                routineUiPhase === 'savingAnswer'
-                                                                    ? routineScore === value
-                                                                        ? 1
-                                                                        : 0.35
-                                                                    : 1,
-                                                            borderWidth: routineScore === value ? 2 : 0,
-                                                            borderColor: routineScore === value ? '#ffffff' : 'transparent',
-                                                            transform: [{ scale: routineScore === value ? 1.08 : 1 }],
-                                                        }}
-                                                    >
-                                                        <Text
-                                                            style={{
-                                                                color: '#fff',
-                                                                fontSize: 12,
-                                                                fontWeight: '700',
-                                                            }}
-                                                        >
-                                                            {value}
-                                                        </Text>
-                                                    </Pressable>
-                                                );
-                                            })}
-                                        </View>
+                                        <ScoreSelector
+                                            value={
+                                                routineScore
+                                            }
+                                            disabled={
+                                                routineUiPhase ===
+                                                'savingAnswer'
+                                            }
+                                            onSelect={
+                                                handleSelectRoutineScore
+                                            }
+                                        />
 
                                         <Text
-                                            className="text-center text-[10px] font-semibold"
-                                            style={{ color: '#f3f4f6' }}
+                                            style={{
+                                                color:
+                                                    '#777777',
+
+                                                fontSize:
+                                                    9,
+
+                                                lineHeight:
+                                                    14,
+
+                                                textAlign:
+                                                    'center',
+
+                                                marginTop:
+                                                    12,
+                                            }}
                                         >
-                                            Al calificar aportas datos a tus estadísticas
+                                            Tu valoración se utilizará para actualizar tus estadísticas y analizar tu evolución.
                                         </Text>
+
+                                        {routineUiPhase ===
+                                            'savingAnswer' && (
+                                                <View
+                                                    style={{
+                                                        flexDirection:
+                                                            'row',
+
+                                                        justifyContent:
+                                                            'center',
+
+                                                        alignItems:
+                                                            'center',
+
+                                                        marginTop:
+                                                            14,
+                                                    }}
+                                                >
+                                                    <ActivityIndicator
+                                                        size="small"
+                                                        color={
+                                                            COLORS.primary
+                                                        }
+                                                    />
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#AAAAAA',
+
+                                                            fontSize:
+                                                                10,
+
+                                                            fontWeight:
+                                                                '700',
+
+                                                            marginLeft:
+                                                                7,
+                                                        }}
+                                                    >
+                                                        Guardando valoración...
+                                                    </Text>
+                                                </View>
+                                            )}
                                     </View>
-                                )}
 
+                                    {/* CANCELAR */}
 
-                            </View>
-                        )}
+                                    {routineUiPhase !==
+                                        'savingAnswer' && (
+                                            <Pressable
+                                                onPress={
+                                                    closeRoutineSurveyModal
+                                                }
+                                                style={({
+                                                    pressed,
+                                                }) => ({
+                                                    height: 43,
+
+                                                    borderRadius:
+                                                        13,
+
+                                                    marginTop:
+                                                        13,
+
+                                                    backgroundColor:
+                                                        pressed
+                                                            ? '#303030'
+                                                            : '#222222',
+
+                                                    borderWidth:
+                                                        1,
+
+                                                    borderColor:
+                                                        '#343434',
+
+                                                    alignItems:
+                                                        'center',
+
+                                                    justifyContent:
+                                                        'center',
+                                                })}
+                                            >
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            '#C7C7C7',
+
+                                                        fontSize:
+                                                            11,
+
+                                                        fontWeight:
+                                                            '800',
+                                                    }}
+                                                >
+                                                    Cancelar
+                                                </Text>
+                                            </Pressable>
+                                        )}
+                                </>
+                            ) : (
+                                /*
+                                 * ====================
+                                 * GUARDADO CON ÉXITO
+                                 * ====================
+                                 */
+
+                                <View
+                                    style={{
+                                        alignItems:
+                                            'center',
+
+                                        paddingVertical:
+                                            15,
+                                    }}
+                                >
+                                    <Animated.View
+                                        style={{
+                                            transform: [
+                                                {
+                                                    scale:
+                                                        routineSuccessIconAnim,
+                                                },
+                                            ],
+                                        }}
+                                    >
+                                        <Ionicons
+                                            name="checkmark-circle"
+                                            size={76}
+                                            color={
+                                                COLORS.primary
+                                            }
+                                        />
+                                    </Animated.View>
+
+                                    <Text
+                                        style={{
+                                            color:
+                                                COLORS.textLight,
+
+                                            fontSize: 21,
+
+                                            fontWeight:
+                                                '900',
+
+                                            marginTop: 9,
+                                        }}
+                                    >
+                                        ¡Rutina registrada!
+                                    </Text>
+
+                                    {routineScore !=
+                                        null && (
+                                            <View
+                                                style={{
+                                                    backgroundColor:
+                                                        'rgba(198,255,0,0.08)',
+
+                                                    borderWidth:
+                                                        1,
+
+                                                    borderColor:
+                                                        'rgba(198,255,0,0.30)',
+
+                                                    borderRadius:
+                                                        999,
+
+                                                    paddingHorizontal:
+                                                        18,
+
+                                                    paddingVertical:
+                                                        7,
+
+                                                    marginTop:
+                                                        11,
+                                                }}
+                                            >
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.primary,
+
+                                                        fontSize:
+                                                            18,
+
+                                                        fontWeight:
+                                                            '900',
+                                                    }}
+                                                >
+                                                    {
+                                                        routineScore
+                                                    }{' '}
+                                                    / 10
+                                                </Text>
+                                            </View>
+                                        )}
+
+                                    <Text
+                                        style={{
+                                            color:
+                                                COLORS.textMuted,
+
+                                            fontSize: 12,
+
+                                            lineHeight:
+                                                18,
+
+                                            textAlign:
+                                                'center',
+
+                                            marginTop:
+                                                13,
+
+                                            maxWidth:
+                                                280,
+                                        }}
+                                    >
+                                        Tu rutina fue marcada como realizada y tu valoración ya forma parte de tus estadísticas.
+                                    </Text>
+
+                                    <Pressable
+                                        onPress={
+                                            closeRoutineSurveyModal
+                                        }
+                                        style={({
+                                            pressed,
+                                        }) => ({
+                                            width:
+                                                '100%',
+
+                                            height: 46,
+
+                                            borderRadius:
+                                                14,
+
+                                            marginTop:
+                                                20,
+
+                                            alignItems:
+                                                'center',
+
+                                            justifyContent:
+                                                'center',
+
+                                            backgroundColor:
+                                                pressed
+                                                    ? '#B4E800'
+                                                    : COLORS.primary,
+                                        })}
+                                    >
+                                        <Text
+                                            style={{
+                                                color:
+                                                    '#101010',
+
+                                                fontSize:
+                                                    13,
+
+                                                fontWeight:
+                                                    '900',
+                                            }}
+                                        >
+                                            Entendido
+                                        </Text>
+                                    </Pressable>
+                                </View>
+                            )}
+                        </Animated.View>
                     </View>
                 </Modal>
                 {/* Modal: confirmar edición de rutina */}

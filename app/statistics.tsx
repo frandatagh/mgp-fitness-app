@@ -1,5 +1,14 @@
 import React, { useEffect } from 'react';
-import { Pressable, ScrollView, Text, View, ActivityIndicator, Modal, type LayoutChangeEvent } from 'react-native';
+import {
+    Pressable,
+    ScrollView,
+    Text, View,
+    ActivityIndicator,
+    Modal,
+    Animated,
+    Easing,
+    type LayoutChangeEvent
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
@@ -401,7 +410,7 @@ function StatisticsNavButton({
                         ? '#333333'
                         : '#242424',
 
-                borderWidth: 2,
+                borderWidth: 3,
                 borderColor: '#353535',
 
                 opacity:
@@ -430,44 +439,26 @@ function StatisticsQuickButton({
     label,
     onPress,
     active = false,
-    twoRows = false,
 }: {
     icon: React.ReactNode;
     label: string;
     onPress: () => void;
     active?: boolean;
-    twoRows?: boolean;
 }) {
     return (
         <View
             style={{
-                flexBasis:
-                    twoRows
-                        ? '31%'
-                        : 0,
-
-                flexGrow: 1,
-
-                minWidth:
-                    twoRows
-                        ? 82
-                        : 46,
-
+                flex: 1,
+                minWidth: 0,
                 alignItems: 'center',
-
-                marginBottom:
-                    twoRows
-                        ? 8
-                        : 0,
             }}
         >
             <Pressable
                 onPress={onPress}
                 style={({ pressed }) => ({
-                    width: 46,
-                    height: 46,
-
-                    borderRadius: 23,
+                    width: 55,
+                    height: 55,
+                    borderRadius: 100,
 
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -479,20 +470,11 @@ function StatisticsQuickButton({
                                 ? '#292929'
                                 : '#1B1B1B',
 
-                    borderWidth:
-                        active
-                            ? 2
-                            : 1,
-
-                    borderColor:
-                        active
-                            ? COLORS.primary
-                            : '#343434',
+                    borderWidth: 3,
+                    borderColor: COLORS.primary,
 
                     opacity:
-                        pressed
-                            ? 0.82
-                            : 1,
+                        pressed ? 0.82 : 1,
 
                     transform: [
                         {
@@ -507,8 +489,6 @@ function StatisticsQuickButton({
                 {icon}
             </Pressable>
 
-            {/* LABEL FUERA DEL CÍRCULO */}
-
             <Text
                 numberOfLines={1}
                 style={{
@@ -517,11 +497,9 @@ function StatisticsQuickButton({
                             ? COLORS.primary
                             : '#BDBDBD',
 
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: '700',
-
                     marginTop: 5,
-
                     textAlign: 'center',
                 }}
             >
@@ -530,6 +508,469 @@ function StatisticsQuickButton({
         </View>
     );
 }
+
+function AnimatedStatsModal({
+    visible,
+    onClose,
+    title,
+    subtitle,
+    icon,
+    children,
+}: {
+    visible: boolean;
+    onClose: () => void;
+    title: string;
+    subtitle?: string;
+    icon: React.ReactNode;
+    children: React.ReactNode;
+}) {
+    const [mounted, setMounted] =
+        React.useState(false);
+
+    const animation =
+        React.useRef(
+            new Animated.Value(0)
+        ).current;
+
+    const closingRef =
+        React.useRef(false);
+
+    React.useEffect(() => {
+        if (!visible) return;
+
+        closingRef.current = false;
+
+        setMounted(true);
+
+        animation.setValue(0);
+
+        const frame =
+            requestAnimationFrame(() => {
+                Animated.timing(
+                    animation,
+                    {
+                        toValue: 1,
+                        duration: 260,
+                        easing:
+                            Easing.out(
+                                Easing.cubic
+                            ),
+                        useNativeDriver:
+                            false,
+                    }
+                ).start();
+            });
+
+        return () => {
+            cancelAnimationFrame(
+                frame
+            );
+        };
+    }, [visible, animation]);
+
+    const closeWithAnimation =
+        () => {
+            if (
+                closingRef.current
+            ) {
+                return;
+            }
+
+            closingRef.current =
+                true;
+
+            Animated.timing(
+                animation,
+                {
+                    toValue: 0,
+                    duration: 190,
+                    easing:
+                        Easing.in(
+                            Easing.cubic
+                        ),
+                    useNativeDriver:
+                        false,
+                }
+            ).start(() => {
+                setMounted(false);
+
+                closingRef.current =
+                    false;
+
+                onClose();
+            });
+        };
+
+    if (!mounted) {
+        return null;
+    }
+
+    const translateY =
+        animation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [35, 0],
+        });
+
+    const scale =
+        animation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.95, 1],
+        });
+
+    const backdropOpacity =
+        animation.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, 0.76],
+        });
+
+    return (
+        <Modal
+            visible={mounted}
+            transparent
+            animationType="none"
+            onRequestClose={
+                closeWithAnimation
+            }
+        >
+            <View
+                style={{
+                    flex: 1,
+
+                    justifyContent:
+                        'center',
+
+                    alignItems:
+                        'center',
+
+                    padding: 20,
+                }}
+            >
+                {/* FONDO */}
+
+                <Animated.View
+                    pointerEvents="none"
+                    style={{
+                        position:
+                            'absolute',
+
+                        left: 0,
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+
+                        backgroundColor:
+                            '#000000',
+
+                        opacity:
+                            backdropOpacity,
+                    }}
+                />
+
+                {/* TARJETA */}
+
+                <Animated.View
+                    style={{
+                        width: '100%',
+                        maxWidth: 390,
+                        maxHeight: '86%',
+
+                        backgroundColor:
+                            '#101010',
+
+                        borderRadius: 24,
+
+                        borderWidth: 1,
+
+                        borderColor:
+                            '#343434',
+
+                        padding: 18,
+
+                        opacity:
+                            animation,
+
+                        transform: [
+                            {
+                                translateY,
+                            },
+                            {
+                                scale,
+                            },
+                        ],
+
+                        shadowColor:
+                            '#000000',
+
+                        shadowOpacity:
+                            0.55,
+
+                        shadowRadius: 24,
+
+                        shadowOffset: {
+                            width: 0,
+                            height: 10,
+                        },
+
+                        elevation: 12,
+                    }}
+                >
+                    {/* HEADER */}
+
+                    <View
+                        style={{
+                            flexDirection:
+                                'row',
+
+                            alignItems:
+                                'center',
+
+                            marginBottom:
+                                16,
+                        }}
+                    >
+                        <View
+                            style={{
+                                width: 46,
+                                height: 46,
+
+                                borderRadius:
+                                    23,
+
+                                backgroundColor:
+                                    'rgba(198,255,0,0.08)',
+
+                                borderWidth: 1,
+
+                                borderColor:
+                                    'rgba(198,255,0,0.40)',
+
+                                alignItems:
+                                    'center',
+
+                                justifyContent:
+                                    'center',
+                            }}
+                        >
+                            {icon}
+                        </View>
+
+                        <View
+                            style={{
+                                flex: 1,
+
+                                marginLeft:
+                                    12,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color:
+                                        COLORS.textLight,
+
+                                    fontSize:
+                                        18,
+
+                                    fontWeight:
+                                        '900',
+                                }}
+                            >
+                                {title}
+                            </Text>
+
+                            {subtitle && (
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textMuted,
+
+                                        fontSize:
+                                            11,
+
+                                        marginTop:
+                                            3,
+                                    }}
+                                >
+                                    {
+                                        subtitle
+                                    }
+                                </Text>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* CONTENIDO */}
+
+                    <ScrollView
+                        showsVerticalScrollIndicator={
+                            false
+                        }
+                        style={{
+                            flexShrink: 1,
+                        }}
+                        contentContainerStyle={{
+                            paddingBottom: 3,
+                        }}
+                    >
+                        {children}
+                    </ScrollView>
+
+                    {/* FOOTER */}
+
+                    <View
+                        style={{
+                            borderTopWidth:
+                                1,
+
+                            borderTopColor:
+                                '#292929',
+
+                            marginTop: 16,
+
+                            paddingTop: 13,
+                        }}
+                    >
+                        <Pressable
+                            onPress={
+                                closeWithAnimation
+                            }
+                            style={({
+                                pressed,
+                            }) => ({
+                                height: 46,
+
+                                borderRadius:
+                                    14,
+
+                                alignItems:
+                                    'center',
+
+                                justifyContent:
+                                    'center',
+
+                                backgroundColor:
+                                    pressed
+                                        ? '#B4E800'
+                                        : COLORS.primary,
+
+                                transform: [
+                                    {
+                                        scale:
+                                            pressed
+                                                ? 0.985
+                                                : 1,
+                                    },
+                                ],
+                            })}
+                        >
+                            <Text
+                                style={{
+                                    color:
+                                        '#101010',
+
+                                    fontSize:
+                                        13,
+
+                                    fontWeight:
+                                        '900',
+                                }}
+                            >
+                                Entendido
+                            </Text>
+                        </Pressable>
+                    </View>
+                </Animated.View>
+            </View>
+        </Modal>
+    );
+}
+
+function ModalMetricCard({
+    icon,
+    label,
+    value,
+    wide = false,
+}: {
+    icon: React.ReactNode;
+    label: string;
+    value: string;
+    wide?: boolean;
+}) {
+    return (
+        <View
+            style={{
+                flexBasis:
+                    wide
+                        ? '100%'
+                        : '47%',
+
+                flexGrow: 1,
+
+                minHeight: 76,
+
+                backgroundColor:
+                    '#181818',
+
+                borderWidth: 1,
+
+                borderColor:
+                    '#292929',
+
+                borderRadius: 15,
+
+                padding: 11,
+            }}
+        >
+            <View
+                style={{
+                    flexDirection:
+                        'row',
+
+                    alignItems:
+                        'center',
+                }}
+            >
+                {icon}
+
+                <Text
+                    style={{
+                        color:
+                            '#8F8F8F',
+
+                        fontSize: 10,
+
+                        fontWeight:
+                            '700',
+
+                        marginLeft: 6,
+                    }}
+                >
+                    {label}
+                </Text>
+            </View>
+
+            <Text
+                numberOfLines={
+                    wide ? 2 : 1
+                }
+                style={{
+                    color:
+                        COLORS.textLight,
+
+                    fontSize: 14,
+
+                    fontWeight:
+                        '900',
+
+                    marginTop: 7,
+                }}
+            >
+                {value}
+            </Text>
+        </View>
+    );
+}
+
+const QUICK_ICON_COLOR = '#C7C7C7';
 
 export default function StatisticsScreen() {
     const { isAuthenticated, isLoading } = useAuth();
@@ -614,10 +1055,7 @@ export default function StatisticsScreen() {
             ReturnType<typeof setTimeout> | null
         >(null);
 
-    const [
-        quickAccessWidth,
-        setQuickAccessWidth,
-    ] = React.useState(0);
+
 
     const [navRoutines, setNavRoutines] =
         React.useState<Routine[]>([]);
@@ -657,14 +1095,6 @@ export default function StatisticsScreen() {
         return () => {
             active = false;
         };
-    }, [isAuthenticated]);
-
-
-
-    useEffect(() => {
-        if (!isAuthenticated) {
-            router.replace('/');
-        }
     }, [isAuthenticated]);
 
 
@@ -771,10 +1201,6 @@ export default function StatisticsScreen() {
         };
     }, []);
 
-    const quickAccessTwoRows =
-        quickAccessWidth > 0 &&
-        quickAccessWidth < 330;
-
     const latestRoutineId =
         React.useMemo(() => {
             if (
@@ -840,13 +1266,29 @@ export default function StatisticsScreen() {
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     };
 
-    const formatStatPace = (seconds?: number | null) => {
+    const formatStatPace = (
+        seconds?: number | null
+    ) => {
         if (!seconds) return '--';
 
-        const minutes = Math.floor(seconds / 60);
-        const secs = Math.round(seconds % 60);
+        const totalSeconds =
+            Math.round(seconds);
 
-        return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        const minutes =
+            Math.floor(
+                totalSeconds / 60
+            );
+
+        const secs =
+            totalSeconds % 60;
+
+        return `${String(minutes).padStart(
+            2,
+            '0'
+        )}:${String(secs).padStart(
+            2,
+            '0'
+        )}`;
     };
 
     const formatStatSpeed = (speedMps?: number | null) => {
@@ -880,6 +1322,75 @@ export default function StatisticsScreen() {
         const value = Number(rating);
 
         return Number.isNaN(value) ? null : value;
+    };
+
+    const getRunSessionEndDate = (
+        session: RunSession
+    ) => {
+        const value =
+            (session as any)
+                .endedAt;
+
+        if (!value) {
+            return null;
+        }
+
+        const date =
+            new Date(value);
+
+        if (
+            Number.isNaN(
+                date.getTime()
+            )
+        ) {
+            return null;
+        }
+
+        return date;
+    };
+
+    const formatClockTime = (
+        date?: Date | null
+    ) => {
+        if (!date) return '--';
+
+        return date.toLocaleTimeString(
+            'es-AR',
+            {
+                hour: '2-digit',
+                minute: '2-digit',
+            }
+        );
+    };
+
+    const getRunAverageSpeedMps = (
+        session: RunSession
+    ) => {
+        const distance =
+            session.distanceMeters ??
+            0;
+
+        const duration =
+            session.durationSeconds ??
+            0;
+
+        if (
+            distance <= 0 ||
+            duration <= 0
+        ) {
+            return null;
+        }
+
+        return distance / duration;
+    };
+
+    const hasSavedRunRoute = (
+        session: RunSession
+    ) => {
+        return Boolean(
+            (session as any)
+                .pathGeoJson
+        );
     };
 
     const filteredRunningSessions = React.useMemo(() => {
@@ -937,10 +1448,44 @@ export default function StatisticsScreen() {
         ? filteredRunningSessions.map((session) => getRunSessionRating(session) ?? 0)
         : [0];
 
-    const openRunSessionDetail = (session: RunSession) => {
+    const [runSelectionFlash, setRunSelectionFlash] =
+        React.useState(false);
+
+    const runSelectionTimerRef =
+        React.useRef<
+            ReturnType<typeof setTimeout> | null
+        >(null);
+
+    const selectRunSession = (
+        session: RunSession
+    ) => {
         setSelectedRunSession(session);
-        setRunDetailVisible(true);
+
+        setRunSelectionFlash(true);
+
+        if (runSelectionTimerRef.current) {
+            clearTimeout(
+                runSelectionTimerRef.current
+            );
+        }
+
+        runSelectionTimerRef.current =
+            setTimeout(() => {
+                setRunSelectionFlash(false);
+
+                runSelectionTimerRef.current =
+                    null;
+            }, 1000);
     };
+
+    const openSelectedRunSessionDetail =
+        () => {
+            if (!selectedRunSession) {
+                return;
+            }
+
+            setRunDetailVisible(true);
+        };
 
 
     const routinePerformancePoints = React.useMemo<RoutinePerformancePoint[]>(() => {
@@ -1049,10 +1594,352 @@ export default function StatisticsScreen() {
         ? filteredRoutinePoints.map((point) => point.value)
         : [0];
 
-    const openRoutinePointDetail = (point: RoutinePerformancePoint) => {
+    const [
+        routineSelectionFlash,
+        setRoutineSelectionFlash,
+    ] = React.useState(false);
+
+    const routineSelectionTimerRef =
+        React.useRef<
+            ReturnType<typeof setTimeout> | null
+        >(null);
+
+    const selectRoutinePoint = (
+        point: RoutinePerformancePoint
+    ) => {
         setSelectedRoutinePoint(point);
-        setRoutineDetailVisible(true);
+
+        setRoutineSelectionFlash(true);
+
+        if (
+            routineSelectionTimerRef.current
+        ) {
+            clearTimeout(
+                routineSelectionTimerRef.current
+            );
+        }
+
+        routineSelectionTimerRef.current =
+            setTimeout(() => {
+                setRoutineSelectionFlash(false);
+
+                routineSelectionTimerRef.current =
+                    null;
+            }, 1000);
     };
+
+    const routinePeriodDescription = {
+        latest: 'últimas sesiones',
+        weekly: 'últimos 7 días',
+        monthly: 'este mes',
+        yearly: 'este año',
+    }[routinePeriod];
+
+    const formatRatingDelta = (
+        value?: number | null
+    ) => {
+        if (value == null) {
+            return '--';
+        }
+
+        const sign =
+            value > 0
+                ? '+'
+                : '';
+
+        return `${sign}${value.toFixed(1)}`;
+    };
+
+    const getRoutinePerformanceLabel = (
+        value: number
+    ) => {
+        if (value >= 9) {
+            return 'Rendimiento excelente';
+        }
+
+        if (value >= 8) {
+            return 'Muy buen rendimiento';
+        }
+
+        if (value >= 7) {
+            return 'Buen rendimiento';
+        }
+
+        if (value >= 5) {
+            return 'Rendimiento intermedio';
+        }
+
+        return 'Sesión con mayor dificultad';
+    };
+
+    const selectedRoutineContext =
+        React.useMemo(() => {
+            if (!selectedRoutinePoint) {
+                return null;
+            }
+
+            /*
+             * EJERCICIOS VALORADOS
+             * EL DÍA DE ESA SESIÓN
+             */
+
+            const selectedDay =
+                historyDays.find(
+                    (day) =>
+                        day.date ===
+                        selectedRoutinePoint.date
+                );
+
+            const exerciseRecords =
+                (selectedDay?.records ?? [])
+                    .filter(
+                        (record) =>
+                            record.type ===
+                            'exercise' &&
+                            record.rating != null
+                    )
+                    .map((record) => ({
+                        ...record,
+
+                        numericRating:
+                            Number(
+                                record.rating
+                            ),
+                    }))
+                    .filter(
+                        (record) =>
+                            !Number.isNaN(
+                                record.numericRating
+                            )
+                    );
+
+            /*
+             * PROMEDIO DE EJERCICIOS
+             */
+
+            const exerciseAverage =
+                exerciseRecords.length
+                    ? exerciseRecords.reduce(
+                        (sum, record) =>
+                            sum +
+                            record.numericRating,
+                        0
+                    ) /
+                    exerciseRecords.length
+                    : null;
+
+            /*
+             * MEJOR EJERCICIO
+             */
+
+            const bestExercise =
+                exerciseRecords.length
+                    ? [...exerciseRecords].sort(
+                        (a, b) =>
+                            b.numericRating -
+                            a.numericRating
+                    )[0]
+                    : null;
+
+            /*
+             * EJERCICIO MÁS DIFÍCIL
+             */
+
+            const hardestExercise =
+                exerciseRecords.length
+                    ? [...exerciseRecords].sort(
+                        (a, b) =>
+                            a.numericRating -
+                            b.numericRating
+                    )[0]
+                    : null;
+
+            /*
+             * SESIÓN ANTERIOR
+             */
+
+            const selectedIndex =
+                filteredRoutinePoints.findIndex(
+                    (point) =>
+                        point.id ===
+                        selectedRoutinePoint.id
+                );
+
+            const previousPoint =
+                selectedIndex > 0
+                    ? filteredRoutinePoints[
+                    selectedIndex - 1
+                    ]
+                    : null;
+
+            const differenceFromPrevious =
+                previousPoint
+                    ? selectedRoutinePoint.value -
+                    previousPoint.value
+                    : null;
+
+            /*
+             * PROMEDIO DEL PERÍODO
+             */
+
+            const periodValues =
+                filteredRoutinePoints
+                    .map(
+                        (point) =>
+                            point.value
+                    )
+                    .filter(
+                        (value) =>
+                            !Number.isNaN(
+                                value
+                            )
+                    );
+
+            const periodAverage =
+                periodValues.length
+                    ? periodValues.reduce(
+                        (sum, value) =>
+                            sum + value,
+                        0
+                    ) /
+                    periodValues.length
+                    : null;
+
+            /*
+             * HISTÓRICO DE ESA MISMA RUTINA
+             */
+
+            const sameRoutinePoints =
+                selectedRoutinePoint.routineName
+                    ? routinePerformancePoints.filter(
+                        (point) =>
+                            point.routineName ===
+                            selectedRoutinePoint
+                                .routineName
+                    )
+                    : [];
+
+            const sameRoutineValues =
+                sameRoutinePoints
+                    .map(
+                        (point) =>
+                            point.value
+                    )
+                    .filter(
+                        (value) =>
+                            !Number.isNaN(
+                                value
+                            )
+                    );
+
+            const historicalAverage =
+                sameRoutineValues.length
+                    ? sameRoutineValues.reduce(
+                        (sum, value) =>
+                            sum + value,
+                        0
+                    ) /
+                    sameRoutineValues.length
+                    : null;
+
+            const historicalBest =
+                sameRoutineValues.length
+                    ? Math.max(
+                        ...sameRoutineValues
+                    )
+                    : null;
+
+            /*
+             * RUTINA ACTUAL
+             */
+
+            const normalizedName =
+                selectedRoutinePoint
+                    .routineName
+                    ?.trim()
+                    .toLowerCase();
+
+            const routineMatches =
+                normalizedName
+                    ? navRoutines.filter(
+                        (routine) =>
+                            routine.title
+                                .trim()
+                                .toLowerCase() ===
+                            normalizedName
+                    )
+                    : [];
+
+            const currentRoutine =
+                routineMatches.length === 1
+                    ? routineMatches[0]
+                    : null;
+
+            return {
+                exerciseRecords,
+                exerciseAverage,
+
+                bestExercise,
+                hardestExercise,
+
+                differenceFromPrevious,
+
+                periodAverage,
+                periodCount:
+                    filteredRoutinePoints.length,
+
+                sameRoutinePoints,
+                historicalAverage,
+                historicalBest,
+
+                currentRoutine,
+            };
+        }, [
+            selectedRoutinePoint,
+            historyDays,
+            filteredRoutinePoints,
+            routinePerformancePoints,
+            navRoutines,
+        ]);
+
+    const openSelectedRoutineDetail =
+        () => {
+            if (!selectedRoutinePoint) {
+                return;
+            }
+
+            setRoutineDetailVisible(true);
+        };
+
+    useEffect(() => {
+        return () => {
+            if (
+                runSelectionTimerRef.current
+            ) {
+                clearTimeout(
+                    runSelectionTimerRef.current
+                );
+            }
+
+            if (
+                routineSelectionTimerRef.current
+            ) {
+                clearTimeout(
+                    routineSelectionTimerRef.current
+                );
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        setSelectedRunSession(null);
+        setRunSelectionFlash(false);
+    }, [runningPeriod]);
+
+    useEffect(() => {
+        setSelectedRoutinePoint(null);
+        setRoutineSelectionFlash(false);
+    }, [routinePeriod]);
 
     const getRunningAverageByDays = (days: number) => {
         const now = new Date();
@@ -1334,9 +2221,6 @@ export default function StatisticsScreen() {
         );
     }
 
-    if (!isLoading && !isAuthenticated) {
-        return null;
-    }
 
     return (
         <SafeAreaView
@@ -1406,44 +2290,39 @@ export default function StatisticsScreen() {
 
                                 <View
                                     style={{
-                                        marginBottom: 30,
+                                        marginBottom: 16,
                                     }}
                                 >
+                                    <Text
+                                        style={{
+                                            color: COLORS.textLight,
+                                            fontSize: 13,
+                                            fontWeight: '400',
+                                            marginLeft: 10,
+                                            marginBottom: 10,
+                                        }}
+                                    >
+                                        Acceso rápido
+                                    </Text>
 
+                                    {/* CINCO ACCESOS PRINCIPALES */}
 
                                     <View
-                                        onLayout={(event) => {
-                                            setQuickAccessWidth(
-                                                event.nativeEvent.layout.width
-                                            );
-                                        }}
                                         style={{
                                             flexDirection: 'row',
-                                            flexWrap:
-                                                quickAccessTwoRows
-                                                    ? 'wrap'
-                                                    : 'nowrap',
-
                                             alignItems: 'flex-start',
-
-                                            justifyContent:
-                                                'space-between',
-
-                                            gap: 5,
-
+                                            justifyContent: 'space-between',
+                                            gap: 4,
                                             paddingHorizontal: 2,
                                         }}
                                     >
                                         {/* INSIGHT */}
 
                                         <StatisticsQuickButton
-                                            label="Insights"
+                                            label="Insight"
                                             active={
                                                 activeQuickSection ===
                                                 'insights'
-                                            }
-                                            twoRows={
-                                                quickAccessTwoRows
                                             }
                                             onPress={() =>
                                                 handleQuickAccess(
@@ -1453,8 +2332,12 @@ export default function StatisticsScreen() {
                                             icon={
                                                 <Ionicons
                                                     name="bulb-outline"
-                                                    size={21}
-                                                    color={COLORS.primary}
+                                                    size={28}
+                                                    color={
+                                                        activeQuickSection === 'insights'
+                                                            ? COLORS.primary
+                                                            : QUICK_ICON_COLOR
+                                                    }
                                                 />
                                             }
                                         />
@@ -1467,9 +2350,6 @@ export default function StatisticsScreen() {
                                                 activeQuickSection ===
                                                 'running'
                                             }
-                                            twoRows={
-                                                quickAccessTwoRows
-                                            }
                                             onPress={() =>
                                                 handleQuickAccess(
                                                     'running'
@@ -1478,8 +2358,12 @@ export default function StatisticsScreen() {
                                             icon={
                                                 <Ionicons
                                                     name="analytics-outline"
-                                                    size={21}
-                                                    color={COLORS.primary}
+                                                    size={28}
+                                                    color={
+                                                        activeQuickSection === 'running'
+                                                            ? COLORS.primary
+                                                            : QUICK_ICON_COLOR
+                                                    }
                                                 />
                                             }
                                         />
@@ -1492,9 +2376,6 @@ export default function StatisticsScreen() {
                                                 activeQuickSection ===
                                                 'times'
                                             }
-                                            twoRows={
-                                                quickAccessTwoRows
-                                            }
                                             onPress={() =>
                                                 handleQuickAccess(
                                                     'times'
@@ -1503,8 +2384,12 @@ export default function StatisticsScreen() {
                                             icon={
                                                 <Ionicons
                                                     name="stopwatch-outline"
-                                                    size={21}
-                                                    color={COLORS.primary}
+                                                    size={30}
+                                                    color={
+                                                        activeQuickSection === 'times'
+                                                            ? COLORS.primary
+                                                            : QUICK_ICON_COLOR
+                                                    }
                                                 />
                                             }
                                         />
@@ -1517,9 +2402,6 @@ export default function StatisticsScreen() {
                                                 activeQuickSection ===
                                                 'routines'
                                             }
-                                            twoRows={
-                                                quickAccessTwoRows
-                                            }
                                             onPress={() =>
                                                 handleQuickAccess(
                                                     'routines'
@@ -1528,8 +2410,12 @@ export default function StatisticsScreen() {
                                             icon={
                                                 <Ionicons
                                                     name="trending-up-outline"
-                                                    size={21}
-                                                    color={COLORS.primary}
+                                                    size={28}
+                                                    color={
+                                                        activeQuickSection === 'routines'
+                                                            ? COLORS.primary
+                                                            : QUICK_ICON_COLOR
+                                                    }
                                                 />
                                             }
                                         />
@@ -1542,9 +2428,6 @@ export default function StatisticsScreen() {
                                                 activeQuickSection ===
                                                 'exercises'
                                             }
-                                            twoRows={
-                                                quickAccessTwoRows
-                                            }
                                             onPress={() =>
                                                 handleQuickAccess(
                                                     'exercises'
@@ -1554,40 +2437,90 @@ export default function StatisticsScreen() {
                                                 <FontAwesome6
                                                     name="dumbbell"
                                                     size={19}
-                                                    color={COLORS.primary}
-                                                />
-                                            }
-                                        />
-
-                                        {/* CONSEJOS */}
-
-                                        <StatisticsQuickButton
-                                            label="Consejos"
-                                            active={
-                                                activeQuickSection ===
-                                                'advice'
-                                            }
-                                            twoRows={
-                                                quickAccessTwoRows
-                                            }
-                                            onPress={() =>
-                                                handleQuickAccess(
-                                                    'advice'
-                                                )
-                                            }
-                                            icon={
-                                                <Ionicons
-                                                    name="compass-outline"
-                                                    size={21}
-                                                    color={COLORS.primary}
+                                                    color={
+                                                        activeQuickSection === 'exercises'
+                                                            ? COLORS.primary
+                                                            : QUICK_ICON_COLOR
+                                                    }
                                                 />
                                             }
                                         />
                                     </View>
+
+                                    {/* CONSEJOS */}
+
+                                    <Pressable
+                                        onPress={() =>
+                                            handleQuickAccess(
+                                                'advice'
+                                            )
+                                        }
+                                        style={({ pressed }) => ({
+                                            marginTop: 14,
+                                            marginBottom: 8,
+
+                                            height: 50,
+
+                                            borderRadius: 14,
+
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+
+                                            backgroundColor:
+                                                activeQuickSection ===
+                                                    'advice'
+                                                    ? 'rgba(198,255,0,0.16)'
+                                                    : pressed
+                                                        ? '#292929'
+                                                        : '#1B1B1B',
+
+                                            borderWidth:
+                                                activeQuickSection ===
+                                                    'advice'
+                                                    ? 2
+                                                    : 3,
+
+                                            borderColor:
+                                                activeQuickSection ===
+                                                    'advice'
+                                                    ? COLORS.primary
+                                                    : '#343434',
+
+                                            opacity:
+                                                pressed ? 0.85 : 1,
+                                        })}
+                                    >
+                                        <Ionicons
+                                            name="compass-outline"
+                                            size={27}
+                                            color={
+                                                activeQuickSection === 'advice'
+                                                    ? COLORS.primary
+                                                    : QUICK_ICON_COLOR
+                                            }
+                                        />
+
+                                        <Text
+                                            style={{
+                                                color:
+                                                    activeQuickSection ===
+                                                        'advice'
+                                                        ? COLORS.primary
+                                                        : COLORS.textLight,
+
+                                                fontSize: 15,
+                                                fontWeight: '600',
+                                                marginLeft: 8,
+                                            }}
+                                        >
+                                            Consejos y recomendaciones
+                                        </Text>
+                                    </Pressable>
                                 </View>
 
 
-                                <Section>
+                                <Section >
                                     <Text className="ml-2 mb-2 text-md font-bold" style={{ color: '#fff' }}>
                                         Resumen general
                                     </Text>
@@ -1736,7 +2669,13 @@ export default function StatisticsScreen() {
                                     }
                                 >
                                     <View className="flex-row m-2 pb-2 items-center justify-between">
-                                        <View className="flex-row items-center">
+                                        <View
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                flex: 1,
+                                            }}
+                                        >
                                             <Ionicons
                                                 name="analytics-outline"
                                                 size={21}
@@ -1746,10 +2685,26 @@ export default function StatisticsScreen() {
                                                 }}
                                             />
 
-                                            <Text className="text-md font-bold" style={{ color: '#fff' }}>
-                                                Rendimiento de tus sesiones
-                                            </Text>
+                                            <View style={{ flex: 1 }}>
+                                                <Text
+                                                    className="text-md font-bold"
+                                                    style={{ color: '#fff' }}
+                                                >
+                                                    Rendimiento de tus sesiones
+                                                </Text>
+
+                                                <Text
+                                                    style={{
+                                                        color: COLORS.textMuted,
+                                                        fontSize: 10,
+                                                        marginTop: 2,
+                                                    }}
+                                                >
+                                                    Evolución de tu valoración de esfuerzo en running
+                                                </Text>
+                                            </View>
                                         </View>
+
 
                                         <InfoButton
                                             onPress={() =>
@@ -1845,10 +2800,15 @@ export default function StatisticsScreen() {
                                                 }}
                                                 bezier
                                                 onDataPointClick={({ index }) => {
-                                                    const session = filteredRunningSessions[index];
+                                                    const session =
+                                                        filteredRunningSessions[
+                                                        index
+                                                        ];
 
                                                     if (session) {
-                                                        openRunSessionDetail(session);
+                                                        selectRunSession(
+                                                            session
+                                                        );
                                                     }
                                                 }}
 
@@ -1856,15 +2816,230 @@ export default function StatisticsScreen() {
                                                     borderRadius: 18,
                                                     marginLeft: -8,
                                                 }}
+                                                getDotColor={(
+                                                    _dataPoint,
+                                                    index
+                                                ) => {
+                                                    const session =
+                                                        filteredRunningSessions[index];
+
+                                                    if (
+                                                        session &&
+                                                        selectedRunSession &&
+                                                        session.id ===
+                                                        selectedRunSession.id
+                                                    ) {
+                                                        return '#FFFFFF';
+                                                    }
+
+                                                    return COLORS.primary;
+                                                }}
                                             />
                                         )}
                                         {runningChartWidth > 0 && filteredRunningSessions.length > 0 && (
                                             <ChartTouchOverlay
                                                 width={runningChartWidth}
                                                 height={180}
-                                                items={filteredRunningSessions}
-                                                onSelect={openRunSessionDetail}
+                                                items={
+                                                    filteredRunningSessions
+                                                }
+                                                onSelect={
+                                                    selectRunSession
+                                                }
                                             />
+                                        )}
+                                        {selectedRunSession && (
+                                            <View
+                                                style={{
+                                                    marginTop: 10,
+
+                                                    backgroundColor:
+                                                        runSelectionFlash
+                                                            ? 'rgba(198,255,0,0.08)'
+                                                            : '#191919',
+
+                                                    borderWidth: 1,
+
+                                                    borderColor:
+                                                        runSelectionFlash
+                                                            ? COLORS.primary
+                                                            : '#303030',
+
+                                                    borderRadius: 16,
+
+                                                    padding: 12,
+                                                }}
+                                            >
+                                                <View
+                                                    style={{
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+                                                        justifyContent:
+                                                            'space-between',
+                                                    }}
+                                                >
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    COLORS.textMuted,
+
+                                                                fontSize: 10,
+
+                                                                fontWeight: '700',
+                                                            }}
+                                                        >
+                                                            Sesión seleccionada
+                                                        </Text>
+
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    COLORS.textLight,
+
+                                                                fontSize: 13,
+
+                                                                fontWeight: '900',
+
+                                                                marginTop: 3,
+                                                            }}
+                                                        >
+                                                            {getSessionDate(
+                                                                selectedRunSession
+                                                            ).toLocaleDateString(
+                                                                'es-AR'
+                                                            )}
+                                                        </Text>
+                                                    </View>
+
+                                                    <View
+                                                        style={{
+                                                            backgroundColor:
+                                                                'rgba(198,255,0,0.10)',
+
+                                                            borderRadius: 999,
+
+                                                            paddingHorizontal: 10,
+                                                            paddingVertical: 5,
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    COLORS.primary,
+
+                                                                fontSize: 11,
+
+                                                                fontWeight: '900',
+                                                            }}
+                                                        >
+                                                            {formatRating(
+                                                                getRunSessionRating(
+                                                                    selectedRunSession
+                                                                )
+                                                            )}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+
+                                                <View
+                                                    style={{
+                                                        flexDirection: 'row',
+                                                        marginTop: 10,
+                                                        gap: 8,
+                                                    }}
+                                                >
+                                                    <View
+                                                        style={{
+                                                            flex: 1,
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                color: '#777777',
+                                                                fontSize: 9,
+                                                            }}
+                                                        >
+                                                            Distancia
+                                                        </Text>
+
+                                                        <Text
+                                                            style={{
+                                                                color: '#DDDDDD',
+                                                                fontSize: 12,
+                                                                fontWeight: '800',
+                                                                marginTop: 2,
+                                                            }}
+                                                        >
+                                                            {formatStatDistance(
+                                                                selectedRunSession
+                                                                    .distanceMeters
+                                                            )}
+                                                        </Text>
+                                                    </View>
+
+                                                    <View
+                                                        style={{
+                                                            flex: 1,
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                color: '#777777',
+                                                                fontSize: 9,
+                                                            }}
+                                                        >
+                                                            Tiempo
+                                                        </Text>
+
+                                                        <Text
+                                                            style={{
+                                                                color: '#DDDDDD',
+                                                                fontSize: 12,
+                                                                fontWeight: '800',
+                                                                marginTop: 2,
+                                                            }}
+                                                        >
+                                                            {formatStatDuration(
+                                                                selectedRunSession
+                                                                    .durationSeconds
+                                                            )}
+                                                        </Text>
+                                                    </View>
+
+                                                    <Pressable
+                                                        onPress={
+                                                            openSelectedRunSessionDetail
+                                                        }
+                                                        style={({ pressed }) => ({
+                                                            paddingHorizontal: 11,
+                                                            paddingVertical: 8,
+
+                                                            borderRadius: 10,
+
+                                                            backgroundColor:
+                                                                pressed
+                                                                    ? '#343434'
+                                                                    : '#242424',
+
+                                                            alignSelf: 'center',
+                                                        })}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    COLORS.textLight,
+
+                                                                fontSize: 10,
+
+                                                                fontWeight: '800',
+                                                            }}
+                                                        >
+                                                            Ver detalle ›
+                                                        </Text>
+                                                    </Pressable>
+                                                </View>
+                                            </View>
                                         )}
                                         {filteredRunningSessions.length === 0 && (
                                             <Text
@@ -1939,6 +3114,15 @@ export default function StatisticsScreen() {
                                                     className="text-md font-bold" style={{ color: '#fff' }}
                                                 >
                                                     Detalles de Running
+                                                </Text>
+                                                <Text
+                                                    style={{
+                                                        color: COLORS.textMuted,
+                                                        fontSize: 10,
+                                                        marginTop: 2,
+                                                    }}
+                                                >
+                                                    Tiempo, distancia, ritmo y velocidad
                                                 </Text>
                                             </View>
                                         </View>
@@ -2033,7 +3217,13 @@ export default function StatisticsScreen() {
                                     }
                                 >
                                     <View className="flex-row m-2 pb-2 items-center justify-between">
-                                        <View className="flex-row items-center">
+                                        <View
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                flex: 1,
+                                            }}
+                                        >
                                             <Ionicons
                                                 name="trending-up-outline"
                                                 size={21}
@@ -2043,9 +3233,24 @@ export default function StatisticsScreen() {
                                                 }}
                                             />
 
-                                            <Text className="text-md font-bold" style={{ color: '#fff' }}>
-                                                Evolución de rutinas
-                                            </Text>
+                                            <View style={{ flex: 1 }}>
+                                                <Text
+                                                    className="text-md font-bold"
+                                                    style={{ color: '#fff' }}
+                                                >
+                                                    Evolución de rutinas
+                                                </Text>
+
+                                                <Text
+                                                    style={{
+                                                        color: COLORS.textMuted,
+                                                        fontSize: 10,
+                                                        marginTop: 2,
+                                                    }}
+                                                >
+                                                    Evolución de tus valoraciones de entrenamiento
+                                                </Text>
+                                            </View>
                                         </View>
 
                                         <InfoButton
@@ -2148,13 +3353,31 @@ export default function StatisticsScreen() {
                                                     const point = filteredRoutinePoints[index];
 
                                                     if (point) {
-                                                        openRoutinePointDetail(point);
+                                                        selectRoutinePoint(point)
                                                     }
                                                 }}
 
                                                 style={{
                                                     borderRadius: 18,
                                                     marginLeft: -8,
+                                                }}
+                                                getDotColor={(
+                                                    _dataPoint,
+                                                    index
+                                                ) => {
+                                                    const point =
+                                                        filteredRoutinePoints[index];
+
+                                                    if (
+                                                        point &&
+                                                        selectedRoutinePoint &&
+                                                        point.id ===
+                                                        selectedRoutinePoint.id
+                                                    ) {
+                                                        return '#FFFFFF';
+                                                    }
+
+                                                    return '#78DCE8';
                                                 }}
                                             />
                                         )}
@@ -2163,9 +3386,183 @@ export default function StatisticsScreen() {
                                                 width={routineChartWidth}
                                                 height={180}
                                                 items={filteredRoutinePoints}
-                                                onSelect={openRoutinePointDetail}
+                                                onSelect={selectRoutinePoint}
                                             />
                                         )}
+                                        {selectedRoutinePoint && (
+                                            <View
+                                                style={{
+                                                    marginTop: 10,
+
+                                                    backgroundColor:
+                                                        routineSelectionFlash
+                                                            ? 'rgba(198,255,0,0.08)'
+                                                            : '#191919',
+
+                                                    borderWidth: 1,
+
+                                                    borderColor:
+                                                        routineSelectionFlash
+                                                            ? COLORS.primary
+                                                            : '#303030',
+
+                                                    borderRadius: 16,
+
+                                                    padding: 12,
+                                                }}
+                                            >
+                                                <View
+                                                    style={{
+                                                        flexDirection: 'row',
+
+                                                        justifyContent:
+                                                            'space-between',
+
+                                                        alignItems: 'center',
+                                                    }}
+                                                >
+                                                    <View
+                                                        style={{
+                                                            flex: 1,
+                                                            paddingRight: 10,
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    COLORS.textMuted,
+
+                                                                fontSize: 10,
+
+                                                                fontWeight: '700',
+                                                            }}
+                                                        >
+                                                            Rutina seleccionada
+                                                        </Text>
+
+                                                        <Text
+                                                            numberOfLines={1}
+                                                            style={{
+                                                                color:
+                                                                    COLORS.textLight,
+
+                                                                fontSize: 13,
+
+                                                                fontWeight: '900',
+
+                                                                marginTop: 3,
+                                                            }}
+                                                        >
+                                                            {selectedRoutinePoint
+                                                                .routineName ??
+                                                                'Entrenamiento registrado'}
+                                                        </Text>
+                                                    </View>
+
+                                                    <View
+                                                        style={{
+                                                            backgroundColor:
+                                                                'rgba(120,220,232,0.10)',
+
+                                                            borderRadius: 999,
+
+                                                            paddingHorizontal: 10,
+                                                            paddingVertical: 5,
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                color: '#78DCE8',
+                                                                fontSize: 11,
+                                                                fontWeight: '900',
+                                                            }}
+                                                        >
+                                                            {formatRating(
+                                                                selectedRoutinePoint
+                                                                    .value
+                                                            )}
+                                                        </Text>
+                                                    </View>
+                                                </View>
+
+                                                <View
+                                                    style={{
+                                                        flexDirection: 'row',
+                                                        alignItems: 'center',
+
+                                                        marginTop: 9,
+                                                    }}
+                                                >
+                                                    <View
+                                                        style={{
+                                                            flex: 1,
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                color: '#AAAAAA',
+                                                                fontSize: 10,
+                                                                fontWeight: '700',
+                                                            }}
+                                                        >
+                                                            {new Date(
+                                                                selectedRoutinePoint.date
+                                                            ).toLocaleDateString(
+                                                                'es-AR'
+                                                            )}
+                                                        </Text>
+
+                                                        <Text
+                                                            style={{
+                                                                color: '#777777',
+                                                                fontSize: 9,
+                                                                marginTop: 2,
+                                                            }}
+                                                        >
+                                                            {selectedRoutinePoint
+                                                                .source ===
+                                                                'routine-rating'
+                                                                ? 'Valoración de rutina completa'
+                                                                : `Promedio de ${selectedRoutinePoint
+                                                                    .ratedExercisesCount ??
+                                                                0
+                                                                } ejercicios`}
+                                                        </Text>
+                                                    </View>
+
+                                                    <Pressable
+                                                        onPress={
+                                                            openSelectedRoutineDetail
+                                                        }
+                                                        style={({ pressed }) => ({
+                                                            paddingHorizontal: 11,
+                                                            paddingVertical: 8,
+
+                                                            borderRadius: 10,
+
+                                                            backgroundColor:
+                                                                pressed
+                                                                    ? '#343434'
+                                                                    : '#242424',
+                                                        })}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    COLORS.textLight,
+
+                                                                fontSize: 10,
+
+                                                                fontWeight: '800',
+                                                            }}
+                                                        >
+                                                            Ver detalle ›
+                                                        </Text>
+                                                    </Pressable>
+                                                </View>
+                                            </View>
+                                        )}
+
                                         {filteredRoutinePoints.length === 0 && (
                                             <Text
                                                 style={{
@@ -2212,8 +3609,8 @@ export default function StatisticsScreen() {
                                         <InfoButton
                                             onPress={() =>
                                                 openInfoModal(
-                                                    'Esfuerzo',
-                                                    'Ejercicios más difíciles: ejercicios con mayor promedio de esfuerzo registrado.\n\nEjercicios más fáciles: ejercicios con menor promedio de esfuerzo registrado.\n\nEsfuerzo promedio por ejercicio: promedio general de las valoraciones que hiciste en tus ejercicios.\n\nEstas métricas ayudan a detectar qué ejercicios te exigen más y cuáles vas dominando mejor.'
+                                                    'Rendimiento de ejercicios',
+                                                    'Ejercicios con mejor rendimiento: son aquellos que recibieron tus valoraciones promedio más altas.\n\nEjercicios que resultaron más difíciles: son aquellos que recibieron tus valoraciones promedio más bajas.\n\nLa valoración promedio por ejercicio reúne las calificaciones que registraste durante tus entrenamientos.\n\nEstos datos te ayudan a reconocer cuáles ejercicios dominás mejor y cuáles conviene trabajar con mayor atención.'
                                                 )
                                             }
                                         />
@@ -2221,7 +3618,7 @@ export default function StatisticsScreen() {
                                     <View className='mb-3'>
                                         <StatCard
                                             icon={<FontAwesome6 name="chart-simple" size={16} color={COLORS.primary} />}
-                                            label="Esfuerzo promedio por ejercicio"
+                                            label="Valoración promedio por ejercicio"
                                             value={formatRating(
                                                 stats?.effort.avgEffortByExercise?.length
                                                     ? stats.effort.avgEffortByExercise.reduce((sum, item) => sum + item.avgEffort, 0) /
@@ -2231,38 +3628,87 @@ export default function StatisticsScreen() {
                                         />
                                     </View>
                                     <View className='mx-2'>
-                                        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14, marginBottom: 10 }}>
-                                            Top ejercicios mejor rendimiento
+                                        <Text
+                                            style={{
+                                                color: '#fff',
+                                                fontWeight: '800',
+                                                fontSize: 14,
+                                                marginBottom: 10,
+                                            }}
+                                        >
+                                            Ejercicios con mejor rendimiento
                                         </Text>
 
-                                        {stats?.effort.topHardestExercises?.length ? (
-                                            stats.effort.topHardestExercises.slice(0, 3).map((item) => (
-                                                <BarRow
-                                                    key={item.exerciseId ?? item.exerciseName}
-                                                    name={item.exerciseName}
-                                                    value={toPercent(item.avgEffort)}
-                                                />
-                                            ))
+                                        {stats?.effort
+                                            .topBestExercises?.length ? (
+                                            stats.effort.topBestExercises
+                                                .slice(0, 3)
+                                                .map((item) => (
+                                                    <BarRow
+                                                        key={
+                                                            item.exerciseId ??
+                                                            item.exerciseName
+                                                        }
+                                                        name={
+                                                            item.exerciseName
+                                                        }
+                                                        value={toPercent(
+                                                            item.avgEffort
+                                                        )}
+                                                    />
+                                                ))
                                         ) : (
-                                            <Text style={{ color: COLORS.textMuted, fontSize: 12, marginBottom: 10 }}>
+                                            <Text
+                                                style={{
+                                                    color:
+                                                        COLORS.textMuted,
+                                                    fontSize: 12,
+                                                    marginBottom: 10,
+                                                }}
+                                            >
                                                 Aún no hay datos suficientes.
                                             </Text>
                                         )}
 
-                                        <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14, marginTop: 8, marginBottom: 10 }}>
-                                            Ejercicios que fueron más difíciles
+                                        <Text
+                                            style={{
+                                                color: '#fff',
+                                                fontWeight: '800',
+                                                fontSize: 14,
+                                                marginTop: 8,
+                                                marginBottom: 10,
+                                            }}
+                                        >
+                                            Ejercicios que resultaron más difíciles
                                         </Text>
 
-                                        {stats?.effort.topBestExercises?.length ? (
-                                            stats.effort.topBestExercises.slice(0, 3).map((item) => (
-                                                <BarRow
-                                                    key={item.exerciseId ?? item.exerciseName}
-                                                    name={item.exerciseName}
-                                                    value={toPercent(item.avgEffort)}
-                                                />
-                                            ))
+                                        {stats?.effort
+                                            .topHardestExercises?.length ? (
+                                            stats.effort.topHardestExercises
+                                                .slice(0, 3)
+                                                .map((item) => (
+                                                    <BarRow
+                                                        key={
+                                                            item.exerciseId ??
+                                                            item.exerciseName
+                                                        }
+                                                        name={
+                                                            item.exerciseName
+                                                        }
+                                                        value={toPercent(
+                                                            item.avgEffort
+                                                        )}
+                                                    />
+                                                ))
                                         ) : (
-                                            <Text style={{ color: COLORS.textMuted, fontSize: 12, marginBottom: 10 }}>
+                                            <Text
+                                                style={{
+                                                    color:
+                                                        COLORS.textMuted,
+                                                    fontSize: 12,
+                                                    marginBottom: 10,
+                                                }}
+                                            >
                                                 Aún no hay datos suficientes.
                                             </Text>
                                         )}
@@ -2503,297 +3949,965 @@ export default function StatisticsScreen() {
                     />
                 </View>
             </View>
-            <Modal
-                visible={infoModalVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setInfoModalVisible(false)}
+            <AnimatedStatsModal
+                visible={
+                    infoModalVisible
+                }
+                onClose={() =>
+                    setInfoModalVisible(
+                        false
+                    )
+                }
+                title={
+                    infoModalTitle ||
+                    'Información'
+                }
+                subtitle="Información sobre esta estadística"
+                icon={
+                    <Ionicons
+                        name="information-circle-outline"
+                        size={26}
+                        color={
+                            COLORS.primary
+                        }
+                    />
+                }
             >
                 <View
                     style={{
-                        flex: 1,
-                        backgroundColor: 'rgba(0,0,0,0.65)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        padding: 24,
+                        backgroundColor:
+                            '#181818',
+
+                        borderRadius: 16,
+
+                        borderWidth: 1,
+
+                        borderColor:
+                            '#292929',
+
+                        padding: 14,
                     }}
                 >
-                    <View
+                    <Text
                         style={{
-                            width: '100%',
-                            maxWidth: 340,
-                            backgroundColor: '#101010',
-                            borderRadius: 22,
-                            borderWidth: 1,
-                            borderColor: COLORS.primary,
-                            padding: 18,
+                            color:
+                                '#C3C3C3',
+
+                            fontSize: 13,
+
+                            lineHeight: 21,
                         }}
                     >
-                        <View className="flex-row items-center justify-between mb-3">
-                            <Text
-                                style={{
-                                    color: COLORS.textLight,
-                                    fontSize: 18,
-                                    fontWeight: '800',
-                                    flex: 1,
-                                }}
-                            >
-                                {infoModalTitle}
-                            </Text>
+                        {infoModalText}
+                    </Text>
+                </View>
+            </AnimatedStatsModal>
+            <AnimatedStatsModal
+                visible={
+                    runDetailVisible
+                }
+                onClose={() =>
+                    setRunDetailVisible(
+                        false
+                    )
+                }
+                title="Detalle de sesión"
+                subtitle={
+                    selectedRunSession
+                        ? getSessionDate(
+                            selectedRunSession
+                        ).toLocaleDateString(
+                            'es-AR',
+                            {
+                                day: '2-digit',
+                                month: 'long',
+                                year: 'numeric',
+                            }
+                        )
+                        : undefined
+                }
+                icon={
+                    <FontAwesome6
+                        name="person-running"
+                        size={22}
+                        color={
+                            COLORS.primary
+                        }
+                    />
+                }
+            >
+                {selectedRunSession && (
+                    <>
+                        <Text
+                            style={{
+                                color:
+                                    '#8F8F8F',
 
-                            <Pressable
-                                onPress={() => setInfoModalVisible(false)}
-                                style={{
-                                    width: 30,
-                                    height: 30,
-                                    borderRadius: 15,
-                                    backgroundColor: '#1b1b1b',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                }}
-                            >
-                                <Ionicons name="close" size={18} color={COLORS.textLight} />
-                            </Pressable>
+                                fontSize: 10,
+
+                                fontWeight:
+                                    '800',
+
+                                marginBottom: 8,
+
+                                textTransform:
+                                    'uppercase',
+
+                                letterSpacing:
+                                    0.6,
+                            }}
+                        >
+                            Resumen de la carrera
+                        </Text>
+
+                        <View
+                            style={{
+                                flexDirection:
+                                    'row',
+
+                                flexWrap:
+                                    'wrap',
+
+                                gap: 8,
+                            }}
+                        >
+                            {/* DISTANCIA */}
+
+                            <ModalMetricCard
+                                icon={
+                                    <Ionicons
+                                        name="map-outline"
+                                        size={17}
+                                        color={
+                                            COLORS.primary
+                                        }
+                                    />
+                                }
+                                label="Distancia"
+                                value={formatStatDistance(
+                                    selectedRunSession
+                                        .distanceMeters
+                                )}
+                            />
+
+                            {/* DURACIÓN */}
+
+                            <ModalMetricCard
+                                icon={
+                                    <Ionicons
+                                        name="stopwatch-outline"
+                                        size={17}
+                                        color={
+                                            COLORS.primary
+                                        }
+                                    />
+                                }
+                                label="Duración"
+                                value={formatStatDuration(
+                                    selectedRunSession
+                                        .durationSeconds
+                                )}
+                            />
+
+                            {/* RITMO */}
+
+                            <ModalMetricCard
+                                icon={
+                                    <Ionicons
+                                        name="speedometer-outline"
+                                        size={17}
+                                        color={
+                                            COLORS.primary
+                                        }
+                                    />
+                                }
+                                label="Ritmo promedio"
+                                value={
+                                    selectedRunSession
+                                        .avgPaceSecPerKm !=
+                                        null
+                                        ? `${formatStatPace(
+                                            selectedRunSession
+                                                .avgPaceSecPerKm
+                                        )} /km`
+                                        : '--'
+                                }
+                            />
+
+                            {/* VELOCIDAD MEDIA */}
+
+                            <ModalMetricCard
+                                icon={
+                                    <Ionicons
+                                        name="pulse-outline"
+                                        size={17}
+                                        color={
+                                            COLORS.primary
+                                        }
+                                    />
+                                }
+                                label="Vel. promedio"
+                                value={formatStatSpeed(
+                                    getRunAverageSpeedMps(
+                                        selectedRunSession
+                                    )
+                                )}
+                            />
+
+                            {/* VELOCIDAD MÁXIMA */}
+
+                            <ModalMetricCard
+                                icon={
+                                    <Ionicons
+                                        name="flash-outline"
+                                        size={17}
+                                        color={
+                                            COLORS.primary
+                                        }
+                                    />
+                                }
+                                label="Vel. máxima"
+                                value={formatStatSpeed(
+                                    selectedRunSession
+                                        .maxSpeedMps
+                                )}
+                            />
+
+                            {/* VALORACIÓN */}
+
+                            <ModalMetricCard
+                                icon={
+                                    <Ionicons
+                                        name="star-outline"
+                                        size={17}
+                                        color={
+                                            COLORS.primary
+                                        }
+                                    />
+                                }
+                                label="Valoración"
+                                value={formatRating(
+                                    getRunSessionRating(
+                                        selectedRunSession
+                                    )
+                                )}
+                            />
                         </View>
+
+                        {/* HORARIOS */}
 
                         <Text
                             style={{
-                                color: COLORS.textMuted,
-                                fontSize: 13,
-                                lineHeight: 20,
+                                color:
+                                    '#8F8F8F',
+
+                                fontSize: 10,
+
+                                fontWeight:
+                                    '800',
+
+                                marginTop: 17,
+
+                                marginBottom: 8,
+
+                                textTransform:
+                                    'uppercase',
+
+                                letterSpacing:
+                                    0.6,
                             }}
                         >
-                            {infoModalText}
+                            Registro
                         </Text>
 
-                        <Pressable
-                            onPress={() => setInfoModalVisible(false)}
+                        <View
                             style={{
-                                marginTop: 16,
-                                backgroundColor: COLORS.primary,
-                                paddingVertical: 13,
-                                borderRadius: 14,
-                                alignItems: 'center',
+                                flexDirection:
+                                    'row',
+
+                                flexWrap:
+                                    'wrap',
+
+                                gap: 8,
                             }}
                         >
-                            <Text style={{ color: '#111', fontWeight: '800' }}>
-                                Entendido
-                            </Text>
-                        </Pressable>
-                    </View>
-                </View>
-            </Modal>
-            <Modal
-                visible={runDetailVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setRunDetailVisible(false)}
-            >
-                <View
-                    style={{
-                        flex: 1,
-                        backgroundColor: 'rgba(0,0,0,0.68)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        padding: 24,
-                    }}
-                >
-                    <View
-                        style={{
-                            width: '100%',
-                            maxWidth: 340,
-                            backgroundColor: '#101010',
-                            borderRadius: 22,
-                            borderWidth: 1,
-                            borderColor: COLORS.primary,
-                            padding: 18,
-                        }}
-                    >
-                        <View className="flex-row items-center justify-between mb-3">
-                            <Text
-                                style={{
-                                    color: COLORS.textLight,
-                                    fontSize: 18,
-                                    fontWeight: '800',
-                                }}
-                            >
-                                Detalle de sesión
-                            </Text>
-
-                            <Pressable
-                                onPress={() => setRunDetailVisible(false)}
-                                style={{
-                                    width: 30,
-                                    height: 30,
-                                    borderRadius: 15,
-                                    backgroundColor: '#1b1b1b',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                }}
-                            >
-                                <Ionicons name="close" size={18} color={COLORS.textLight} />
-                            </Pressable>
-                        </View>
-
-                        {selectedRunSession && (
-                            <>
-                                <Text style={{ color: '#9CA3AF', fontSize: 12 }}>
-                                    Fecha
-                                </Text>
-                                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 10 }}>
-                                    {getSessionDate(selectedRunSession).toLocaleDateString('es-AR')}
-                                </Text>
-
-                                <View className="flex-row" style={{ gap: 10, marginBottom: 10 }}>
-                                    <StatCard
-                                        icon={<Ionicons name="walk-outline" size={16} color={COLORS.primary} />}
-                                        label="Distancia"
-                                        value={formatStatDistance(selectedRunSession.distanceMeters)}
-                                    />
-
-                                    <StatCard
-                                        icon={<Ionicons name="stopwatch-outline" size={16} color="#78DCE8" />}
-                                        label="Tiempo"
-                                        value={formatStatDuration(selectedRunSession.durationSeconds)}
-                                    />
-                                </View>
-
-                                <View className="flex-row" style={{ gap: 10, marginBottom: 10 }}>
-                                    <StatCard
-                                        icon={<Ionicons name="speedometer-outline" size={16} color="#78DCE8" />}
-                                        label="Ritmo"
-                                        value={
-                                            selectedRunSession.avgPaceSecPerKm != null
-                                                ? `${formatStatPace(selectedRunSession.avgPaceSecPerKm)} /km`
-                                                : '--'
+                            <ModalMetricCard
+                                icon={
+                                    <Ionicons
+                                        name="play-outline"
+                                        size={17}
+                                        color={
+                                            QUICK_ICON_COLOR
                                         }
                                     />
+                                }
+                                label="Inicio"
+                                value={formatClockTime(
+                                    getSessionDate(
+                                        selectedRunSession
+                                    )
+                                )}
+                            />
 
-                                    <StatCard
-                                        icon={<Ionicons name="flash-outline" size={16} color={COLORS.primary} />}
-                                        label="Vel. Máx"
-                                        value={formatStatSpeed(selectedRunSession.maxSpeedMps)}
+                            <ModalMetricCard
+                                icon={
+                                    <Ionicons
+                                        name="flag-outline"
+                                        size={17}
+                                        color={
+                                            QUICK_ICON_COLOR
+                                        }
                                     />
-                                </View>
+                                }
+                                label="Finalización"
+                                value={formatClockTime(
+                                    getRunSessionEndDate(
+                                        selectedRunSession
+                                    )
+                                )}
+                            />
 
-                                <StatCard
-                                    icon={<Ionicons name="star-outline" size={16} color={COLORS.primary} />}
-                                    label="Valoración"
-                                    value={formatRating(getRunSessionRating(selectedRunSession))}
-                                />
-                            </>
-                        )}
-                    </View>
-                </View>
-            </Modal>
-            <Modal
-                visible={routineDetailVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setRoutineDetailVisible(false)}
-            >
-                <View
-                    style={{
-                        flex: 1,
-                        backgroundColor: 'rgba(0,0,0,0.68)',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        padding: 24,
-                    }}
-                >
-                    <View
-                        style={{
-                            width: '100%',
-                            maxWidth: 340,
-                            backgroundColor: '#101010',
-                            borderRadius: 22,
-                            borderWidth: 1,
-                            borderColor: COLORS.primary,
-                            padding: 18,
-                        }}
-                    >
-                        <View className="flex-row items-center justify-between mb-3">
-                            <Text
-                                style={{
-                                    color: COLORS.textLight,
-                                    fontSize: 18,
-                                    fontWeight: '800',
-                                }}
-                            >
-                                Detalle de rutina
-                            </Text>
-
-                            <Pressable
-                                onPress={() => setRoutineDetailVisible(false)}
-                                style={{
-                                    width: 30,
-                                    height: 30,
-                                    borderRadius: 15,
-                                    backgroundColor: '#1b1b1b',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                }}
-                            >
-                                <Ionicons name="close" size={18} color={COLORS.textLight} />
-                            </Pressable>
+                            <ModalMetricCard
+                                wide
+                                icon={
+                                    <Ionicons
+                                        name="location-outline"
+                                        size={17}
+                                        color={
+                                            QUICK_ICON_COLOR
+                                        }
+                                    />
+                                }
+                                label="Recorrido GPS"
+                                value={
+                                    hasSavedRunRoute(
+                                        selectedRunSession
+                                    )
+                                        ? 'Ruta guardada correctamente'
+                                        : 'Ruta no disponible'
+                                }
+                            />
                         </View>
+                    </>
+                )}
+            </AnimatedStatsModal>
+            <AnimatedStatsModal
+                visible={
+                    routineDetailVisible
+                }
+                onClose={() =>
+                    setRoutineDetailVisible(
+                        false
+                    )
+                }
+                title="Detalle de rutina"
+                subtitle={
+                    selectedRoutinePoint
+                        ? new Date(
+                            selectedRoutinePoint.date
+                        ).toLocaleDateString(
+                            'es-AR',
+                            {
+                                day: '2-digit',
+                                month: 'long',
+                                year: 'numeric',
+                            }
+                        )
+                        : undefined
+                }
+                icon={
+                    <FontAwesome6
+                        name="dumbbell"
+                        size={21}
+                        color={COLORS.primary}
+                    />
+                }
+            >
+                {selectedRoutinePoint &&
+                    selectedRoutineContext && (
+                        <>
+                            {/* VALORACIÓN PRINCIPAL */}
 
-                        {selectedRoutinePoint && (
-                            <>
-                                <Text style={{ color: '#9CA3AF', fontSize: 12 }}>
-                                    Fecha
-                                </Text>
+                            <View
+                                style={{
+                                    backgroundColor:
+                                        'rgba(198,255,0,0.07)',
+
+                                    borderWidth: 1,
+
+                                    borderColor:
+                                        'rgba(198,255,0,0.30)',
+
+                                    borderRadius: 18,
+
+                                    paddingVertical: 16,
+                                    paddingHorizontal: 14,
+
+                                    alignItems:
+                                        'center',
+
+                                    marginBottom: 16,
+                                }}
+                            >
                                 <Text
                                     style={{
-                                        color: '#fff',
-                                        fontSize: 15,
-                                        fontWeight: '700',
-                                        marginBottom: 10,
+                                        color:
+                                            COLORS.primary,
+
+                                        fontSize: 30,
+
+                                        fontWeight:
+                                            '900',
                                     }}
                                 >
-                                    {new Date(selectedRoutinePoint.date).toLocaleDateString('es-AR')}
+                                    {formatRating(
+                                        selectedRoutinePoint
+                                            .value
+                                    )}
                                 </Text>
 
-                                {selectedRoutinePoint.routineName && (
-                                    <>
-                                        <Text style={{ color: '#9CA3AF', fontSize: 12 }}>
-                                            Rutina
-                                        </Text>
-                                        <Text
-                                            style={{
-                                                color: '#fff',
-                                                fontSize: 15,
-                                                fontWeight: '700',
-                                                marginBottom: 10,
-                                            }}
-                                        >
-                                            {selectedRoutinePoint.routineName}
-                                        </Text>
-                                    </>
-                                )}
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textLight,
 
-                                <StatCard
-                                    icon={<Ionicons name="star-outline" size={16} color={COLORS.primary} />}
+                                        fontSize: 12,
+
+                                        fontWeight:
+                                            '800',
+
+                                        marginTop: 3,
+                                    }}
+                                >
+                                    {getRoutinePerformanceLabel(
+                                        selectedRoutinePoint
+                                            .value
+                                    )}
+                                </Text>
+                            </View>
+
+                            {/* SESIÓN */}
+
+                            <Text
+                                style={{
+                                    color: '#8F8F8F',
+
+                                    fontSize: 10,
+
+                                    fontWeight: '900',
+
+                                    letterSpacing: 0.7,
+
+                                    marginBottom: 8,
+                                }}
+                            >
+                                SESIÓN
+                            </Text>
+
+                            <View
+                                style={{
+                                    flexDirection:
+                                        'row',
+
+                                    flexWrap:
+                                        'wrap',
+
+                                    gap: 8,
+                                }}
+                            >
+                                <ModalMetricCard
+                                    icon={
+                                        <Ionicons
+                                            name="star-outline"
+                                            size={17}
+                                            color={
+                                                COLORS.primary
+                                            }
+                                        />
+                                    }
                                     label="Valoración"
-                                    value={formatRating(selectedRoutinePoint.value)}
+                                    value={formatRating(
+                                        selectedRoutinePoint
+                                            .value
+                                    )}
                                 />
 
-                                <View style={{ marginTop: 10 }}>
-                                    <StatCard
-                                        icon={<Ionicons name="information-circle-outline" size={16} color="#78DCE8" />}
-                                        label="Cálculo"
-                                        value={
-                                            selectedRoutinePoint.source === 'routine-rating'
-                                                ? 'Rutina completa'
-                                                : `Promedio de ${selectedRoutinePoint.ratedExercisesCount ?? 0} ejercicios`
-                                        }
-                                    />
+                                <ModalMetricCard
+                                    icon={
+                                        <Ionicons
+                                            name="analytics-outline"
+                                            size={17}
+                                            color={
+                                                QUICK_ICON_COLOR
+                                            }
+                                        />
+                                    }
+                                    label="Promedio período"
+                                    value={formatRating(
+                                        selectedRoutineContext
+                                            .periodAverage
+                                    )}
+                                />
+
+                                <ModalMetricCard
+                                    icon={
+                                        <Ionicons
+                                            name={
+                                                (
+                                                    selectedRoutineContext
+                                                        .differenceFromPrevious ??
+                                                    0
+                                                ) >= 0
+                                                    ? 'trending-up-outline'
+                                                    : 'trending-down-outline'
+                                            }
+                                            size={17}
+                                            color={
+                                                QUICK_ICON_COLOR
+                                            }
+                                        />
+                                    }
+                                    label="Vs. anterior"
+                                    value={
+                                        selectedRoutineContext
+                                            .differenceFromPrevious !=
+                                            null
+                                            ? `${formatRatingDelta(
+                                                selectedRoutineContext
+                                                    .differenceFromPrevious
+                                            )} pts`
+                                            : '--'
+                                    }
+                                />
+
+                                <ModalMetricCard
+                                    icon={
+                                        <Ionicons
+                                            name="layers-outline"
+                                            size={17}
+                                            color={
+                                                QUICK_ICON_COLOR
+                                            }
+                                        />
+                                    }
+                                    label="Sesiones período"
+                                    value={String(
+                                        selectedRoutineContext
+                                            .periodCount
+                                    )}
+                                />
+                            </View>
+
+                            {/* EJERCICIOS */}
+
+                            <Text
+                                style={{
+                                    color: '#8F8F8F',
+
+                                    fontSize: 10,
+
+                                    fontWeight: '900',
+
+                                    letterSpacing: 0.7,
+
+                                    marginTop: 18,
+                                    marginBottom: 8,
+                                }}
+                            >
+                                EJERCICIOS DE ESE DÍA
+                            </Text>
+
+                            <View
+                                style={{
+                                    flexDirection:
+                                        'row',
+
+                                    flexWrap:
+                                        'wrap',
+
+                                    gap: 8,
+                                }}
+                            >
+                                <ModalMetricCard
+                                    icon={
+                                        <Ionicons
+                                            name="calculator-outline"
+                                            size={17}
+                                            color={
+                                                COLORS.primary
+                                            }
+                                        />
+                                    }
+                                    label="Promedio"
+                                    value={formatRating(
+                                        selectedRoutineContext
+                                            .exerciseAverage
+                                    )}
+                                />
+
+                                <ModalMetricCard
+                                    icon={
+                                        <Ionicons
+                                            name="checkmark-done-outline"
+                                            size={17}
+                                            color={
+                                                QUICK_ICON_COLOR
+                                            }
+                                        />
+                                    }
+                                    label="Valorados"
+                                    value={String(
+                                        selectedRoutineContext
+                                            .exerciseRecords
+                                            .length
+                                    )}
+                                />
+
+                                {/* MEJOR */}
+
+                                <View
+                                    style={{
+                                        flexBasis: '47%',
+                                        flexGrow: 1,
+
+                                        backgroundColor:
+                                            '#181818',
+
+                                        borderWidth: 1,
+                                        borderColor:
+                                            '#292929',
+
+                                        borderRadius: 15,
+
+                                        padding: 11,
+
+                                        minHeight: 82,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color:
+                                                '#8F8F8F',
+
+                                            fontSize: 10,
+
+                                            fontWeight:
+                                                '700',
+                                        }}
+                                    >
+                                        Mejor
+                                    </Text>
+
+                                    <Text
+                                        numberOfLines={1}
+                                        style={{
+                                            color:
+                                                COLORS.textLight,
+
+                                            fontSize: 12,
+
+                                            fontWeight:
+                                                '900',
+
+                                            marginTop: 7,
+                                        }}
+                                    >
+                                        {selectedRoutineContext
+                                            .bestExercise
+                                            ?.title ??
+                                            '--'}
+                                    </Text>
+
+                                    <Text
+                                        style={{
+                                            color:
+                                                COLORS.primary,
+
+                                            fontSize: 11,
+
+                                            fontWeight:
+                                                '900',
+
+                                            marginTop: 3,
+                                        }}
+                                    >
+                                        {selectedRoutineContext
+                                            .bestExercise
+                                            ? formatRating(
+                                                selectedRoutineContext
+                                                    .bestExercise
+                                                    .numericRating
+                                            )
+                                            : '--'}
+                                    </Text>
                                 </View>
-                            </>
-                        )}
-                    </View>
-                </View>
-            </Modal>
+
+                                {/* MÁS DIFÍCIL */}
+
+                                <View
+                                    style={{
+                                        flexBasis: '47%',
+                                        flexGrow: 1,
+
+                                        backgroundColor:
+                                            '#181818',
+
+                                        borderWidth: 1,
+                                        borderColor:
+                                            '#292929',
+
+                                        borderRadius: 15,
+
+                                        padding: 11,
+
+                                        minHeight: 82,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color:
+                                                '#8F8F8F',
+
+                                            fontSize: 10,
+
+                                            fontWeight:
+                                                '700',
+                                        }}
+                                    >
+                                        Más difícil
+                                    </Text>
+
+                                    <Text
+                                        numberOfLines={1}
+                                        style={{
+                                            color:
+                                                COLORS.textLight,
+
+                                            fontSize: 12,
+
+                                            fontWeight:
+                                                '900',
+
+                                            marginTop: 7,
+                                        }}
+                                    >
+                                        {selectedRoutineContext
+                                            .hardestExercise
+                                            ?.title ??
+                                            '--'}
+                                    </Text>
+
+                                    <Text
+                                        style={{
+                                            color:
+                                                '#C7C7C7',
+
+                                            fontSize: 11,
+
+                                            fontWeight:
+                                                '900',
+
+                                            marginTop: 3,
+                                        }}
+                                    >
+                                        {selectedRoutineContext
+                                            .hardestExercise
+                                            ? formatRating(
+                                                selectedRoutineContext
+                                                    .hardestExercise
+                                                    .numericRating
+                                            )
+                                            : '--'}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* HISTORIAL */}
+
+                            <Text
+                                style={{
+                                    color: '#8F8F8F',
+
+                                    fontSize: 10,
+
+                                    fontWeight: '900',
+
+                                    letterSpacing: 0.7,
+
+                                    marginTop: 18,
+                                    marginBottom: 8,
+                                }}
+                            >
+                                HISTORIAL DE ESTA RUTINA
+                            </Text>
+
+                            <View
+                                style={{
+                                    flexDirection:
+                                        'row',
+
+                                    flexWrap:
+                                        'wrap',
+
+                                    gap: 8,
+                                }}
+                            >
+                                <ModalMetricCard
+                                    icon={
+                                        <Ionicons
+                                            name="repeat-outline"
+                                            size={17}
+                                            color={
+                                                QUICK_ICON_COLOR
+                                            }
+                                        />
+                                    }
+                                    label="Sesiones"
+                                    value={String(
+                                        selectedRoutineContext
+                                            .sameRoutinePoints
+                                            .length
+                                    )}
+                                />
+
+                                <ModalMetricCard
+                                    icon={
+                                        <Ionicons
+                                            name="analytics-outline"
+                                            size={17}
+                                            color={
+                                                QUICK_ICON_COLOR
+                                            }
+                                        />
+                                    }
+                                    label="Promedio"
+                                    value={formatRating(
+                                        selectedRoutineContext
+                                            .historicalAverage
+                                    )}
+                                />
+
+                                <ModalMetricCard
+                                    wide
+                                    icon={
+                                        <Ionicons
+                                            name="trophy-outline"
+                                            size={17}
+                                            color={
+                                                COLORS.primary
+                                            }
+                                        />
+                                    }
+                                    label="Mejor marca"
+                                    value={formatRating(
+                                        selectedRoutineContext
+                                            .historicalBest
+                                    )}
+                                />
+                            </View>
+
+                            {/* RUTINA ACTUAL */}
+
+                            <Text
+                                style={{
+                                    color: '#8F8F8F',
+
+                                    fontSize: 10,
+
+                                    fontWeight: '900',
+
+                                    letterSpacing: 0.7,
+
+                                    marginTop: 18,
+                                    marginBottom: 8,
+                                }}
+                            >
+                                RUTINA ACTUAL
+                            </Text>
+
+                            <View
+                                style={{
+                                    backgroundColor:
+                                        '#181818',
+
+                                    borderWidth: 1,
+
+                                    borderColor:
+                                        '#292929',
+
+                                    borderRadius: 15,
+
+                                    padding: 13,
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        flexDirection:
+                                            'row',
+
+                                        alignItems:
+                                            'center',
+
+                                        justifyContent:
+                                            'space-between',
+                                    }}
+                                >
+                                    <View
+                                        style={{
+                                            flexDirection:
+                                                'row',
+
+                                            alignItems:
+                                                'center',
+                                        }}
+                                    >
+                                        <FontAwesome6
+                                            name="dumbbell"
+                                            size={17}
+                                            color={
+                                                COLORS.primary
+                                            }
+                                        />
+
+                                        <Text
+                                            style={{
+                                                color:
+                                                    COLORS.textLight,
+
+                                                fontSize: 12,
+
+                                                fontWeight:
+                                                    '800',
+
+                                                marginLeft: 8,
+                                            }}
+                                        >
+                                            Ejercicios
+                                        </Text>
+                                    </View>
+
+                                    <Text
+                                        style={{
+                                            color:
+                                                COLORS.primary,
+
+                                            fontSize: 16,
+
+                                            fontWeight:
+                                                '900',
+                                        }}
+                                    >
+                                        {selectedRoutineContext
+                                            .currentRoutine
+                                            ?.exercises
+                                            ?.length ??
+                                            '--'}
+                                    </Text>
+                                </View>
+                            </View>
+                        </>
+                    )}
+            </AnimatedStatsModal>
         </SafeAreaView>
 
     );

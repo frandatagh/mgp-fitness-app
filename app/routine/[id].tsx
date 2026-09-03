@@ -4,6 +4,7 @@ import {
     ActivityIndicator,
     ScrollView,
     Text,
+    TextInput,
     View,
     Pressable,
     Modal,
@@ -15,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { COLORS } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
-import { getRoutine, Routine, RoutineExercise, markRoutineDone, saveExerciseCheckin, saveRoutineCheckin } from '../../lib/routines';
+import { getRoutine, Routine, RoutineExercise, markRoutineDone, saveExerciseCheckin, saveRoutineCheckin, updateRoutineExercise } from '../../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
 import {
     saveExerciseCheckinWithOfflineSupport,
@@ -27,6 +28,7 @@ import {
     saveRoutineViewMode,
     type RoutineViewMode,
 } from '../../lib/uiPreferences';
+
 
 
 // Columnas alineadas para la “tabla”
@@ -284,7 +286,56 @@ export default function RoutineDetailScreen() {
         | 'saved'
     >('idle');
 
+    const [
+        quickEditVisible,
+        setQuickEditVisible,
+    ] = useState(false);
+
+    const [
+        quickEditSaving,
+        setQuickEditSaving,
+    ] = useState(false);
+
+    const [
+        quickEditError,
+        setQuickEditError,
+    ] = useState<string | null>(
+        null
+    );
+
+    const [
+        quickEditName,
+        setQuickEditName,
+    ] = useState('');
+
+    const [
+        quickEditSets,
+        setQuickEditSets,
+    ] = useState('');
+
+    const [
+        quickEditReps,
+        setQuickEditReps,
+    ] = useState('');
+
+    const [
+        quickEditDay,
+        setQuickEditDay,
+    ] = useState('');
+
+    const [
+        quickEditNotes,
+        setQuickEditNotes,
+    ] = useState('');
+
     const [doneMarked, setDoneMarked] = useState(false);
+
+    const [
+        developmentFeature,
+        setDevelopmentFeature,
+    ] = useState<
+        'export' | 'share' | null
+    >(null);
 
     const routineSuccessIconAnim = React.useRef(new Animated.Value(0.85)).current;
     const exerciseModalAnim =
@@ -360,6 +411,156 @@ export default function RoutineDetailScreen() {
             active = false;
         };
     }, []);
+
+    const handleOpenQuickExerciseEdit =
+        () => {
+            if (!selectedExercise) {
+                return;
+            }
+
+            setQuickEditName(
+                selectedExercise.name ?? ''
+            );
+
+            setQuickEditSets(
+                selectedExercise.sets ?? ''
+            );
+
+            setQuickEditReps(
+                selectedExercise.reps ?? ''
+            );
+
+            setQuickEditDay(
+                selectedExercise.day ?? ''
+            );
+
+            setQuickEditNotes(
+                selectedExercise.notes ?? ''
+            );
+
+            setQuickEditError(null);
+
+            /*
+             * Cerramos primero el detalle
+             * para evitar dos Modals
+             * superpuestos.
+             */
+            setExerciseModalVisible(
+                false
+            );
+
+            setQuickEditVisible(true);
+        };
+
+    const handleSaveQuickExerciseEdit =
+        async () => {
+            if (
+                !routine?.id ||
+                !selectedExercise?.id
+            ) {
+                return;
+            }
+
+            const cleanName =
+                quickEditName.trim();
+
+            if (!cleanName) {
+                setQuickEditError(
+                    'El ejercicio necesita un nombre.'
+                );
+
+                return;
+            }
+
+            try {
+                setQuickEditSaving(true);
+                setQuickEditError(null);
+
+                const updatedExercise =
+                    await updateRoutineExercise(
+                        routine.id,
+                        selectedExercise.id,
+                        {
+                            name:
+                                cleanName,
+
+                            sets:
+                                quickEditSets
+                                    .trim() ||
+                                null,
+
+                            reps:
+                                quickEditReps
+                                    .trim() ||
+                                null,
+
+                            day:
+                                quickEditDay
+                                    .trim() ||
+                                null,
+
+                            notes:
+                                quickEditNotes
+                                    .trim() ||
+                                null,
+                        }
+                    );
+
+                /*
+                 * Actualización inmediata
+                 * del estado local.
+                 */
+                setRoutine(
+                    (current) => {
+                        if (!current) {
+                            return current;
+                        }
+
+                        return {
+                            ...current,
+
+                            exercises:
+                                (
+                                    current.exercises ??
+                                    []
+                                ).map(
+                                    (
+                                        exercise
+                                    ) =>
+                                        exercise.id ===
+                                            updatedExercise.id
+                                            ? updatedExercise
+                                            : exercise
+                                ),
+                        };
+                    }
+                );
+
+                setSelectedExercise(
+                    updatedExercise
+                );
+
+                setSelectedExerciseDay(
+                    updatedExercise.day ??
+                    'Sin día'
+                );
+
+                setQuickEditVisible(
+                    false
+                );
+            } catch (error) {
+                console.error(
+                    'Error editando ejercicio:',
+                    error
+                );
+
+                setQuickEditError(
+                    'No se pudieron guardar los cambios.'
+                );
+            } finally {
+                setQuickEditSaving(false);
+            }
+        };
 
     const handleToggleRoutineView = () => {
         const nextMode: RoutineViewMode =
@@ -2225,6 +2426,57 @@ export default function RoutineDetailScreen() {
                                             </Text>
                                         </Pressable>
 
+                                        <Pressable
+                                            onPress={
+                                                handleOpenQuickExerciseEdit
+                                            }
+                                            style={({ pressed }) => ({
+                                                height: 42,
+
+                                                borderRadius: 13,
+
+                                                marginTop: 8,
+
+                                                borderWidth: 1,
+
+                                                borderColor:
+                                                    pressed
+                                                        ? COLORS.primary
+                                                        : '#343434',
+
+                                                backgroundColor:
+                                                    pressed
+                                                        ? 'rgba(198,255,0,0.08)'
+                                                        : '#181818',
+
+                                                flexDirection: 'row',
+
+                                                alignItems: 'center',
+
+                                                justifyContent: 'center',
+                                            })}
+                                        >
+                                            <Ionicons
+                                                name="create-outline"
+                                                size={18}
+                                                color="#C7C7C7"
+                                            />
+
+                                            <Text
+                                                style={{
+                                                    color: '#C7C7C7',
+
+                                                    fontSize: 11,
+
+                                                    fontWeight: '800',
+
+                                                    marginLeft: 7,
+                                                }}
+                                            >
+                                                Editar ejercicio
+                                            </Text>
+                                        </Pressable>
+
                                         {/* BOTÓN VALORAR */}
 
                                         {exerciseUiPhase ===
@@ -2410,6 +2662,8 @@ export default function RoutineDetailScreen() {
                                     </ScrollView>
 
                                     {/* FOOTER */}
+
+
 
                                     {exerciseUiPhase !==
                                         'savingAnswer' && (
@@ -2659,10 +2913,18 @@ export default function RoutineDetailScreen() {
                                             });
                                         } else if (item.action === 'delete' && routine?.id) {
                                             console.log('Borrar rutina', routine.id);
-                                        } else if (item.action === 'export') {
-                                            console.log('Exportar rutina', routine?.id);
-                                        } else if (item.action === 'share') {
-                                            console.log('Compartir rutina', routine?.id);
+                                        } else if (
+                                            item.action === 'export'
+                                        ) {
+                                            setDevelopmentFeature(
+                                                'export'
+                                            );
+                                        } else if (
+                                            item.action === 'share'
+                                        ) {
+                                            setDevelopmentFeature(
+                                                'share'
+                                            );
                                         } else if (item.action === 'close') {
                                             handleBack();
                                         }
@@ -3407,8 +3669,744 @@ export default function RoutineDetailScreen() {
                         </View>
                     </View>
                 </Modal>
+                <Modal
+                    visible={
+                        developmentFeature !== null
+                    }
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() =>
+                        setDevelopmentFeature(null)
+                    }
+                >
+                    <View
+                        style={{
+                            flex: 1,
+                            backgroundColor:
+                                'rgba(0,0,0,0.72)',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            padding: 20,
+                        }}
+                    >
+                        <View
+                            style={{
+                                width: '100%',
+                                maxWidth: 360,
 
+                                backgroundColor:
+                                    '#101010',
 
+                                borderRadius: 24,
+
+                                borderWidth: 1,
+                                borderColor:
+                                    '#343434',
+
+                                padding: 20,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 50,
+                                    height: 50,
+
+                                    borderRadius: 25,
+
+                                    backgroundColor:
+                                        'rgba(198,255,0,0.08)',
+
+                                    borderWidth: 1,
+
+                                    borderColor:
+                                        'rgba(198,255,0,0.35)',
+
+                                    alignItems: 'center',
+                                    justifyContent:
+                                        'center',
+
+                                    alignSelf: 'center',
+                                }}
+                            >
+                                <Ionicons
+                                    name={
+                                        developmentFeature ===
+                                            'export'
+                                            ? 'download-outline'
+                                            : 'share-social-outline'
+                                    }
+                                    size={25}
+                                    color={COLORS.primary}
+                                />
+                            </View>
+
+                            <Text
+                                style={{
+                                    color:
+                                        COLORS.textLight,
+
+                                    fontSize: 20,
+
+                                    fontWeight: '900',
+
+                                    textAlign: 'center',
+
+                                    marginTop: 14,
+                                }}
+                            >
+                                {developmentFeature ===
+                                    'export'
+                                    ? 'Exportar rutina'
+                                    : 'Compartir rutina'}
+                            </Text>
+
+                            <Text
+                                style={{
+                                    color:
+                                        COLORS.primary,
+
+                                    fontSize: 13,
+
+                                    fontWeight: '900',
+
+                                    textAlign: 'center',
+
+                                    marginTop: 10,
+                                }}
+                            >
+                                Función en desarrollo
+                            </Text>
+
+                            <Text
+                                style={{
+                                    color:
+                                        COLORS.textMuted,
+
+                                    fontSize: 11,
+
+                                    lineHeight: 17,
+
+                                    textAlign: 'center',
+
+                                    marginTop: 7,
+                                }}
+                            >
+                                Esta opción estará
+                                disponible en una próxima
+                                versión de la aplicación.
+                            </Text>
+
+                            <Pressable
+                                onPress={() =>
+                                    setDevelopmentFeature(
+                                        null
+                                    )
+                                }
+                                style={({ pressed }) => ({
+                                    height: 46,
+
+                                    borderRadius: 14,
+
+                                    marginTop: 18,
+
+                                    alignItems: 'center',
+                                    justifyContent:
+                                        'center',
+
+                                    backgroundColor:
+                                        pressed
+                                            ? '#B4E800'
+                                            : COLORS.primary,
+                                })}
+                            >
+                                <Text
+                                    style={{
+                                        color: '#101010',
+                                        fontSize: 13,
+                                        fontWeight: '900',
+                                    }}
+                                >
+                                    Entendido
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </Modal>
+                <Modal
+                    visible={quickEditVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => {
+                        if (!quickEditSaving) {
+                            setQuickEditVisible(
+                                false
+                            );
+                        }
+                    }}
+                >
+                    <View
+                        style={{
+                            flex: 1,
+
+                            backgroundColor:
+                                'rgba(0,0,0,0.74)',
+
+                            justifyContent:
+                                'center',
+
+                            alignItems:
+                                'center',
+
+                            padding: 20,
+                        }}
+                    >
+                        <View
+                            style={{
+                                width: '100%',
+                                maxWidth: 390,
+
+                                maxHeight: '88%',
+
+                                backgroundColor:
+                                    '#101010',
+
+                                borderRadius: 24,
+
+                                borderWidth: 1,
+
+                                borderColor:
+                                    '#343434',
+
+                                padding: 18,
+                            }}
+                        >
+                            {/* HEADER */}
+
+                            <View
+                                style={{
+                                    flexDirection:
+                                        'row',
+
+                                    alignItems:
+                                        'center',
+
+                                    marginBottom: 16,
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        width: 44,
+                                        height: 44,
+
+                                        borderRadius: 22,
+
+                                        backgroundColor:
+                                            'rgba(198,255,0,0.08)',
+
+                                        borderWidth: 1,
+
+                                        borderColor:
+                                            'rgba(198,255,0,0.35)',
+
+                                        alignItems:
+                                            'center',
+
+                                        justifyContent:
+                                            'center',
+                                    }}
+                                >
+                                    <Ionicons
+                                        name="create-outline"
+                                        size={23}
+                                        color={
+                                            COLORS.primary
+                                        }
+                                    />
+                                </View>
+
+                                <View
+                                    style={{
+                                        flex: 1,
+                                        marginLeft: 11,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color:
+                                                COLORS.textLight,
+
+                                            fontSize: 18,
+
+                                            fontWeight:
+                                                '900',
+                                        }}
+                                    >
+                                        Editar ejercicio
+                                    </Text>
+
+                                    <Text
+                                        style={{
+                                            color:
+                                                COLORS.textMuted,
+
+                                            fontSize: 10,
+
+                                            marginTop: 2,
+                                        }}
+                                    >
+                                        Modificación rápida
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <ScrollView
+                                showsVerticalScrollIndicator={
+                                    false
+                                }
+                            >
+                                {/* NOMBRE */}
+
+                                <Text
+                                    style={{
+                                        color: '#888888',
+                                        fontSize: 9,
+                                        fontWeight: '800',
+                                        marginBottom: 5,
+                                    }}
+                                >
+                                    NOMBRE
+                                </Text>
+
+                                <TextInput
+                                    value={quickEditName}
+                                    onChangeText={
+                                        setQuickEditName
+                                    }
+                                    editable={
+                                        !quickEditSaving
+                                    }
+                                    placeholder="Nombre del ejercicio"
+                                    placeholderTextColor="#666666"
+                                    style={{
+                                        backgroundColor:
+                                            '#181818',
+
+                                        borderWidth: 1,
+
+                                        borderColor:
+                                            '#303030',
+
+                                        borderRadius: 13,
+
+                                        color:
+                                            COLORS.textLight,
+
+                                        paddingHorizontal:
+                                            12,
+
+                                        paddingVertical:
+                                            11,
+
+                                        fontSize: 13,
+
+                                        fontWeight: '800',
+
+                                        marginBottom: 10,
+                                    }}
+                                />
+
+                                {/* SERIES + REPETICIONES */}
+
+                                <View
+                                    style={{
+                                        flexDirection:
+                                            'row',
+
+                                        gap: 8,
+                                    }}
+                                >
+                                    <View
+                                        style={{
+                                            flex: 1,
+                                        }}
+                                    >
+                                        <Text
+                                            style={{
+                                                color:
+                                                    '#888888',
+
+                                                fontSize: 9,
+
+                                                fontWeight:
+                                                    '800',
+
+                                                marginBottom:
+                                                    5,
+                                            }}
+                                        >
+                                            SERIES
+                                        </Text>
+
+                                        <TextInput
+                                            value={
+                                                quickEditSets
+                                            }
+                                            onChangeText={
+                                                setQuickEditSets
+                                            }
+                                            editable={
+                                                !quickEditSaving
+                                            }
+                                            placeholder="4"
+                                            placeholderTextColor="#666666"
+                                            style={{
+                                                backgroundColor:
+                                                    '#181818',
+
+                                                borderWidth:
+                                                    1,
+
+                                                borderColor:
+                                                    '#303030',
+
+                                                borderRadius:
+                                                    13,
+
+                                                color:
+                                                    COLORS.textLight,
+
+                                                paddingHorizontal:
+                                                    12,
+
+                                                paddingVertical:
+                                                    11,
+
+                                                fontSize:
+                                                    13,
+
+                                                fontWeight:
+                                                    '800',
+                                            }}
+                                        />
+                                    </View>
+
+                                    <View
+                                        style={{
+                                            flex: 1,
+                                        }}
+                                    >
+                                        <Text
+                                            style={{
+                                                color:
+                                                    '#888888',
+
+                                                fontSize: 9,
+
+                                                fontWeight:
+                                                    '800',
+
+                                                marginBottom:
+                                                    5,
+                                            }}
+                                        >
+                                            REPETICIONES
+                                        </Text>
+
+                                        <TextInput
+                                            value={
+                                                quickEditReps
+                                            }
+                                            onChangeText={
+                                                setQuickEditReps
+                                            }
+                                            editable={
+                                                !quickEditSaving
+                                            }
+                                            placeholder="8 - 10"
+                                            placeholderTextColor="#666666"
+                                            style={{
+                                                backgroundColor:
+                                                    '#181818',
+
+                                                borderWidth:
+                                                    1,
+
+                                                borderColor:
+                                                    '#303030',
+
+                                                borderRadius:
+                                                    13,
+
+                                                color:
+                                                    COLORS.textLight,
+
+                                                paddingHorizontal:
+                                                    12,
+
+                                                paddingVertical:
+                                                    11,
+
+                                                fontSize:
+                                                    13,
+
+                                                fontWeight:
+                                                    '800',
+                                            }}
+                                        />
+                                    </View>
+                                </View>
+
+                                {/* DÍA */}
+
+                                <Text
+                                    style={{
+                                        color: '#888888',
+
+                                        fontSize: 9,
+
+                                        fontWeight: '800',
+
+                                        marginTop: 10,
+
+                                        marginBottom: 5,
+                                    }}
+                                >
+                                    DÍA / GRUPO
+                                </Text>
+
+                                <TextInput
+                                    value={quickEditDay}
+                                    onChangeText={
+                                        setQuickEditDay
+                                    }
+                                    editable={
+                                        !quickEditSaving
+                                    }
+                                    placeholder="Ej: Día 1"
+                                    placeholderTextColor="#666666"
+                                    style={{
+                                        backgroundColor:
+                                            '#181818',
+
+                                        borderWidth: 1,
+
+                                        borderColor:
+                                            '#303030',
+
+                                        borderRadius: 13,
+
+                                        color:
+                                            COLORS.textLight,
+
+                                        paddingHorizontal:
+                                            12,
+
+                                        paddingVertical:
+                                            11,
+
+                                        fontSize: 13,
+
+                                        fontWeight: '700',
+                                    }}
+                                />
+
+                                {/* NOTAS */}
+
+                                <Text
+                                    style={{
+                                        color: '#888888',
+
+                                        fontSize: 9,
+
+                                        fontWeight: '800',
+
+                                        marginTop: 10,
+
+                                        marginBottom: 5,
+                                    }}
+                                >
+                                    NOTAS
+                                </Text>
+
+                                <TextInput
+                                    value={
+                                        quickEditNotes
+                                    }
+                                    onChangeText={
+                                        setQuickEditNotes
+                                    }
+                                    editable={
+                                        !quickEditSaving
+                                    }
+                                    placeholder="Notas del ejercicio..."
+                                    placeholderTextColor="#666666"
+                                    multiline
+                                    textAlignVertical="top"
+                                    style={{
+                                        minHeight: 90,
+
+                                        backgroundColor:
+                                            '#181818',
+
+                                        borderWidth: 1,
+
+                                        borderColor:
+                                            '#303030',
+
+                                        borderRadius: 13,
+
+                                        color:
+                                            COLORS.textLight,
+
+                                        paddingHorizontal:
+                                            12,
+
+                                        paddingVertical:
+                                            11,
+
+                                        fontSize: 12,
+
+                                        lineHeight: 18,
+                                    }}
+                                />
+
+                                {quickEditError && (
+                                    <Text
+                                        style={{
+                                            color: '#FF8A8A',
+
+                                            fontSize: 10,
+
+                                            textAlign:
+                                                'center',
+
+                                            marginTop: 9,
+                                        }}
+                                    >
+                                        {quickEditError}
+                                    </Text>
+                                )}
+                            </ScrollView>
+
+                            {/* ACCIONES */}
+
+                            <View
+                                style={{
+                                    flexDirection: 'row',
+                                    gap: 8,
+                                    marginTop: 14,
+                                }}
+                            >
+                                <Pressable
+                                    disabled={
+                                        quickEditSaving
+                                    }
+                                    onPress={() =>
+                                        setQuickEditVisible(
+                                            false
+                                        )
+                                    }
+                                    style={({ pressed }) => ({
+                                        flex: 1,
+
+                                        height: 44,
+
+                                        borderRadius: 13,
+
+                                        backgroundColor:
+                                            pressed
+                                                ? '#303030'
+                                                : '#222222',
+
+                                        borderWidth: 1,
+
+                                        borderColor:
+                                            '#343434',
+
+                                        alignItems:
+                                            'center',
+
+                                        justifyContent:
+                                            'center',
+
+                                        opacity:
+                                            quickEditSaving
+                                                ? 0.5
+                                                : 1,
+                                    })}
+                                >
+                                    <Text
+                                        style={{
+                                            color:
+                                                '#C7C7C7',
+
+                                            fontSize: 11,
+
+                                            fontWeight:
+                                                '800',
+                                        }}
+                                    >
+                                        Cancelar
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    disabled={
+                                        quickEditSaving
+                                    }
+                                    onPress={
+                                        handleSaveQuickExerciseEdit
+                                    }
+                                    style={({ pressed }) => ({
+                                        flex: 1.3,
+
+                                        height: 44,
+
+                                        borderRadius: 13,
+
+                                        backgroundColor:
+                                            pressed
+                                                ? '#B4E800'
+                                                : COLORS.primary,
+
+                                        alignItems:
+                                            'center',
+
+                                        justifyContent:
+                                            'center',
+
+                                        opacity:
+                                            quickEditSaving
+                                                ? 0.7
+                                                : 1,
+                                    })}
+                                >
+                                    {quickEditSaving ? (
+                                        <ActivityIndicator
+                                            size="small"
+                                            color="#111111"
+                                        />
+                                    ) : (
+                                        <Text
+                                            style={{
+                                                color:
+                                                    '#111111',
+
+                                                fontSize:
+                                                    11,
+
+                                                fontWeight:
+                                                    '900',
+                                            }}
+                                        >
+                                            Guardar cambios
+                                        </Text>
+                                    )}
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
             </View >
         </SafeAreaView >
     );

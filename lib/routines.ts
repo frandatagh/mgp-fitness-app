@@ -235,3 +235,53 @@ export async function saveRoutineCheckin(
 
     return res.json();
 }
+
+export type UpdateRoutineExercisePayload = {
+    name?: string;
+    sets?: string | null;
+    reps?: string | null;
+    notes?: string | null;
+    day?: string | null;
+};
+
+export async function updateRoutineExercise(
+    routineId: string,
+    exerciseId: string,
+    payload: UpdateRoutineExercisePayload
+): Promise<RoutineExercise> {
+    const res = await apiFetch(
+        `/routines/${routineId}/exercises/${exerciseId}`,
+        {
+            method: 'PATCH',
+
+            headers: {
+                'Content-Type':
+                    'application/json',
+            },
+
+            body: JSON.stringify(
+                payload
+            ),
+        }
+    );
+
+    if (!res.ok) {
+        const text =
+            await res
+                .text()
+                .catch(() => '');
+
+        console.log(
+            'Error editando ejercicio:',
+            text
+        );
+
+        throw new Error(
+            'No se pudo actualizar el ejercicio'
+        );
+    }
+
+    return (
+        await res.json()
+    ) as RoutineExercise;
+}

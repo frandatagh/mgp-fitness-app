@@ -9,6 +9,8 @@ export interface RoutineExercise {
     notes?: string | null;
     order?: number | null;
     day?: string | null;
+    lastRating?: number | null;
+    lastRatedAt?: string | null;
 }
 
 export interface Routine {
@@ -19,6 +21,8 @@ export interface Routine {
     createdAt?: string;
     updatedAt?: string;
     lastDoneAt?: string | null;
+    lastRating?: number | null;
+    lastRatedAt?: string | null;
 }
 
 interface RoutineListResponse {
@@ -121,14 +125,44 @@ export async function updateRoutine(
     return data;
 }
 
-export async function deleteRoutine(id: string): Promise<void> {
-    const res = await apiFetch(`/routines/${id}`, {
-        method: 'DELETE',
-    });
+export type DeleteRoutineMode =
+    | 'preserve'
+    | 'cascade';
+
+export async function deleteRoutine(
+    id: string,
+    deleteHistory = false
+): Promise<{
+    mode: DeleteRoutineMode;
+    message: string;
+}> {
+    const res = await apiFetch(
+        `/routines/${id}?cascade=${deleteHistory
+            ? 'true'
+            : 'false'
+        }`,
+        {
+            method: 'DELETE',
+        }
+    );
 
     if (!res.ok) {
-        throw new Error('Error al borrar la rutina');
+        const text =
+            await res
+                .text()
+                .catch(() => '');
+
+        console.log(
+            'Error borrando rutina:',
+            text
+        );
+
+        throw new Error(
+            'No se pudo borrar la rutina'
+        );
     }
+
+    return res.json();
 }
 
 export async function markRoutineDone(id: string): Promise<Routine> {

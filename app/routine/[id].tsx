@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { COLORS } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
-import { getRoutine, Routine, RoutineExercise, markRoutineDone, saveExerciseCheckin, saveRoutineCheckin, updateRoutineExercise } from '../../lib/routines';
+import { getRoutine, Routine, RoutineExercise, markRoutineDone, updateRoutineExercise, deleteRoutine } from '../../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
 import {
     saveExerciseCheckinWithOfflineSupport,
@@ -32,10 +32,22 @@ import {
 
 
 // Columnas alineadas para la “tabla”
-const colName = { flex: 4 };   // nombre ejercicio
-const colSets = { flex: 1.2 }; // series
-const colReps = { flex: 1.2 }; // reps
-const colNotes = { flex: 3 };  // notas
+const colName = {
+    flex: 1,
+    minWidth: 0,
+};
+
+const colSets = {
+    width: 48,
+};
+
+const colReps = {
+    width: 60,
+};
+
+const colRating = {
+    width: 62,
+};
 
 function RoutineNavButton({
     icon,
@@ -378,6 +390,28 @@ export default function RoutineDetailScreen() {
         setViewPreferenceLoaded,
     ] = useState(false);
 
+    const [
+        deleteModalVisible,
+        setDeleteModalVisible,
+    ] = useState(false);
+
+    const [
+        deleteHistory,
+        setDeleteHistory,
+    ] = useState(false);
+
+    const [
+        deleteSaving,
+        setDeleteSaving,
+    ] = useState(false);
+
+    const [
+        deleteError,
+        setDeleteError,
+    ] = useState<string | null>(
+        null
+    );
+
 
 
     useEffect(() => {
@@ -527,9 +561,11 @@ export default function RoutineDetailScreen() {
                                     (
                                         exercise
                                     ) =>
-                                        exercise.id ===
-                                            updatedExercise.id
-                                            ? updatedExercise
+                                        exercise.id === updatedExercise.id
+                                            ? {
+                                                ...exercise,
+                                                ...updatedExercise,
+                                            }
                                             : exercise
                                 ),
                         };
@@ -537,7 +573,13 @@ export default function RoutineDetailScreen() {
                 );
 
                 setSelectedExercise(
-                    updatedExercise
+                    (current) =>
+                        current
+                            ? {
+                                ...current,
+                                ...updatedExercise,
+                            }
+                            : updatedExercise
                 );
 
                 setSelectedExerciseDay(
@@ -659,6 +701,45 @@ export default function RoutineDetailScreen() {
         });
     };
 
+    const handleDeleteRoutine =
+        async () => {
+            if (!routine?.id) {
+                return;
+            }
+
+            try {
+                setDeleteSaving(true);
+                setDeleteError(null);
+
+                await deleteRoutine(
+                    routine.id,
+                    deleteHistory
+                );
+
+                setDeleteModalVisible(
+                    false
+                );
+
+                /*
+                 * La rutina ya no es
+                 * una pantalla válida.
+                 */
+                router.replace('/home');
+
+            } catch (error) {
+                console.error(
+                    'Error borrando rutina:',
+                    error
+                );
+
+                setDeleteError(
+                    'No se pudo eliminar la rutina. Intenta nuevamente.'
+                );
+            } finally {
+                setDeleteSaving(false);
+            }
+        };
+
 
 
     const animateSuccessIcon = () => {
@@ -675,7 +756,7 @@ export default function RoutineDetailScreen() {
                 toValue: 1,
                 friction: 5,
                 tension: 120,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
         ]).start();
     };
@@ -694,7 +775,7 @@ export default function RoutineDetailScreen() {
                 toValue: 1,
                 friction: 5,
                 tension: 120,
-                useNativeDriver: true,
+                useNativeDriver: false,
             }),
         ]).start();
     };
@@ -745,9 +826,34 @@ export default function RoutineDetailScreen() {
                     result
                 );
 
-                setRoutine(
-                    updatedRoutine
-                );
+                setRoutine((current) => {
+                    if (!current) {
+                        return {
+                            ...updatedRoutine,
+                            lastRating: score,
+                            lastRatedAt:
+                                new Date().toISOString(),
+                        };
+                    }
+
+                    return {
+                        ...current,
+                        ...updatedRoutine,
+
+                        /*
+                         * Conservamos los ejercicios
+                         * que ya tienen lastRating.
+                         */
+                        exercises:
+                            current.exercises,
+
+                        lastRating:
+                            score,
+
+                        lastRatedAt:
+                            new Date().toISOString(),
+                    };
+                });
 
                 setDoneMarked(
                     true
@@ -962,6 +1068,53 @@ export default function RoutineDetailScreen() {
                             score,
                         }
                     );
+
+                const ratedExerciseId =
+                    selectedExercise.id;
+
+                setRoutine((current) => {
+                    if (!current) {
+                        return current;
+                    }
+
+                    return {
+                        ...current,
+
+                        exercises:
+                            current.exercises?.map(
+                                (exercise) =>
+                                    exercise.id ===
+                                        ratedExerciseId
+                                        ? {
+                                            ...exercise,
+
+                                            lastRating:
+                                                score,
+
+                                            lastRatedAt:
+                                                new Date()
+                                                    .toISOString(),
+                                        }
+                                        : exercise
+                            ),
+                    };
+                });
+
+                setSelectedExercise(
+                    (current) =>
+                        current
+                            ? {
+                                ...current,
+
+                                lastRating:
+                                    score,
+
+                                lastRatedAt:
+                                    new Date()
+                                        .toISOString(),
+                            }
+                            : current
+                );
 
                 console.log(
                     'Resultado checkin ejercicio:',
@@ -1180,6 +1333,19 @@ export default function RoutineDetailScreen() {
         { label: 'Salir de rutina', action: 'close' as const },
     ];
 
+    const formatLastRating = (
+        value?: number | null
+    ) => {
+        if (value == null) {
+            return '--';
+        }
+
+        return `${value} ${value === 1
+            ? 'punto'
+            : 'puntos'
+            }`;
+    };
+
     return (
         <SafeAreaView
             className="flex-1"
@@ -1211,7 +1377,7 @@ export default function RoutineDetailScreen() {
                     <View className="flex-row items-center mb-3 px-4">
                         <View style={{ flex: 1, marginRight: 10 }}>
                             <Text
-                                className="text-[16px] underline font-semibold text-white"
+                                className="text-[16px] font-bold text-white"
                                 numberOfLines={2}
                                 ellipsizeMode="tail"
                             >
@@ -1252,6 +1418,51 @@ export default function RoutineDetailScreen() {
                                     {routine.notes}
                                 </Text>
                             )}
+
+                            <View
+                                style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    paddingHorizontal: 16,
+                                    marginTop: 3,
+                                    marginBottom: 6,
+                                }}
+                            >
+                                <Ionicons
+                                    name="star-outline"
+                                    size={20}
+                                    color={
+                                        routine.lastRating != null
+                                            ? COLORS.primary
+                                            : '#666666'
+                                    }
+                                />
+
+                                <Text
+                                    style={{
+                                        color: '#929292',
+                                        fontSize: 13,
+                                        marginLeft: 6,
+                                    }}
+                                >
+                                    Última marca de rutina:{' '}
+
+                                    <Text
+                                        style={{
+                                            color:
+                                                routine.lastRating != null
+                                                    ? COLORS.primary
+                                                    : '#777777',
+
+                                            fontWeight: '900',
+                                        }}
+                                    >
+                                        {formatLastRating(
+                                            routine.lastRating
+                                        )}
+                                    </Text>
+                                </Text>
+                            </View>
 
                             {/* VISUALIZACIÓN DE LA RUTINA */}
 
@@ -1386,23 +1597,16 @@ export default function RoutineDetailScreen() {
 
                                                         <Text
                                                             style={[
-                                                                colNotes,
+                                                                colRating,
                                                                 {
-                                                                    color:
-                                                                        '#F3F4F6',
-
-                                                                    fontSize:
-                                                                        14,
-
-                                                                    fontWeight:
-                                                                        '700',
-
-                                                                    textAlign:
-                                                                        'right',
+                                                                    color: '#F3F4F6',
+                                                                    fontSize: 12,
+                                                                    fontWeight: '700',
+                                                                    textAlign: 'center',
                                                                 },
                                                             ]}
                                                         >
-                                                            Notas
+                                                            Última
                                                         </Text>
                                                     </View>
 
@@ -1505,24 +1709,27 @@ export default function RoutineDetailScreen() {
 
                                                                 <Text
                                                                     style={[
-                                                                        colNotes,
+                                                                        colRating,
                                                                         {
                                                                             color:
-                                                                                '#D1D5DB',
+                                                                                ex.lastRating != null
+                                                                                    ? COLORS.primary
+                                                                                    : '#777777',
 
-                                                                            fontSize:
-                                                                                14,
+                                                                            fontSize: 12,
 
-                                                                            textAlign:
-                                                                                'right',
+                                                                            fontWeight:
+                                                                                ex.lastRating != null
+                                                                                    ? '900'
+                                                                                    : '600',
+
+                                                                            textAlign: 'center',
                                                                         },
                                                                     ]}
-                                                                    numberOfLines={
-                                                                        1
-                                                                    }
                                                                 >
-                                                                    {ex.notes ??
-                                                                        '-'}
+                                                                    {ex.lastRating != null
+                                                                        ? `${ex.lastRating}/10`
+                                                                        : '--'}
                                                                 </Text>
                                                             </Pressable>
                                                         )
@@ -1975,8 +2182,9 @@ export default function RoutineDetailScreen() {
 
                                                                             <Text
                                                                                 numberOfLines={
-                                                                                    2
+                                                                                    1
                                                                                 }
+                                                                                ellipsizeMode="tail"
                                                                                 style={{
                                                                                     flex: 1,
 
@@ -1996,6 +2204,53 @@ export default function RoutineDetailScreen() {
                                                                             </Text>
                                                                         </View>
                                                                     )}
+                                                                    <View
+                                                                        style={{
+                                                                            flexDirection: 'row',
+                                                                            alignItems: 'center',
+
+                                                                            marginTop: 9,
+                                                                            paddingTop: 8,
+
+                                                                            borderTopWidth: 1,
+                                                                            borderTopColor: '#292929',
+                                                                        }}
+                                                                    >
+                                                                        <Ionicons
+                                                                            name="star-outline"
+                                                                            size={15}
+                                                                            color={
+                                                                                ex.lastRating != null
+                                                                                    ? COLORS.primary
+                                                                                    : '#666666'
+                                                                            }
+                                                                        />
+
+                                                                        <Text
+                                                                            style={{
+                                                                                color: '#888888',
+                                                                                fontSize: 10,
+                                                                                marginLeft: 6,
+                                                                            }}
+                                                                        >
+                                                                            Última valoración:{' '}
+
+                                                                            <Text
+                                                                                style={{
+                                                                                    color:
+                                                                                        ex.lastRating != null
+                                                                                            ? COLORS.primary
+                                                                                            : '#777777',
+
+                                                                                    fontWeight: '900',
+                                                                                }}
+                                                                            >
+                                                                                {formatLastRating(
+                                                                                    ex.lastRating
+                                                                                )}
+                                                                            </Text>
+                                                                        </Text>
+                                                                    </View>
                                                                 </Pressable>
                                                             );
                                                         }
@@ -2911,8 +3166,16 @@ export default function RoutineDetailScreen() {
                                                 pathname: '/routine/edit/[id]',
                                                 params: { id: routine.id },
                                             });
-                                        } else if (item.action === 'delete' && routine?.id) {
-                                            console.log('Borrar rutina', routine.id);
+                                        } else if (
+                                            item.action === 'delete' &&
+                                            routine?.id
+                                        ) {
+                                            setDeleteHistory(false);
+                                            setDeleteError(null);
+
+                                            setDeleteModalVisible(
+                                                true
+                                            );
                                         } else if (
                                             item.action === 'export'
                                         ) {
@@ -4400,6 +4663,453 @@ export default function RoutineDetailScreen() {
                                             }}
                                         >
                                             Guardar cambios
+                                        </Text>
+                                    )}
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+                </Modal>
+                <Modal
+                    visible={deleteModalVisible}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => {
+                        if (!deleteSaving) {
+                            setDeleteModalVisible(
+                                false
+                            );
+                        }
+                    }}
+                >
+                    <View
+                        style={{
+                            flex: 1,
+
+                            backgroundColor:
+                                'rgba(0,0,0,0.76)',
+
+                            justifyContent:
+                                'center',
+
+                            alignItems:
+                                'center',
+
+                            padding: 20,
+                        }}
+                    >
+                        <View
+                            style={{
+                                width: '100%',
+                                maxWidth: 390,
+
+                                backgroundColor:
+                                    '#101010',
+
+                                borderRadius: 24,
+
+                                borderWidth: 1,
+
+                                borderColor:
+                                    '#3A3A3A',
+
+                                padding: 18,
+                            }}
+                        >
+                            {/* HEADER */}
+
+                            <View
+                                style={{
+                                    flexDirection:
+                                        'row',
+
+                                    alignItems:
+                                        'center',
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        width: 46,
+                                        height: 46,
+
+                                        borderRadius: 23,
+
+                                        backgroundColor:
+                                            'rgba(255,80,80,0.08)',
+
+                                        borderWidth: 1,
+
+                                        borderColor:
+                                            'rgba(255,100,100,0.35)',
+
+                                        alignItems:
+                                            'center',
+
+                                        justifyContent:
+                                            'center',
+                                    }}
+                                >
+                                    <Ionicons
+                                        name="trash-outline"
+                                        size={23}
+                                        color="#FF8A8A"
+                                    />
+                                </View>
+
+                                <View
+                                    style={{
+                                        flex: 1,
+                                        marginLeft: 12,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color:
+                                                COLORS.textLight,
+
+                                            fontSize: 18,
+
+                                            fontWeight:
+                                                '900',
+                                        }}
+                                    >
+                                        Eliminar rutina
+                                    </Text>
+
+                                    <Text
+                                        numberOfLines={2}
+                                        style={{
+                                            color:
+                                                COLORS.textMuted,
+
+                                            fontSize: 10,
+
+                                            marginTop: 3,
+                                        }}
+                                    >
+                                        {routine.title}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            {/* MODO NORMAL */}
+
+                            <View
+                                style={{
+                                    backgroundColor:
+                                        '#181818',
+
+                                    borderRadius: 15,
+
+                                    borderWidth: 1,
+
+                                    borderColor:
+                                        '#303030',
+
+                                    padding: 12,
+
+                                    marginTop: 16,
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textLight,
+
+                                        fontSize: 12,
+
+                                        fontWeight:
+                                            '800',
+                                    }}
+                                >
+                                    La rutina dejará de aparecer en tus rutinas.
+                                </Text>
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textMuted,
+
+                                        fontSize: 10,
+
+                                        lineHeight: 16,
+
+                                        marginTop: 5,
+                                    }}
+                                >
+                                    Si no seleccionas la opción inferior, tus valoraciones y registros históricos se conservarán para estadísticas.
+                                </Text>
+                            </View>
+
+                            {/* CHECK CASCADE */}
+
+                            <Pressable
+                                disabled={deleteSaving}
+                                onPress={() =>
+                                    setDeleteHistory(
+                                        (current) =>
+                                            !current
+                                    )
+                                }
+                                style={({ pressed }) => ({
+                                    flexDirection:
+                                        'row',
+
+                                    alignItems:
+                                        'flex-start',
+
+                                    backgroundColor:
+                                        deleteHistory
+                                            ? 'rgba(255,80,80,0.07)'
+                                            : '#181818',
+
+                                    borderRadius: 15,
+
+                                    borderWidth: 1,
+
+                                    borderColor:
+                                        deleteHistory
+                                            ? '#9F4747'
+                                            : '#303030',
+
+                                    padding: 12,
+
+                                    marginTop: 10,
+
+                                    opacity:
+                                        pressed
+                                            ? 0.8
+                                            : 1,
+                                })}
+                            >
+                                <Ionicons
+                                    name={
+                                        deleteHistory
+                                            ? 'checkbox'
+                                            : 'square-outline'
+                                    }
+                                    size={22}
+                                    color={
+                                        deleteHistory
+                                            ? '#FF8A8A'
+                                            : '#8A8A8A'
+                                    }
+                                />
+
+                                <View
+                                    style={{
+                                        flex: 1,
+
+                                        marginLeft: 9,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color:
+                                                deleteHistory
+                                                    ? '#FFAAAA'
+                                                    : '#CCCCCC',
+
+                                            fontSize: 11,
+
+                                            fontWeight:
+                                                '900',
+                                        }}
+                                    >
+                                        Eliminar también historial y valoraciones
+                                    </Text>
+
+                                    <Text
+                                        style={{
+                                            color:
+                                                '#888888',
+
+                                            fontSize: 9,
+
+                                            lineHeight: 14,
+
+                                            marginTop: 4,
+                                        }}
+                                    >
+                                        Se eliminarán en cascada los ejercicios y los registros detallados asociados a esta rutina. Esta acción no se puede deshacer.
+                                    </Text>
+                                </View>
+                            </Pressable>
+
+                            {deleteHistory && (
+                                <View
+                                    style={{
+                                        flexDirection:
+                                            'row',
+
+                                        marginTop: 10,
+
+                                        padding: 10,
+
+                                        borderRadius: 12,
+
+                                        backgroundColor:
+                                            'rgba(255,80,80,0.06)',
+                                    }}
+                                >
+                                    <Ionicons
+                                        name="warning-outline"
+                                        size={17}
+                                        color="#FF8A8A"
+                                    />
+
+                                    <Text
+                                        style={{
+                                            flex: 1,
+
+                                            color:
+                                                '#C98D8D',
+
+                                            fontSize: 9,
+
+                                            lineHeight: 14,
+
+                                            marginLeft: 7,
+                                        }}
+                                    >
+                                        Atención: se realizará un borrado permanente en modo Cascade. Los resúmenes mensuales ya archivados pueden conservar información agregada.
+                                    </Text>
+                                </View>
+                            )}
+
+                            {deleteError && (
+                                <Text
+                                    style={{
+                                        color: '#FF8A8A',
+
+                                        fontSize: 10,
+
+                                        textAlign:
+                                            'center',
+
+                                        marginTop: 10,
+                                    }}
+                                >
+                                    {deleteError}
+                                </Text>
+                            )}
+
+                            {/* BOTONES */}
+
+                            <View
+                                style={{
+                                    flexDirection:
+                                        'row',
+
+                                    gap: 8,
+
+                                    marginTop: 16,
+                                }}
+                            >
+                                <Pressable
+                                    disabled={
+                                        deleteSaving
+                                    }
+                                    onPress={() =>
+                                        setDeleteModalVisible(
+                                            false
+                                        )
+                                    }
+                                    style={({ pressed }) => ({
+                                        flex: 1,
+
+                                        height: 45,
+
+                                        borderRadius: 13,
+
+                                        backgroundColor:
+                                            pressed
+                                                ? '#303030'
+                                                : '#222222',
+
+                                        borderWidth: 1,
+
+                                        borderColor:
+                                            '#343434',
+
+                                        alignItems:
+                                            'center',
+
+                                        justifyContent:
+                                            'center',
+
+                                        opacity:
+                                            deleteSaving
+                                                ? 0.5
+                                                : 1,
+                                    })}
+                                >
+                                    <Text
+                                        style={{
+                                            color:
+                                                '#C7C7C7',
+
+                                            fontSize: 11,
+
+                                            fontWeight:
+                                                '800',
+                                        }}
+                                    >
+                                        Cancelar
+                                    </Text>
+                                </Pressable>
+
+                                <Pressable
+                                    disabled={
+                                        deleteSaving
+                                    }
+                                    onPress={
+                                        handleDeleteRoutine
+                                    }
+                                    style={({ pressed }) => ({
+                                        flex: 1.25,
+
+                                        height: 45,
+
+                                        borderRadius: 13,
+
+                                        backgroundColor:
+                                            pressed
+                                                ? '#E36060'
+                                                : '#C84F4F',
+
+                                        alignItems:
+                                            'center',
+
+                                        justifyContent:
+                                            'center',
+
+                                        opacity:
+                                            deleteSaving
+                                                ? 0.7
+                                                : 1,
+                                    })}
+                                >
+                                    {deleteSaving ? (
+                                        <ActivityIndicator
+                                            size="small"
+                                            color="#FFFFFF"
+                                        />
+                                    ) : (
+                                        <Text
+                                            style={{
+                                                color:
+                                                    '#FFFFFF',
+
+                                                fontSize: 11,
+
+                                                fontWeight:
+                                                    '900',
+                                            }}
+                                        >
+                                            {deleteHistory
+                                                ? 'Eliminar todo'
+                                                : 'Eliminar rutina'}
                                         </Text>
                                     )}
                                 </Pressable>

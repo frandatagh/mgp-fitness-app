@@ -1,7 +1,7 @@
 // app/home.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, View, Text, Pressable, ScrollView, Image, Modal } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Animated, View, Text, Pressable, ScrollView, Image, Modal, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
 import { RoutineCard } from '../components/RoutineCard';
 import { router } from 'expo-router';
@@ -535,6 +535,26 @@ export default function HomeScreen() {
 
     const [createRoutineModalVisible, setCreateRoutineModalVisible] = useState(false);
 
+    const [
+        routineToDelete,
+        setRoutineToDelete,
+    ] = useState<Routine | null>(null);
+
+    const [
+        deleteHistory,
+        setDeleteHistory,
+    ] = useState(false);
+
+    const [
+        deleteSaving,
+        setDeleteSaving,
+    ] = useState(false);
+
+    const [
+        deleteError,
+        setDeleteError,
+    ] = useState<string | null>(null);
+
     const displayName =
         profileDisplayName ??
         user?.name ??
@@ -580,9 +600,6 @@ export default function HomeScreen() {
         loadHomeProfileAndStats();
     }, [isAuthenticated]);
 
-    const insets = useSafeAreaInsets();
-    const footerBottomSpace = Math.max(insets.bottom, 10);
-    const footerReservedHeight = 78 + footerBottomSpace;
 
     // 👉 Redirigir a login si NO está autenticado (pero desde un efecto)
     useEffect(() => {
@@ -631,20 +648,97 @@ export default function HomeScreen() {
         await logout();
         // el efecto de arriba se encargará de mandarte a "/"
     };
-    const handleDeleteRoutine = async (id: string) => {
-        try {
-            setRoutinesError(null);
-            await deleteRoutine(id); // 🔥 borra en el backend
-            // y ahora actualizamos el listado en memoria
-            setRoutines((prev) => prev.filter((r) => r.id !== id));
-        } catch (error) {
-            const message =
-                error instanceof Error
-                    ? error.message
-                    : 'Error al borrar la rutina';
-            setRoutinesError(message);
-        }
+
+    const handleRequestDeleteRoutine = (
+        routine: Routine
+    ) => {
+        setRoutineToDelete(
+            routine
+        );
+
+        /*
+         * Por seguridad el borrado
+         * de historial siempre comienza
+         * destildado.
+         */
+        setDeleteHistory(false);
+
+        setDeleteError(null);
     };
+
+    const closeDeleteRoutineModal =
+        () => {
+            if (deleteSaving) {
+                return;
+            }
+
+            setRoutineToDelete(null);
+
+            setDeleteHistory(false);
+
+            setDeleteError(null);
+        };
+
+    const handleDeleteRoutine =
+        async () => {
+            if (!routineToDelete?.id) {
+                return;
+            }
+
+            const routineId =
+                routineToDelete.id;
+
+            try {
+                setDeleteSaving(true);
+
+                setDeleteError(null);
+
+                const result =
+                    await deleteRoutine(
+                        routineId,
+                        deleteHistory
+                    );
+
+                console.log(
+                    'Resultado borrado rutina:',
+                    result
+                );
+
+                /*
+                 * La quitamos inmediatamente
+                 * del Home sin necesidad
+                 * de volver a consultar.
+                 */
+                setRoutines(
+                    (current) =>
+                        current.filter(
+                            (routine) =>
+                                routine.id !==
+                                routineId
+                        )
+                );
+
+                setRoutineToDelete(
+                    null
+                );
+
+                setDeleteHistory(
+                    false
+                );
+
+            } catch (error) {
+                console.error(
+                    'Error borrando rutina:',
+                    error
+                );
+
+                setDeleteError(
+                    'No se pudo eliminar la rutina. Intenta nuevamente.'
+                );
+            } finally {
+                setDeleteSaving(false);
+            }
+        };
 
 
 
@@ -689,8 +783,8 @@ export default function HomeScreen() {
                 style={{
                     maxWidth: 800,
                     alignSelf: 'center',
-                    position: 'relative',
-                    paddingBottom: footerReservedHeight,
+                    width: '100%',
+                    minHeight: 0,
                 }}
             >
                 <AppHeader profileGreeting={`Hola, ${displayName}`} />
@@ -731,14 +825,36 @@ export default function HomeScreen() {
 
                 {/* MARCO PRINCIPAL */}
                 <View
-                    className="flex-1 mt-2 rounded-3xl px-3 py-3 relative"
-                    style={{ borderWidth: 2, borderColor: COLORS.primary, position: 'relative', overflow: 'hidden' }}
+                    className="flex-1 mt-2 rounded-3xl px-3 py-3"
+                    style={{
+                        borderWidth: 2,
+                        borderColor: COLORS.primary,
+
+                        position: 'relative',
+                        overflow: 'hidden',
+
+                        /*
+                         * Fundamental para que el panel
+                         * pueda ocupar correctamente
+                         * todo el espacio disponible.
+                         */
+                        minHeight: 0,
+
+                        /*
+                         * Apenas un pequeño espacio
+                         * antes del footer.
+                         */
+                        marginBottom: 8,
+                    }}
                 >
                     <ScrollView
                         style={{ flex: 1 }}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{
-                            paddingBottom: routines.length > 0 ? 135 : 0,
+                            paddingBottom:
+                                routines.length > 0
+                                    ? 135
+                                    : 12,
                         }}
                     >
                         {loadingRoutines && (
@@ -806,7 +922,11 @@ export default function HomeScreen() {
                                         params: { id: routine.id },
                                     });
                                 }}
-                                onDelete={() => handleDeleteRoutine(routine.id)}
+                                onDelete={() =>
+                                    handleRequestDeleteRoutine(
+                                        routine
+                                    )
+                                }
                                 onShare={() => {
                                     console.log('Compartir / exportar rutina', routine.id);
                                 }}
@@ -861,19 +981,19 @@ export default function HomeScreen() {
                 {/* BOTONES INFERIORES */}
                 <View
                     style={{
-                        position: 'absolute',
-                        left: 16,
-                        right: 16,
-                        bottom: 5,
                         flexDirection: 'row',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        paddingBottom: footerBottomSpace,
-                        paddingTop: 8,
-                        backgroundColor: COLORS.background,
+
                         gap: 10,
-                        zIndex: 100,
-                        elevation: 100,
+
+                        paddingTop: 2,
+                        paddingBottom: 6,
+
+                        backgroundColor:
+                            COLORS.background,
+
+                        flexShrink: 0,
                     }}
                 >
                     {/* Crear rutina */}
@@ -1237,6 +1357,458 @@ export default function HomeScreen() {
                             >
                                 El escaneo funcionará mejor con texto impreso, buena iluminación y papel claro. En la primera versión no se garantizará lectura correcta de manuscritos.
                             </Text>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+            <Modal
+                visible={
+                    routineToDelete !== null
+                }
+                transparent
+                animationType="fade"
+                onRequestClose={
+                    closeDeleteRoutineModal
+                }
+            >
+                <View
+                    style={{
+                        flex: 1,
+
+                        backgroundColor:
+                            'rgba(0,0,0,0.76)',
+
+                        justifyContent:
+                            'center',
+
+                        alignItems:
+                            'center',
+
+                        padding: 20,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 390,
+
+                            backgroundColor:
+                                '#101010',
+
+                            borderRadius: 24,
+
+                            borderWidth: 1,
+
+                            borderColor:
+                                '#3A3A3A',
+
+                            padding: 18,
+                        }}
+                    >
+                        {/* HEADER */}
+
+                        <View
+                            style={{
+                                flexDirection:
+                                    'row',
+
+                                alignItems:
+                                    'center',
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 46,
+                                    height: 46,
+
+                                    borderRadius: 23,
+
+                                    backgroundColor:
+                                        'rgba(255,80,80,0.08)',
+
+                                    borderWidth: 1,
+
+                                    borderColor:
+                                        'rgba(255,100,100,0.35)',
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+                                }}
+                            >
+                                <Ionicons
+                                    name="trash-outline"
+                                    size={23}
+                                    color="#FF8A8A"
+                                />
+                            </View>
+
+                            <View
+                                style={{
+                                    flex: 1,
+                                    marginLeft: 12,
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textLight,
+
+                                        fontSize: 18,
+
+                                        fontWeight:
+                                            '900',
+                                    }}
+                                >
+                                    Eliminar rutina
+                                </Text>
+
+                                <Text
+                                    numberOfLines={2}
+                                    style={{
+                                        color:
+                                            COLORS.textMuted,
+
+                                        fontSize: 10,
+
+                                        marginTop: 3,
+                                    }}
+                                >
+                                    {
+                                        routineToDelete
+                                            ?.title
+                                    }
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* BORRADO SEGURO */}
+
+                        <View
+                            style={{
+                                backgroundColor:
+                                    '#181818',
+
+                                borderRadius: 15,
+
+                                borderWidth: 1,
+
+                                borderColor:
+                                    '#303030',
+
+                                padding: 12,
+
+                                marginTop: 16,
+                            }}
+                        >
+                            <Text
+                                style={{
+                                    color:
+                                        COLORS.textLight,
+
+                                    fontSize: 12,
+
+                                    fontWeight:
+                                        '800',
+                                }}
+                            >
+                                La rutina dejará de aparecer en tus rutinas.
+                            </Text>
+
+                            <Text
+                                style={{
+                                    color:
+                                        COLORS.textMuted,
+
+                                    fontSize: 10,
+
+                                    lineHeight: 16,
+
+                                    marginTop: 5,
+                                }}
+                            >
+                                Si no seleccionas la opción inferior, tus valoraciones y registros históricos se conservarán.
+                            </Text>
+                        </View>
+
+                        {/* CHECK */}
+
+                        <Pressable
+                            disabled={
+                                deleteSaving
+                            }
+                            onPress={() =>
+                                setDeleteHistory(
+                                    (current) =>
+                                        !current
+                                )
+                            }
+                            style={({ pressed }) => ({
+                                flexDirection:
+                                    'row',
+
+                                alignItems:
+                                    'flex-start',
+
+                                backgroundColor:
+                                    deleteHistory
+                                        ? 'rgba(255,80,80,0.07)'
+                                        : '#181818',
+
+                                borderRadius: 15,
+
+                                borderWidth: 1,
+
+                                borderColor:
+                                    deleteHistory
+                                        ? '#9F4747'
+                                        : '#303030',
+
+                                padding: 12,
+
+                                marginTop: 10,
+
+                                opacity:
+                                    pressed
+                                        ? 0.8
+                                        : 1,
+                            })}
+                        >
+                            <Ionicons
+                                name={
+                                    deleteHistory
+                                        ? 'checkbox'
+                                        : 'square-outline'
+                                }
+                                size={22}
+                                color={
+                                    deleteHistory
+                                        ? '#FF8A8A'
+                                        : '#8A8A8A'
+                                }
+                            />
+
+                            <View
+                                style={{
+                                    flex: 1,
+                                    marginLeft: 9,
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color:
+                                            deleteHistory
+                                                ? '#FFAAAA'
+                                                : '#CCCCCC',
+
+                                        fontSize: 11,
+
+                                        fontWeight:
+                                            '900',
+                                    }}
+                                >
+                                    Eliminar también historial y valoraciones
+                                </Text>
+
+                                <Text
+                                    style={{
+                                        color:
+                                            '#888888',
+
+                                        fontSize: 9,
+
+                                        lineHeight: 14,
+
+                                        marginTop: 4,
+                                    }}
+                                >
+                                    Se eliminarán en cascada los ejercicios y registros detallados asociados a esta rutina. Esta acción no se puede deshacer.
+                                </Text>
+                            </View>
+                        </Pressable>
+
+                        {/* ADVERTENCIA */}
+
+                        {deleteHistory && (
+                            <View
+                                style={{
+                                    flexDirection:
+                                        'row',
+
+                                    marginTop: 10,
+
+                                    padding: 10,
+
+                                    borderRadius: 12,
+
+                                    backgroundColor:
+                                        'rgba(255,80,80,0.06)',
+                                }}
+                            >
+                                <Ionicons
+                                    name="warning-outline"
+                                    size={17}
+                                    color="#FF8A8A"
+                                />
+
+                                <Text
+                                    style={{
+                                        flex: 1,
+
+                                        color:
+                                            '#C98D8D',
+
+                                        fontSize: 9,
+
+                                        lineHeight: 14,
+
+                                        marginLeft: 7,
+                                    }}
+                                >
+                                    Atención: se realizará un borrado permanente en modo Cascade. Los resúmenes históricos ya consolidados pueden conservar información agregada.
+                                </Text>
+                            </View>
+                        )}
+
+                        {/* ERROR */}
+
+                        {deleteError && (
+                            <Text
+                                style={{
+                                    color:
+                                        '#FF8A8A',
+
+                                    fontSize: 10,
+
+                                    textAlign:
+                                        'center',
+
+                                    marginTop: 10,
+                                }}
+                            >
+                                {deleteError}
+                            </Text>
+                        )}
+
+                        {/* BOTONES */}
+
+                        <View
+                            style={{
+                                flexDirection:
+                                    'row',
+
+                                gap: 8,
+
+                                marginTop: 16,
+                            }}
+                        >
+                            <Pressable
+                                disabled={
+                                    deleteSaving
+                                }
+                                onPress={
+                                    closeDeleteRoutineModal
+                                }
+                                style={({ pressed }) => ({
+                                    flex: 1,
+
+                                    height: 45,
+
+                                    borderRadius: 13,
+
+                                    backgroundColor:
+                                        pressed
+                                            ? '#303030'
+                                            : '#222222',
+
+                                    borderWidth: 1,
+
+                                    borderColor:
+                                        '#343434',
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+
+                                    opacity:
+                                        deleteSaving
+                                            ? 0.5
+                                            : 1,
+                                })}
+                            >
+                                <Text
+                                    style={{
+                                        color:
+                                            '#C7C7C7',
+
+                                        fontSize: 11,
+
+                                        fontWeight:
+                                            '800',
+                                    }}
+                                >
+                                    Cancelar
+                                </Text>
+                            </Pressable>
+
+                            <Pressable
+                                disabled={
+                                    deleteSaving
+                                }
+                                onPress={
+                                    handleDeleteRoutine
+                                }
+                                style={({ pressed }) => ({
+                                    flex: 1.25,
+
+                                    height: 45,
+
+                                    borderRadius: 13,
+
+                                    backgroundColor:
+                                        pressed
+                                            ? '#E36060'
+                                            : '#C84F4F',
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+
+                                    opacity:
+                                        deleteSaving
+                                            ? 0.7
+                                            : 1,
+                                })}
+                            >
+                                {deleteSaving ? (
+                                    <ActivityIndicator
+                                        size="small"
+                                        color="#FFFFFF"
+                                    />
+                                ) : (
+                                    <Text
+                                        style={{
+                                            color:
+                                                '#FFFFFF',
+
+                                            fontSize: 11,
+
+                                            fontWeight:
+                                                '900',
+                                        }}
+                                    >
+                                        {deleteHistory
+                                            ? 'Eliminar todo'
+                                            : 'Eliminar rutina'}
+                                    </Text>
+                                )}
+                            </Pressable>
                         </View>
                     </View>
                 </View>

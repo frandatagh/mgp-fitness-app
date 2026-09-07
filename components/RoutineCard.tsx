@@ -32,8 +32,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
     mode = 'normal',
 }) => {
     const [optionsVisible, setOptionsVisible] = useState(false);
-    const [confirmVisible, setConfirmVisible] = useState(false);
-    const [deleting, setDeleting] = useState(false);
+
 
     const isSuggestion = mode === 'suggestion';
 
@@ -45,27 +44,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
         setOptionsVisible(false);
     };
 
-    const handleAskDelete = () => {
-        // cerrar el menú y abrir confirmación
-        setOptionsVisible(false);
-        setConfirmVisible(true);
-    };
 
-    const handleCancelDelete = () => {
-        setConfirmVisible(false);
-    };
-
-    const handleConfirmDelete = async () => {
-        try {
-            setDeleting(true);
-            await onDelete(); // 🔥 llama a handleDeleteRoutine del Home
-            setConfirmVisible(false); // cerrar modal si todo fue bien
-        } catch (error) {
-            console.error('Error eliminando rutina', error);
-        } finally {
-            setDeleting(false);
-        }
-    };
 
     const exerciseCount = exercisesPreview?.length ?? 0;
 
@@ -248,7 +227,10 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                                 style={{ backgroundColor: COLORS.textMuted }}
                             />
 
-                            <Pressable className="py-2" onPress={handleAskDelete}>
+                            <Pressable className="py-2" onPress={() => {
+                                handleCloseOptions();
+                                onDelete();
+                            }}>
                                 <Text
                                     style={{
                                         color: '#FFBABA',
@@ -272,74 +254,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                 </Modal>
             )}
 
-            {/* MODAL DE CONFIRMACIÓN DE BORRADO */}
-            {!isSuggestion && (
-                <Modal
-                    visible={confirmVisible}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={handleCancelDelete}
-                >
-                    <View
-                        className="flex-1 justify-center items-center"
-                        style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}
-                    >
-                        <View
-                            className="w-11/12 max-w-xs rounded-2xl p-4"
-                            style={{
-                                backgroundColor: '#111111',
-                                borderWidth: 1,
-                                borderColor: COLORS.primary,
-                            }}
-                        >
-                            <Text
-                                className="text-center text-base font-semibold mb-1"
-                                style={{ color: COLORS.textLight }}
-                            >
-                                ¿Eliminar rutina?
-                            </Text>
-                            <Text
-                                className="text-center text-xs mb-4"
-                                style={{ color: COLORS.textMuted }}
-                            >
-                                Esta acción no se puede deshacer.
-                            </Text>
 
-                            <View className="flex-row justify-center mt-1">
-                                <Pressable
-                                    className="px-4 py-2 rounded-full mr-2 border"
-                                    style={{
-                                        borderColor: COLORS.textLight,
-                                        backgroundColor: '#222222',
-                                    }}
-                                    onPress={handleCancelDelete}
-                                    disabled={deleting}
-                                >
-                                    <Text style={{ color: COLORS.textLight }}>
-                                        Cancelar
-                                    </Text>
-                                </Pressable>
-
-                                <Pressable
-                                    className="px-4 py-2 rounded-full"
-                                    style={{ backgroundColor: '#FF4B4B' }}
-                                    onPress={handleConfirmDelete}
-                                    disabled={deleting}
-                                >
-                                    <Text
-                                        style={{
-                                            color: 'white',
-                                            fontWeight: '600',
-                                        }}
-                                    >
-                                        {deleting ? 'Eliminando...' : 'Eliminar'}
-                                    </Text>
-                                </Pressable>
-                            </View>
-                        </View>
-                    </View>
-                </Modal>
-            )}
 
         </>
     );

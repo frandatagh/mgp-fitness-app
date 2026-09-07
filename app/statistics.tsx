@@ -3916,20 +3916,7 @@ export default function StatisticsScreen() {
                         }
                     />
 
-                    {/* 4 — RUNNING */}
 
-                    <StatisticsNavButton
-                        onPress={() =>
-                            router.push('/liverun')
-                        }
-                        icon={
-                            <FontAwesome6
-                                name="person-running"
-                                size={25}
-                                color="#FFFFFF"
-                            />
-                        }
-                    />
 
                     {/* 5 — HISTORIAL GENERAL */}
 

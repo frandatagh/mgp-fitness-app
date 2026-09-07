@@ -2292,7 +2292,6 @@ export default function LiveRunWeb() {
 
                         fontSize: 12,
                         fontWeight: '600',
-                        marginTop: 3,
                     }}
                 >
                     {loading ? '...' : label}

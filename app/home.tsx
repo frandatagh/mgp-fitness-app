@@ -680,6 +680,117 @@ export default function HomeScreen() {
         () => buildHomeGoalProgress(profileData?.profile, statsData),
         [profileData, statsData]
     );
+
+    const homeProfileBadge =
+        useMemo(() => {
+            const weeklyAverage =
+                statsData
+                    ?.performance
+                    ?.weeklyAverage ??
+                null;
+
+            const monthlyAverage =
+                statsData
+                    ?.performance
+                    ?.monthlyAverage ??
+                null;
+
+            const latestAverage =
+                statsData
+                    ?.performance
+                    ?.latestAverage ??
+                null;
+
+
+            /*
+             * ===================================
+             * 1 — PRIORIDAD: SEMANA ACTUAL
+             * ===================================
+             */
+
+            if (
+                weeklyAverage != null &&
+                Number.isFinite(
+                    Number(
+                        weeklyAverage
+                    )
+                )
+            ) {
+                return {
+                    text:
+                        Number(
+                            weeklyAverage
+                        ).toFixed(1),
+
+                    showStar: true,
+                };
+            }
+
+
+            /*
+             * ===================================
+             * 2 — SEGUNDA OPCIÓN: MES ACTUAL
+             * ===================================
+             */
+
+            if (
+                monthlyAverage != null &&
+                Number.isFinite(
+                    Number(
+                        monthlyAverage
+                    )
+                )
+            ) {
+                return {
+                    text:
+                        Number(
+                            monthlyAverage
+                        ).toFixed(1),
+
+                    showStar: true,
+                };
+            }
+
+
+            /*
+             * ===================================
+             * 3 — ÚLTIMA VALORACIÓN HISTÓRICA
+             * ===================================
+             */
+
+            if (
+                latestAverage != null &&
+                Number.isFinite(
+                    Number(
+                        latestAverage
+                    )
+                )
+            ) {
+                return {
+                    text:
+                        Number(
+                            latestAverage
+                        ).toFixed(1),
+
+                    showStar: true,
+                };
+            }
+
+
+            /*
+             * ===================================
+             * 4 — USUARIO SIN VALORACIONES
+             * ===================================
+             */
+
+            return {
+                text:
+                    'Entrena ahora!',
+
+                showStar: false,
+            };
+        }, [statsData]);
+
     const [
         activeHomeTab,
         setActiveHomeTab,
@@ -698,6 +809,11 @@ export default function HomeScreen() {
             new Animated.Value(0)
         ).current;
 
+
+    const homeTabTargetRef =
+        useRef<0 | 1 | 2 | null>(
+            null
+        );
 
     // PRECAUCIONES
 
@@ -1107,11 +1223,19 @@ export default function HomeScreen() {
     const goToHomeTab = (
         index: 0 | 1 | 2
     ) => {
+        /*
+         * Guardamos qué pestaña queremos
+         * alcanzar programáticamente.
+         */
+        homeTabTargetRef.current =
+            index;
+
         setActiveHomeTab(index);
 
-        if (
-            homePanelWidth <= 0
-        ) {
+        if (homePanelWidth <= 0) {
+            homeTabTargetRef.current =
+                null;
+
             return;
         }
 
@@ -1137,14 +1261,18 @@ export default function HomeScreen() {
                     minHeight: 0,
                 }}
             >
-                <AppHeader profileGreeting={`Nivel 6.8`} />
+                <AppHeader
+                    profileBadge={
+                        homeProfileBadge
+                    }
+                />
 
 
 
                 {/* TABS SUPERIORES */}
                 <View
                     style={{
-                        marginTop: 12,
+                        marginTop: 1,
                         marginBottom: 7,
 
                         position: 'relative',
@@ -1375,10 +1503,13 @@ export default function HomeScreen() {
                                 onMomentumScrollEnd={(
                                     event
                                 ) => {
+                                    const x =
+                                        event.nativeEvent
+                                            .contentOffset.x;
+
                                     const index =
                                         Math.round(
-                                            event.nativeEvent
-                                                .contentOffset.x /
+                                            x /
                                             homePanelWidth
                                         );
 
@@ -1389,11 +1520,45 @@ export default function HomeScreen() {
                                                 2,
                                                 index
                                             )
-                                        ) as
-                                        | 0
-                                        | 1
-                                        | 2;
+                                        ) as 0 | 1 | 2;
 
+                                    /*
+                                     * Si nosotros ordenamos
+                                     * un cambio de pestaña,
+                                     * ignoramos cualquier evento
+                                     * atrasado de la pestaña anterior.
+                                     */
+                                    const target =
+                                        homeTabTargetRef.current;
+
+                                    if (target !== null) {
+                                        const targetX =
+                                            homePanelWidth *
+                                            target;
+
+                                        const arrived =
+                                            Math.abs(
+                                                x -
+                                                targetX
+                                            ) < 4;
+
+                                        if (arrived) {
+                                            setActiveHomeTab(
+                                                target
+                                            );
+
+                                            homeTabTargetRef.current =
+                                                null;
+                                        }
+
+                                        return;
+                                    }
+
+                                    /*
+                                     * Si fue un swipe normal
+                                     * del usuario, actualizamos
+                                     * normalmente.
+                                     */
                                     setActiveHomeTab(
                                         safeIndex
                                     );
@@ -4409,15 +4574,18 @@ export default function HomeScreen() {
 
                             <Pressable
                                 onPress={() => {
+                                    /*
+                                     * Primero ordenamos al pager
+                                     * volver realmente a página 0.
+                                     */
+                                    goToHomeTab(0);
+
+                                    /*
+                                     * Después cerramos el modal.
+                                     */
                                     setAdviceModalVisible(
                                         false
                                     );
-
-                                    /*
-                                     * Volvemos a la primera
-                                     * pestaña de Home.
-                                     */
-                                    goToHomeTab(0);
                                 }}
                                 style={({ pressed }) => ({
                                     flex: 1,

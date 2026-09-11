@@ -24,9 +24,30 @@ export type MyStatisticsResponse = {
     insights: InsightItem[];
 
     performance: {
-        weeklyAverage: number | null;
-        bestDay: string | null;
-        worstDay: string | null;
+        /*
+         * Promedio de las valoraciones
+         * de la semana actual.
+         */
+        weeklyAverage:
+        number | null;
+
+        /*
+         * Promedio del mes actual.
+         */
+        monthlyAverage:
+        number | null;
+
+        /*
+         * Última valoración registrada.
+         */
+        latestAverage:
+        number | null;
+
+        bestDay:
+        string | null;
+
+        worstDay:
+        string | null;
 
         chart: {
             labels: string[];

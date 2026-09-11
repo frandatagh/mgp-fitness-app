@@ -9,7 +9,14 @@ import { getMyProfile } from '../lib/profile';
 
 type AppHeaderProps = {
     showProfile?: boolean;
-    profileGreeting?: string | null;
+
+    profileGreeting?:
+    string | null;
+
+    profileBadge?: {
+        text: string;
+        showStar?: boolean;
+    } | null;
 };
 
 function getInitials(nameOrEmail: string) {
@@ -79,7 +86,11 @@ function MenuItem({
 }
 
 
-export default function AppHeader({ showProfile = true, profileGreeting = null }: AppHeaderProps) {
+export default function AppHeader({
+    showProfile = true,
+    profileGreeting = null,
+    profileBadge = null,
+}: AppHeaderProps) {
     const insets = useSafeAreaInsets();
     const { user, logout, isAuthenticated } = useAuth();
 
@@ -232,8 +243,8 @@ export default function AppHeader({ showProfile = true, profileGreeting = null }
                                 style={{
                                     marginTop: 23,
                                     right: -10,
-                                    width: 60,
-                                    height: 60,
+                                    width: 70,
+                                    height: 70,
                                     borderRadius: 100,
                                     backgroundColor: '#1b1b1b',
                                     borderWidth: 3,
@@ -266,7 +277,61 @@ export default function AppHeader({ showProfile = true, profileGreeting = null }
                                 )}
                             </View>
 
-                            {profileGreeting ? (
+                            {profileBadge ? (
+                                <View
+                                    style={{
+                                        marginTop: -5,
+                                        right: -10,
+
+                                        backgroundColor:
+                                            COLORS.primary,
+
+                                        borderRadius: 999,
+
+                                        borderWidth: 2,
+                                        borderColor: '#444444',
+
+                                        paddingHorizontal:
+                                            profileBadge.showStar
+                                                ? 9
+                                                : 11,
+
+                                        paddingVertical: 1,
+
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+
+                                        maxWidth: 120,
+                                    }}
+                                >
+                                    <Text
+                                        numberOfLines={1}
+                                        style={{
+                                            color: '#111111',
+                                            fontSize:
+                                                profileBadge.showStar
+                                                    ? 12
+                                                    : 10,
+
+                                            fontWeight: '900',
+                                        }}
+                                    >
+                                        {profileBadge.text}
+                                    </Text>
+
+                                    {profileBadge.showStar && (
+                                        <Ionicons
+                                            name="star"
+                                            size={12}
+                                            color="#111111"
+                                            style={{
+                                                marginLeft: 3,
+                                            }}
+                                        />
+                                    )}
+                                </View>
+                            ) : profileGreeting ? (
                                 <View
                                     style={{
                                         marginTop: -5,

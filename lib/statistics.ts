@@ -14,6 +14,63 @@ export type ExerciseEffortItem = {
     count: number;
 };
 
+export type TrainingActivityDay = {
+    date: string;
+
+    routineRecords: number;
+
+    exerciseRecords: number;
+
+    runningSessions: number;
+
+    totalRecords: number;
+
+    active: boolean;
+};
+
+
+export type TrainingActivityWeek = {
+    weekStart: string;
+
+    weekEnd: string;
+
+    activeDays: number;
+
+    routineRecords: number;
+
+    exerciseRecords: number;
+
+    runningSessions: number;
+
+    totalRecords: number;
+
+    consistencyScore: number;
+};
+
+
+export type TrainingActivityResponse = {
+    currentWeek:
+    TrainingActivityDay[];
+
+    currentMonth:
+    TrainingActivityDay[];
+
+    weeklyHistory:
+    TrainingActivityWeek[];
+
+    totals: {
+        activeDays: number;
+
+        routineRecords: number;
+
+        exerciseRecords: number;
+
+        runningSessions: number;
+
+        totalRecords: number;
+    };
+};
+
 export type MyStatisticsResponse = {
     summary: {
         weeklySessions: number;
@@ -108,4 +165,27 @@ export async function getMyAdvice() {
     }
 
     return data as { items: AdviceItem[] };
+}
+
+export async function getTrainingActivity() {
+    const res =
+        await apiFetch(
+            '/statistics/activity'
+        );
+
+    const data =
+        await res
+            .json()
+            .catch(
+                () => null
+            );
+
+    if (!res.ok) {
+        throw new Error(
+            data?.message ||
+            'No se pudo cargar la actividad'
+        );
+    }
+
+    return data as TrainingActivityResponse;
 }

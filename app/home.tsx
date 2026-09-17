@@ -9,8 +9,19 @@ import { useAuth } from '../context/AuthContext';
 import { getRoutines, getRoutine, Routine, deleteRoutine } from '../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
 import { getMyProfile, type MyProfileResponse, type UserProfile } from '../lib/profile';
-import { getMyStatistics, getMyAdvice, type AdviceItem, type MyStatisticsResponse } from '../lib/statistics';
+import {
+    getMyStatistics,
+    getMyAdvice,
+    getTrainingActivity,
+
+    type AdviceItem,
+    type MyStatisticsResponse,
+    type TrainingActivityResponse,
+    type TrainingActivityDay,
+    type TrainingActivityWeek,
+} from '../lib/statistics';
 import AppHeader from '../components/AppHeader';
+import { LineChart } from 'react-native-chart-kit';
 import AppLoading from '../components/AppLoading';
 import { SlideInLeft } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -520,6 +531,141 @@ function HomeHelpCard({
     );
 }
 
+type ActivityCalendarMode =
+    | 'week'
+    | 'month';
+
+
+function parseActivityDate(
+    dateKey: string
+) {
+    /*
+     * Usamos mediodía para evitar
+     * corrimientos de fecha por timezone.
+     */
+    return new Date(
+        `${dateKey}T12:00:00`
+    );
+}
+
+
+function activityWeekDayLabel(
+    dateKey: string
+) {
+    const date =
+        parseActivityDate(
+            dateKey
+        );
+
+    const labels = [
+        'D',
+        'L',
+        'M',
+        'X',
+        'J',
+        'V',
+        'S',
+    ];
+
+    return labels[
+        date.getDay()
+    ];
+}
+
+
+function activityDayNumber(
+    dateKey: string
+) {
+    return parseActivityDate(
+        dateKey
+    ).getDate();
+}
+
+
+function activityMonthTitle(
+    dateKey?: string
+) {
+    if (!dateKey) {
+        return '';
+    }
+
+    const text =
+        parseActivityDate(
+            dateKey
+        ).toLocaleDateString(
+            'es-AR',
+            {
+                month: 'long',
+                year: 'numeric',
+            }
+        );
+
+    return (
+        text.charAt(0).toUpperCase() +
+        text.slice(1)
+    );
+}
+
+
+function activityMondayOffset(
+    dateKey?: string
+) {
+    if (!dateKey) {
+        return 0;
+    }
+
+    const day =
+        parseActivityDate(
+            dateKey
+        ).getDay();
+
+    /*
+     * JS:
+     * domingo = 0
+     *
+     * Nosotros:
+     * lunes = 0
+     */
+    return (
+        day + 6
+    ) % 7;
+}
+
+
+function activityCellColor(
+    totalRecords: number
+) {
+    if (totalRecords <= 0) {
+        return '#191919';
+    }
+
+    if (totalRecords <= 2) {
+        return 'rgba(198,255,0,0.20)';
+    }
+
+    if (totalRecords <= 5) {
+        return 'rgba(198,255,0,0.38)';
+    }
+
+    return 'rgba(198,255,0,0.68)';
+}
+
+
+function formatActivityShortDate(
+    dateKey: string
+) {
+    const date =
+        parseActivityDate(
+            dateKey
+        );
+
+    return `${String(
+        date.getDate()
+    ).padStart(2, '0')}/${String(
+        date.getMonth() + 1
+    ).padStart(2, '0')}`;
+}
+
 type HomeGoalProgress = {
     currentLabel: string;
     targetLabel: string;
@@ -627,6 +773,54 @@ function buildHomeGoalProgress(
         remainingLabel,
         progressPercent,
     };
+}
+
+function getLocalActivityDateKey(
+    date = new Date()
+) {
+    const year =
+        date.getFullYear();
+
+    const month =
+        String(
+            date.getMonth() + 1
+        ).padStart(
+            2,
+            '0'
+        );
+
+    const day =
+        String(
+            date.getDate()
+        ).padStart(
+            2,
+            '0'
+        );
+
+    return `${year}-${month}-${day}`;
+}
+
+
+function isActivityToday(
+    dateKey: string
+) {
+    return (
+        dateKey ===
+        getLocalActivityDateKey()
+    );
+}
+
+
+function isCurrentActivityWeek(
+    week: TrainingActivityWeek
+) {
+    const today =
+        getLocalActivityDateKey();
+
+    return (
+        today >= week.weekStart &&
+        today <= week.weekEnd
+    );
 }
 
 export default function HomeScreen() {
@@ -879,6 +1073,299 @@ export default function HomeScreen() {
         adviceModalVisible,
         setAdviceModalVisible,
     ] = useState(false);
+
+    // ===================================
+    // ACTIVIDAD / CONSTANCIA
+    // ===================================
+
+    const [
+        activityData,
+        setActivityData,
+    ] =
+        useState<TrainingActivityResponse | null>(
+            null
+        );
+
+    const [
+        activityLoading,
+        setActivityLoading,
+    ] =
+        useState(false);
+
+    const [
+        activityError,
+        setActivityError,
+    ] =
+        useState<string | null>(
+            null
+        );
+
+    const [
+        activityCalendarMode,
+        setActivityCalendarMode,
+    ] =
+        useState<ActivityCalendarMode>(
+            'week'
+        );
+
+    const [
+        activityEvolutionVisible,
+        setActivityEvolutionVisible,
+    ] =
+        useState(false);
+
+    const [
+        selectedActivityWeek,
+        setSelectedActivityWeek,
+    ] =
+        useState<TrainingActivityWeek | null>(
+            null
+        );
+
+    const [
+        activityChartViewportWidth,
+        setActivityChartViewportWidth,
+    ] =
+        useState(0);
+
+    /*
+ * Día seleccionado en el calendario.
+ */
+    const [
+        selectedActivityDay,
+        setSelectedActivityDay,
+    ] =
+        useState<TrainingActivityDay | null>(
+            null
+        );
+
+
+    /*
+     * Scroll horizontal del gráfico histórico.
+     */
+    const activityChartScrollRef =
+        useRef<ScrollView | null>(
+            null
+        );
+
+
+    /*
+     * Evita repetir el auto-scroll
+     * cada vez que cambia otro estado.
+     */
+    const activityChartAutoScrolledRef =
+        useRef(false);
+
+
+    /*
+     * Evita pedir todo el historial
+     * cada vez que entramos a la pestaña.
+     */
+    const activityLoadedRef =
+        useRef(false);
+
+
+    /*
+     * Controlamos si Semana y Mes
+     * ya hicieron su animación.
+     */
+    const activityAnimatedModesRef =
+        useRef({
+            week: false,
+            month: false,
+        });
+
+
+    /*
+     * 42 alcanza para cualquier
+     * grilla mensual:
+     *
+     * 6 semanas × 7 días.
+     */
+    const activityCellAnimations =
+        useRef(
+            Array.from(
+                { length: 42 },
+                () =>
+                    new Animated.Value(
+                        0
+                    )
+            )
+        ).current;
+
+    useEffect(() => {
+        /*
+         * La pestaña 1 es
+         * Actividad & Ayuda.
+         */
+        if (
+            !isAuthenticated ||
+            activeHomeTab !== 1 ||
+            activityLoadedRef.current
+        ) {
+            return;
+        }
+
+        let cancelled = false;
+
+        const loadActivity =
+            async () => {
+                try {
+                    setActivityLoading(
+                        true
+                    );
+
+                    setActivityError(
+                        null
+                    );
+
+                    const data =
+                        await getTrainingActivity();
+
+                    if (cancelled) {
+                        return;
+                    }
+
+                    setActivityData(
+                        data
+                    );
+
+                    /*
+                     * Solamente marcamos como
+                     * cargado si funcionó.
+                     */
+                    activityLoadedRef.current =
+                        true;
+
+                } catch (error) {
+                    if (cancelled) {
+                        return;
+                    }
+
+                    console.error(
+                        'Error cargando actividad:',
+                        error
+                    );
+
+                    setActivityError(
+                        'No se pudieron cargar tus registros de entrenamiento.'
+                    );
+
+                } finally {
+                    if (!cancelled) {
+                        setActivityLoading(
+                            false
+                        );
+                    }
+                }
+            };
+
+        void loadActivity();
+
+        return () => {
+            cancelled = true;
+        };
+
+    }, [
+        activeHomeTab,
+        isAuthenticated,
+    ]);
+
+    useEffect(() => {
+        if (
+            activeHomeTab !== 1 ||
+            !activityData
+        ) {
+            return;
+        }
+
+        const mode =
+            activityCalendarMode;
+
+        let cellCount = 7;
+
+        if (mode === 'month') {
+            const offset =
+                activityMondayOffset(
+                    activityData
+                        .currentMonth[0]
+                        ?.date
+                );
+
+            cellCount =
+                offset +
+                activityData
+                    .currentMonth
+                    .length;
+        }
+
+
+        const values =
+            activityCellAnimations.slice(
+                0,
+                cellCount
+            );
+
+
+        /*
+         * Si ya animó esta vista,
+         * simplemente queda visible.
+         */
+        if (
+            activityAnimatedModesRef
+                .current[mode]
+        ) {
+            values.forEach(
+                (value) =>
+                    value.setValue(1)
+            );
+
+            return;
+        }
+
+
+        values.forEach(
+            (value) =>
+                value.setValue(0)
+        );
+
+
+        const animations =
+            values.map(
+                (value) =>
+                    Animated.spring(
+                        value,
+                        {
+                            toValue: 1,
+
+                            tension: 90,
+
+                            friction: 7,
+
+                            useNativeDriver:
+                                true,
+                        }
+                    )
+            );
+
+
+        Animated.stagger(
+            mode === 'week'
+                ? 90
+                : 45,
+
+            animations
+        ).start(() => {
+            activityAnimatedModesRef
+                .current[mode] =
+                true;
+        });
+
+    }, [
+        activeHomeTab,
+        activityData,
+        activityCalendarMode,
+    ]);
 
 
     // TÉCNICA
@@ -1182,6 +1669,97 @@ export default function HomeScreen() {
     const homeAdvice =
         adviceItems[0] ?? null;
 
+    const activityVisibleDays =
+        activityCalendarMode ===
+            'week'
+            ? activityData
+                ?.currentWeek ??
+            []
+            : activityData
+                ?.currentMonth ??
+            [];
+
+
+    const activityPeriodStats =
+        useMemo(() => {
+            return activityVisibleDays
+                .reduce(
+                    (
+                        acc,
+                        day
+                    ) => {
+                        if (
+                            day.active
+                        ) {
+                            acc.activeDays +=
+                                1;
+                        }
+
+                        acc.totalRecords +=
+                            day.totalRecords;
+
+                        acc.routineRecords +=
+                            day.routineRecords;
+
+                        acc.exerciseRecords +=
+                            day.exerciseRecords;
+
+                        acc.runningSessions +=
+                            day.runningSessions;
+
+                        return acc;
+                    },
+                    {
+                        activeDays: 0,
+                        totalRecords: 0,
+                        routineRecords: 0,
+                        exerciseRecords: 0,
+                        runningSessions: 0,
+                    }
+                );
+        }, [
+            activityVisibleDays,
+        ]);
+
+
+    const activityMonthOffset =
+        activityMondayOffset(
+            activityData
+                ?.currentMonth[0]
+                ?.date
+        );
+
+
+    const activityMonthCells:
+        Array<
+            TrainingActivityDay | null
+        > = [
+            ...Array(
+                activityMonthOffset
+            ).fill(null),
+
+            ...(
+                activityData
+                    ?.currentMonth ??
+                []
+            ),
+        ];
+
+
+    const activityHistory =
+        activityData
+            ?.weeklyHistory ??
+        [];
+
+
+    const activityChartWidth =
+        Math.max(
+            activityChartViewportWidth,
+
+            activityHistory.length *
+            58
+        );
+
 
 
     useEffect(() => {
@@ -1198,7 +1776,7 @@ export default function HomeScreen() {
 
             animated: false,
         });
-    }, [homePanelWidth]); 0.
+    }, [homePanelWidth]);
 
     const handleOpenTechnique =
         async () => {
@@ -1364,7 +1942,7 @@ export default function HomeScreen() {
                     >
                         {[
                             'Mis rutinas',
-                            'Ayuda & Sugerencias',
+                            'Actividad & Ayuda',
                             'Notificaciones',
                         ].map(
                             (
@@ -1894,7 +2472,7 @@ export default function HomeScreen() {
 
 
                                 {/* ================================= */}
-                                {/* PÁGINA 2 — AYUDA & SUGERENCIAS  */}
+                                {/* PÁGINA 2 — ACTIVIDAD & AYUDA      */}
                                 {/* ================================= */}
 
                                 <View
@@ -1911,63 +2489,1177 @@ export default function HomeScreen() {
                                         style={{
                                             flex: 1,
                                         }}
-
                                         showsVerticalScrollIndicator={
                                             false
                                         }
-
                                         contentContainerStyle={{
                                             padding: 14,
                                             paddingBottom: 24,
                                         }}
                                     >
-                                        {/* TÍTULO */}
+
+                                        {/* ============================== */}
+                                        {/* REGISTROS DE ENTRENAMIENTO     */}
+                                        {/* ============================== */}
 
                                         <View
                                             style={{
-                                                marginBottom: 14,
+                                                flexDirection:
+                                                    'row',
+
+                                                alignItems:
+                                                    'center',
+
+                                                justifyContent:
+                                                    'space-between',
+
+                                                marginBottom: 12,
                                             }}
                                         >
+                                            <View
+                                                style={{
+                                                    flex: 1,
+                                                }}
+                                            >
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.textLight,
+
+                                                        fontSize: 16,
+
+                                                        fontWeight:
+                                                            '900',
+                                                    }}
+                                                >
+                                                    Registros de entrenamiento
+                                                </Text>
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.textMuted,
+
+                                                        fontSize: 9,
+
+                                                        marginTop: 2,
+                                                    }}
+                                                >
+                                                    Registro visual de tu constancia
+                                                </Text>
+                                            </View>
+
+
+                                            {/* SEMANA / MES */}
+
+                                            <Pressable
+                                                onPress={() => {
+                                                    setSelectedActivityDay(
+                                                        null
+                                                    );
+
+                                                    setActivityCalendarMode(
+                                                        (current) =>
+                                                            current === 'week'
+                                                                ? 'month'
+                                                                : 'week'
+                                                    );
+                                                }}
+                                                style={({ pressed }) => ({
+                                                    flexDirection:
+                                                        'row',
+
+                                                    alignItems:
+                                                        'center',
+
+                                                    paddingHorizontal:
+                                                        10,
+
+                                                    paddingVertical:
+                                                        6,
+
+                                                    borderRadius: 12,
+
+                                                    backgroundColor:
+                                                        pressed
+                                                            ? 'rgba(198,255,0,0.14)'
+                                                            : '#1A1A1A',
+
+                                                    borderWidth: 1,
+
+                                                    borderColor:
+                                                        'rgba(198,255,0,0.30)',
+                                                })}
+                                            >
+                                                <Ionicons
+                                                    name="calendar-outline"
+                                                    size={13}
+                                                    color={
+                                                        COLORS.primary
+                                                    }
+                                                />
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.textLight,
+
+                                                        fontSize: 9,
+
+                                                        fontWeight:
+                                                            '800',
+
+                                                        marginLeft: 5,
+                                                    }}
+                                                >
+                                                    {activityCalendarMode ===
+                                                        'week'
+                                                        ? 'Semana'
+                                                        : 'Mes'}
+                                                </Text>
+                                            </Pressable>
+                                        </View>
+
+
+                                        {/* CARGANDO */}
+
+                                        {activityLoading && (
+                                            <View
+                                                style={{
+                                                    minHeight: 120,
+
+                                                    alignItems:
+                                                        'center',
+
+                                                    justifyContent:
+                                                        'center',
+                                                }}
+                                            >
+                                                <ActivityIndicator
+                                                    color={
+                                                        COLORS.primary
+                                                    }
+                                                />
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.textMuted,
+
+                                                        fontSize: 9,
+
+                                                        marginTop: 7,
+                                                    }}
+                                                >
+                                                    Cargando actividad...
+                                                </Text>
+                                            </View>
+                                        )}
+
+
+                                        {/* ERROR */}
+
+                                        {!activityLoading &&
+                                            activityError && (
+                                                <View
+                                                    style={{
+                                                        backgroundColor:
+                                                            '#181818',
+
+                                                        borderRadius: 15,
+
+                                                        borderWidth: 1,
+
+                                                        borderColor:
+                                                            '#303030',
+
+                                                        padding: 14,
+
+                                                        marginBottom: 12,
+                                                    }}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                COLORS.textMuted,
+
+                                                            fontSize: 10,
+
+                                                            textAlign:
+                                                                'center',
+                                                        }}
+                                                    >
+                                                        {activityError}
+                                                    </Text>
+                                                </View>
+                                            )}
+
+
+                                        {/* CALENDARIO */}
+
+                                        {!activityLoading &&
+                                            !activityError &&
+                                            activityData && (
+                                                <View
+                                                    style={{
+                                                        backgroundColor:
+                                                            '#141414',
+
+                                                        borderRadius: 18,
+
+                                                        borderWidth: 1,
+
+                                                        borderColor:
+                                                            '#2F2F2F',
+
+                                                        padding: 12,
+                                                    }}
+                                                >
+
+                                                    {/* ========= SEMANA ========= */}
+
+                                                    {activityCalendarMode ===
+                                                        'week' && (
+                                                            <View
+                                                                style={{
+                                                                    flexDirection:
+                                                                        'row',
+                                                                }}
+                                                            >
+                                                                {activityData.currentWeek.map(
+                                                                    (
+                                                                        day,
+                                                                        index
+                                                                    ) => {
+                                                                        const animation =
+                                                                            activityCellAnimations[
+                                                                            index
+                                                                            ];
+
+                                                                        return (
+                                                                            <Animated.View
+                                                                                key={
+                                                                                    day.date
+                                                                                }
+                                                                                style={{
+                                                                                    flex: 1,
+
+                                                                                    alignItems:
+                                                                                        'center',
+
+                                                                                    opacity:
+                                                                                        animation,
+
+                                                                                    transform:
+                                                                                        [
+                                                                                            {
+                                                                                                translateY:
+                                                                                                    animation.interpolate(
+                                                                                                        {
+                                                                                                            inputRange:
+                                                                                                                [
+                                                                                                                    0,
+                                                                                                                    1,
+                                                                                                                ],
+
+                                                                                                            outputRange:
+                                                                                                                [
+                                                                                                                    12,
+                                                                                                                    0,
+                                                                                                                ],
+                                                                                                        }
+                                                                                                    ),
+                                                                                            },
+                                                                                            {
+                                                                                                scale:
+                                                                                                    animation.interpolate(
+                                                                                                        {
+                                                                                                            inputRange:
+                                                                                                                [
+                                                                                                                    0,
+                                                                                                                    1,
+                                                                                                                ],
+
+                                                                                                            outputRange:
+                                                                                                                [
+                                                                                                                    0.72,
+                                                                                                                    1,
+                                                                                                                ],
+                                                                                                        }
+                                                                                                    ),
+                                                                                            },
+                                                                                        ],
+                                                                                }}
+                                                                            >
+                                                                                <Text
+                                                                                    style={{
+                                                                                        color:
+                                                                                            '#777777',
+
+                                                                                        fontSize:
+                                                                                            8,
+
+                                                                                        fontWeight:
+                                                                                            '800',
+
+                                                                                        marginBottom:
+                                                                                            5,
+                                                                                    }}
+                                                                                >
+                                                                                    {activityWeekDayLabel(
+                                                                                        day.date
+                                                                                    )}
+                                                                                </Text>
+
+                                                                                <Pressable
+                                                                                    onPress={() =>
+                                                                                        setSelectedActivityDay(
+                                                                                            (current) =>
+                                                                                                current?.date ===
+                                                                                                    day.date
+                                                                                                    ? null
+                                                                                                    : day
+                                                                                        )
+                                                                                    }
+                                                                                    style={({ pressed }) => {
+                                                                                        const isToday =
+                                                                                            isActivityToday(
+                                                                                                day.date
+                                                                                            );
+
+                                                                                        const isSelected =
+                                                                                            selectedActivityDay
+                                                                                                ?.date ===
+                                                                                            day.date;
+
+                                                                                        return {
+                                                                                            width: 36,
+                                                                                            height: 43,
+
+                                                                                            borderRadius: 11,
+
+                                                                                            backgroundColor:
+                                                                                                activityCellColor(
+                                                                                                    day.totalRecords
+                                                                                                ),
+
+                                                                                            borderWidth:
+                                                                                                isToday ||
+                                                                                                    isSelected ||
+                                                                                                    day.active
+                                                                                                    ? 1
+                                                                                                    : 0,
+
+                                                                                            borderColor:
+                                                                                                isSelected
+                                                                                                    ? '#FFFFFF'
+                                                                                                    : isToday
+                                                                                                        ? COLORS.primary
+                                                                                                        : 'rgba(198,255,0,0.50)',
+
+                                                                                            alignItems:
+                                                                                                'center',
+
+                                                                                            justifyContent:
+                                                                                                'center',
+
+                                                                                            transform: [
+                                                                                                {
+                                                                                                    scale:
+                                                                                                        pressed
+                                                                                                            ? 0.93
+                                                                                                            : 1,
+                                                                                                },
+                                                                                            ],
+                                                                                        };
+                                                                                    }}
+                                                                                >
+                                                                                    <Text
+                                                                                        style={{
+                                                                                            color:
+                                                                                                day.active
+                                                                                                    ? '#FFFFFF'
+                                                                                                    : '#666666',
+
+                                                                                            fontSize: 12,
+
+                                                                                            fontWeight: '900',
+                                                                                        }}
+                                                                                    >
+                                                                                        {activityDayNumber(
+                                                                                            day.date
+                                                                                        )}
+                                                                                    </Text>
+
+                                                                                    {day.totalRecords > 0 && (
+                                                                                        <Text
+                                                                                            style={{
+                                                                                                color:
+                                                                                                    COLORS.primary,
+
+                                                                                                fontSize: 7,
+
+                                                                                                fontWeight:
+                                                                                                    '900',
+
+                                                                                                marginTop: 1,
+                                                                                            }}
+                                                                                        >
+                                                                                            {day.totalRecords} reg.
+                                                                                        </Text>
+                                                                                    )}
+                                                                                </Pressable>
+                                                                            </Animated.View>
+                                                                        );
+                                                                    }
+                                                                )}
+                                                            </View>
+                                                        )}
+
+
+                                                    {/* ========= MES ========= */}
+
+                                                    {activityCalendarMode ===
+                                                        'month' && (
+                                                            <>
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            COLORS.textLight,
+
+                                                                        fontSize: 11,
+
+                                                                        fontWeight:
+                                                                            '900',
+
+                                                                        textAlign:
+                                                                            'center',
+
+                                                                        marginBottom: 10,
+                                                                    }}
+                                                                >
+                                                                    {activityMonthTitle(
+                                                                        activityData
+                                                                            .currentMonth[0]
+                                                                            ?.date
+                                                                    )}
+                                                                </Text>
+
+
+                                                                {/* DÍAS DE SEMANA */}
+
+                                                                <View
+                                                                    style={{
+                                                                        flexDirection:
+                                                                            'row',
+                                                                    }}
+                                                                >
+                                                                    {[
+                                                                        'L',
+                                                                        'M',
+                                                                        'X',
+                                                                        'J',
+                                                                        'V',
+                                                                        'S',
+                                                                        'D',
+                                                                    ].map(
+                                                                        (
+                                                                            label
+                                                                        ) => (
+                                                                            <Text
+                                                                                key={
+                                                                                    label
+                                                                                }
+                                                                                style={{
+                                                                                    width:
+                                                                                        '14.2857%',
+
+                                                                                    color:
+                                                                                        '#666666',
+
+                                                                                    fontSize:
+                                                                                        8,
+
+                                                                                    fontWeight:
+                                                                                        '900',
+
+                                                                                    textAlign:
+                                                                                        'center',
+
+                                                                                    marginBottom:
+                                                                                        5,
+                                                                                }}
+                                                                            >
+                                                                                {
+                                                                                    label
+                                                                                }
+                                                                            </Text>
+                                                                        )
+                                                                    )}
+                                                                </View>
+
+
+                                                                {/* GRILLA */}
+
+                                                                <View
+                                                                    style={{
+                                                                        flexDirection:
+                                                                            'row',
+
+                                                                        flexWrap:
+                                                                            'wrap',
+                                                                    }}
+                                                                >
+                                                                    {activityMonthCells.map(
+                                                                        (
+                                                                            day,
+                                                                            index
+                                                                        ) => {
+                                                                            if (
+                                                                                !day
+                                                                            ) {
+                                                                                return (
+                                                                                    <View
+                                                                                        key={`blank-${index}`}
+                                                                                        style={{
+                                                                                            width:
+                                                                                                '14.2857%',
+
+                                                                                            height:
+                                                                                                36,
+                                                                                        }}
+                                                                                    />
+                                                                                );
+                                                                            }
+
+                                                                            const animation =
+                                                                                activityCellAnimations[
+                                                                                index
+                                                                                ];
+
+                                                                            return (
+                                                                                <View
+                                                                                    key={
+                                                                                        day.date
+                                                                                    }
+                                                                                    style={{
+                                                                                        width:
+                                                                                            '14.2857%',
+
+                                                                                        padding:
+                                                                                            2,
+                                                                                    }}
+                                                                                >
+                                                                                    <Animated.View
+                                                                                        style={{
+                                                                                            opacity:
+                                                                                                animation,
+
+                                                                                            transform: [
+                                                                                                {
+                                                                                                    translateY:
+                                                                                                        animation.interpolate({
+                                                                                                            inputRange: [
+                                                                                                                0,
+                                                                                                                1,
+                                                                                                            ],
+
+                                                                                                            outputRange: [
+                                                                                                                10,
+                                                                                                                0,
+                                                                                                            ],
+                                                                                                        }),
+                                                                                                },
+
+                                                                                                {
+                                                                                                    scale:
+                                                                                                        animation.interpolate({
+                                                                                                            inputRange: [
+                                                                                                                0,
+                                                                                                                1,
+                                                                                                            ],
+
+                                                                                                            outputRange: [
+                                                                                                                0.72,
+                                                                                                                1,
+                                                                                                            ],
+                                                                                                        }),
+                                                                                                },
+                                                                                            ],
+                                                                                        }}
+                                                                                    >
+                                                                                        <Pressable
+                                                                                            onPress={() =>
+                                                                                                setSelectedActivityDay(
+                                                                                                    (current) =>
+                                                                                                        current?.date ===
+                                                                                                            day.date
+                                                                                                            ? null
+                                                                                                            : day
+                                                                                                )
+                                                                                            }
+                                                                                            style={({ pressed }) => {
+                                                                                                const isToday =
+                                                                                                    isActivityToday(
+                                                                                                        day.date
+                                                                                                    );
+
+                                                                                                const isSelected =
+                                                                                                    selectedActivityDay
+                                                                                                        ?.date ===
+                                                                                                    day.date;
+
+                                                                                                return {
+                                                                                                    height: 32,
+
+                                                                                                    borderRadius: 9,
+
+                                                                                                    backgroundColor:
+                                                                                                        activityCellColor(
+                                                                                                            day.totalRecords
+                                                                                                        ),
+
+                                                                                                    borderWidth:
+                                                                                                        isToday ||
+                                                                                                            isSelected ||
+                                                                                                            day.active
+                                                                                                            ? 1
+                                                                                                            : 0,
+
+                                                                                                    borderColor:
+                                                                                                        isSelected
+                                                                                                            ? '#FFFFFF'
+                                                                                                            : isToday
+                                                                                                                ? COLORS.primary
+                                                                                                                : 'rgba(198,255,0,0.45)',
+
+                                                                                                    alignItems:
+                                                                                                        'center',
+
+                                                                                                    justifyContent:
+                                                                                                        'center',
+
+                                                                                                    transform: [
+                                                                                                        {
+                                                                                                            scale:
+                                                                                                                pressed
+                                                                                                                    ? 0.92
+                                                                                                                    : 1,
+                                                                                                        },
+                                                                                                    ],
+                                                                                                };
+                                                                                            }}
+                                                                                        >
+                                                                                            <Text
+                                                                                                style={{
+                                                                                                    color:
+                                                                                                        day.active
+                                                                                                            ? '#FFFFFF'
+                                                                                                            : '#666666',
+
+                                                                                                    fontSize: 9,
+
+                                                                                                    fontWeight: '900',
+                                                                                                }}
+                                                                                            >
+                                                                                                {activityDayNumber(
+                                                                                                    day.date
+                                                                                                )}
+                                                                                            </Text>
+
+                                                                                            {day.totalRecords > 0 && (
+                                                                                                <View
+                                                                                                    style={{
+                                                                                                        width: 4,
+                                                                                                        height: 4,
+
+                                                                                                        borderRadius: 2,
+
+                                                                                                        backgroundColor:
+                                                                                                            COLORS.primary,
+
+                                                                                                        marginTop: 2,
+                                                                                                    }}
+                                                                                                />
+                                                                                            )}
+                                                                                        </Pressable>
+                                                                                    </Animated.View>
+                                                                                </View>
+                                                                            );
+                                                                        }
+                                                                    )}
+                                                                </View>
+                                                            </>
+                                                        )}
+
+
+                                                    {/* RESUMEN */}
+
+                                                    <View
+                                                        style={{
+                                                            borderTopWidth: 1,
+
+                                                            borderTopColor:
+                                                                '#292929',
+
+                                                            marginTop: 11,
+
+                                                            paddingTop: 10,
+                                                        }}
+                                                    >
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    COLORS.textLight,
+
+                                                                fontSize: 10,
+
+                                                                fontWeight:
+                                                                    '900',
+
+                                                                textAlign:
+                                                                    'center',
+                                                            }}
+                                                        >
+                                                            {
+                                                                activityPeriodStats.activeDays
+                                                            }{' '}
+                                                            días activos ·{' '}
+                                                            {
+                                                                activityPeriodStats.totalRecords
+                                                            }{' '}
+                                                            registros
+                                                        </Text>
+
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    '#777777',
+
+                                                                fontSize: 8,
+
+                                                                textAlign:
+                                                                    'center',
+
+                                                                marginTop: 4,
+                                                            }}
+                                                        >
+                                                            Rutinas{' '}
+                                                            {
+                                                                activityPeriodStats.routineRecords
+                                                            }
+                                                            {'  ·  '}
+                                                            Ejercicios{' '}
+                                                            {
+                                                                activityPeriodStats.exerciseRecords
+                                                            }
+                                                            {'  ·  '}
+                                                            Running{' '}
+                                                            {
+                                                                activityPeriodStats.runningSessions
+                                                            }
+                                                        </Text>
+                                                    </View>
+                                                    {selectedActivityDay && (
+                                                        <View
+                                                            style={{
+                                                                marginTop: 11,
+
+                                                                backgroundColor:
+                                                                    '#1B1B1B',
+
+                                                                borderRadius: 14,
+
+                                                                borderWidth: 1,
+
+                                                                borderColor:
+                                                                    'rgba(198,255,0,0.28)',
+
+                                                                padding: 11,
+                                                            }}
+                                                        >
+                                                            <View
+                                                                style={{
+                                                                    flexDirection:
+                                                                        'row',
+
+                                                                    alignItems:
+                                                                        'center',
+
+                                                                    justifyContent:
+                                                                        'space-between',
+                                                                }}
+                                                            >
+                                                                <View>
+                                                                    <Text
+                                                                        style={{
+                                                                            color:
+                                                                                COLORS.textLight,
+
+                                                                            fontSize: 11,
+
+                                                                            fontWeight:
+                                                                                '900',
+                                                                        }}
+                                                                    >
+                                                                        {isActivityToday(
+                                                                            selectedActivityDay.date
+                                                                        )
+                                                                            ? 'Hoy'
+                                                                            : parseActivityDate(
+                                                                                selectedActivityDay.date
+                                                                            ).toLocaleDateString(
+                                                                                'es-AR',
+                                                                                {
+                                                                                    weekday:
+                                                                                        'long',
+
+                                                                                    day:
+                                                                                        'numeric',
+
+                                                                                    month:
+                                                                                        'long',
+                                                                                }
+                                                                            )}
+                                                                    </Text>
+
+                                                                    <Text
+                                                                        style={{
+                                                                            color:
+                                                                                selectedActivityDay.active
+                                                                                    ? COLORS.primary
+                                                                                    : '#777777',
+
+                                                                            fontSize: 9,
+
+                                                                            fontWeight:
+                                                                                '800',
+
+                                                                            marginTop: 3,
+                                                                        }}
+                                                                    >
+                                                                        {selectedActivityDay.active
+                                                                            ? `${selectedActivityDay.totalRecords} registros`
+                                                                            : 'Sin actividad registrada'}
+                                                                    </Text>
+                                                                </View>
+
+                                                                <Ionicons
+                                                                    name={
+                                                                        selectedActivityDay.active
+                                                                            ? 'checkmark-circle'
+                                                                            : 'remove-circle-outline'
+                                                                    }
+                                                                    size={22}
+                                                                    color={
+                                                                        selectedActivityDay.active
+                                                                            ? COLORS.primary
+                                                                            : '#555555'
+                                                                    }
+                                                                />
+                                                            </View>
+
+
+                                                            {selectedActivityDay.active && (
+                                                                <View
+                                                                    style={{
+                                                                        flexDirection:
+                                                                            'row',
+
+                                                                        marginTop: 10,
+
+                                                                        gap: 6,
+                                                                    }}
+                                                                >
+                                                                    {/* RUTINAS */}
+
+                                                                    <View
+                                                                        style={{
+                                                                            flex: 1,
+
+                                                                            backgroundColor:
+                                                                                '#111111',
+
+                                                                            borderRadius: 10,
+
+                                                                            paddingVertical:
+                                                                                7,
+
+                                                                            alignItems:
+                                                                                'center',
+                                                                        }}
+                                                                    >
+                                                                        <Text
+                                                                            style={{
+                                                                                color:
+                                                                                    COLORS.textLight,
+
+                                                                                fontSize: 12,
+
+                                                                                fontWeight:
+                                                                                    '900',
+                                                                            }}
+                                                                        >
+                                                                            {
+                                                                                selectedActivityDay.routineRecords
+                                                                            }
+                                                                        </Text>
+
+                                                                        <Text
+                                                                            style={{
+                                                                                color:
+                                                                                    '#777777',
+
+                                                                                fontSize: 7,
+
+                                                                                marginTop: 2,
+                                                                            }}
+                                                                        >
+                                                                            RUTINAS
+                                                                        </Text>
+                                                                    </View>
+
+
+                                                                    {/* EJERCICIOS */}
+
+                                                                    <View
+                                                                        style={{
+                                                                            flex: 1,
+
+                                                                            backgroundColor:
+                                                                                '#111111',
+
+                                                                            borderRadius: 10,
+
+                                                                            paddingVertical:
+                                                                                7,
+
+                                                                            alignItems:
+                                                                                'center',
+                                                                        }}
+                                                                    >
+                                                                        <Text
+                                                                            style={{
+                                                                                color:
+                                                                                    COLORS.textLight,
+
+                                                                                fontSize: 12,
+
+                                                                                fontWeight:
+                                                                                    '900',
+                                                                            }}
+                                                                        >
+                                                                            {
+                                                                                selectedActivityDay.exerciseRecords
+                                                                            }
+                                                                        </Text>
+
+                                                                        <Text
+                                                                            style={{
+                                                                                color:
+                                                                                    '#777777',
+
+                                                                                fontSize: 7,
+
+                                                                                marginTop: 2,
+                                                                            }}
+                                                                        >
+                                                                            EJERCICIOS
+                                                                        </Text>
+                                                                    </View>
+
+
+                                                                    {/* RUNNING */}
+
+                                                                    <View
+                                                                        style={{
+                                                                            flex: 1,
+
+                                                                            backgroundColor:
+                                                                                '#111111',
+
+                                                                            borderRadius: 10,
+
+                                                                            paddingVertical:
+                                                                                7,
+
+                                                                            alignItems:
+                                                                                'center',
+                                                                        }}
+                                                                    >
+                                                                        <Text
+                                                                            style={{
+                                                                                color:
+                                                                                    COLORS.textLight,
+
+                                                                                fontSize: 12,
+
+                                                                                fontWeight:
+                                                                                    '900',
+                                                                            }}
+                                                                        >
+                                                                            {
+                                                                                selectedActivityDay.runningSessions
+                                                                            }
+                                                                        </Text>
+
+                                                                        <Text
+                                                                            style={{
+                                                                                color:
+                                                                                    '#777777',
+
+                                                                                fontSize: 7,
+
+                                                                                marginTop: 2,
+                                                                            }}
+                                                                        >
+                                                                            RUNNING
+                                                                        </Text>
+                                                                    </View>
+                                                                </View>
+                                                            )}
+                                                        </View>
+                                                    )}
+                                                </View>
+                                            )}
+
+
+                                        {/* VER EVOLUCIÓN */}
+
+                                        <Pressable
+                                            disabled={
+                                                activityLoading ||
+                                                !activityData
+                                            }
+                                            onPress={() => {
+                                                /*
+                                                 * Permitimos un nuevo
+                                                 * auto-scroll al abrir.
+                                                 */
+                                                activityChartAutoScrolledRef
+                                                    .current = false;
+
+
+                                                /*
+                                                 * Arrancamos mostrando
+                                                 * la semana actual o,
+                                                 * si no está disponible,
+                                                 * la última.
+                                                 */
+                                                const currentWeek =
+                                                    activityHistory.find(
+                                                        isCurrentActivityWeek
+                                                    ) ??
+                                                    activityHistory[
+                                                    activityHistory.length -
+                                                    1
+                                                    ] ??
+                                                    null;
+
+                                                setSelectedActivityWeek(
+                                                    currentWeek
+                                                );
+
+                                                setActivityEvolutionVisible(
+                                                    true
+                                                );
+                                            }}
+                                            style={({ pressed }) => ({
+                                                minHeight: 44,
+
+                                                borderRadius: 14,
+
+                                                marginTop: 10,
+
+                                                backgroundColor:
+                                                    pressed
+                                                        ? 'rgba(198,255,0,0.12)'
+                                                        : '#1A1A1A',
+
+                                                borderWidth: 1,
+
+                                                borderColor:
+                                                    'rgba(198,255,0,0.28)',
+
+                                                flexDirection:
+                                                    'row',
+
+                                                alignItems:
+                                                    'center',
+
+                                                justifyContent:
+                                                    'center',
+
+                                                opacity:
+                                                    activityLoading ||
+                                                        !activityData
+                                                        ? 0.5
+                                                        : 1,
+                                            })}
+                                        >
+                                            <Ionicons
+                                                name="trending-up-outline"
+                                                size={17}
+                                                color={
+                                                    COLORS.primary
+                                                }
+                                            />
+
                                             <Text
                                                 style={{
                                                     color:
                                                         COLORS.textLight,
 
-                                                    fontSize: 18,
+                                                    fontSize: 10,
 
                                                     fontWeight:
                                                         '900',
+
+                                                    marginLeft: 7,
                                                 }}
                                             >
-                                                Ayuda & Sugerencias
+                                                Ver evolución de registros
                                             </Text>
+                                        </Pressable>
 
-                                            <Text
-                                                style={{
-                                                    color:
-                                                        COLORS.textMuted,
 
-                                                    fontSize: 10,
+                                        {/* SEPARADOR */}
 
-                                                    lineHeight: 15,
+                                        <View
+                                            style={{
+                                                height: 1,
 
-                                                    marginTop: 4,
-                                                }}
-                                            >
-                                                Recursos para entrenar mejor y aprovechar tus registros.
-                                            </Text>
-                                        </View>
+                                                backgroundColor:
+                                                    '#292929',
+
+                                                marginVertical: 18,
+                                            }}
+                                        />
+
+
+                                        <Text
+                                            style={{
+                                                color:
+                                                    COLORS.textLight,
+
+                                                fontSize: 14,
+
+                                                fontWeight:
+                                                    '900',
+
+                                                marginBottom: 10,
+                                            }}
+                                        >
+                                            Ayuda y recursos
+                                        </Text>
 
 
                                         {/* PRECAUCIONES */}
 
                                         <HomeHelpCard
                                             icon="shield-checkmark-outline"
-
                                             title="Precauciones"
-
                                             description="Cuidados importantes para entrenamiento en gimnasio, running y ejercicios en casa."
-
                                             onPress={() =>
                                                 setPrecautionsVisible(
                                                     true
@@ -1980,11 +3672,8 @@ export default function HomeScreen() {
 
                                         <HomeHelpCard
                                             icon="barbell-outline"
-
                                             title="Elegir rutina predeterminada"
-
                                             description="Explora las rutinas preparadas por la aplicación y guarda la que mejor se adapte a ti."
-
                                             onPress={() =>
                                                 router.push(
                                                     '/suggestions'
@@ -2006,15 +3695,15 @@ export default function HomeScreen() {
                                             description={
                                                 adviceLoading
                                                     ? 'Analizando tus registros...'
-
                                                     : homeAdvice
                                                         ? homeAdvice.description
-
                                                         : 'Registra entrenamientos para recibir recomendaciones personalizadas.'
                                             }
 
                                             onPress={() =>
-                                                setAdviceModalVisible(true)
+                                                setAdviceModalVisible(
+                                                    true
+                                                )
                                             }
                                         />
 
@@ -2029,7 +3718,6 @@ export default function HomeScreen() {
                                             description={
                                                 primaryRoutine
                                                     ? `Consulta los ejercicios de "${primaryRoutine.title}" y busca demostraciones para mejorar tu técnica.`
-
                                                     : 'Necesitas una rutina activa para utilizar esta función.'
                                             }
 
@@ -2037,6 +3725,7 @@ export default function HomeScreen() {
                                                 handleOpenTechnique
                                             }
                                         />
+
                                     </ScrollView>
                                 </View>
 
@@ -2180,7 +3869,7 @@ export default function HomeScreen() {
                         gap: 10,
 
                         paddingTop: 2,
-                        paddingBottom: 6,
+                        paddingBottom: 10,
 
                         backgroundColor:
                             COLORS.background,
@@ -4711,6 +6400,615 @@ export default function HomeScreen() {
                                 </Text>
                             </Pressable>
                         </View>
+                    </View>
+                </View>
+            </Modal>
+            {/* ===================================================== */}
+            {/* MODAL — EVOLUCIÓN DE CONSTANCIA                       */}
+            {/* ===================================================== */}
+
+            <Modal
+                visible={
+                    activityEvolutionVisible
+                }
+                transparent
+                animationType="fade"
+                onRequestClose={() =>
+                    setActivityEvolutionVisible(
+                        false
+                    )
+                }
+            >
+                <View
+                    style={{
+                        flex: 1,
+
+                        backgroundColor:
+                            'rgba(0,0,0,0.78)',
+
+                        justifyContent:
+                            'center',
+
+                        alignItems:
+                            'center',
+
+                        padding: 18,
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+                            maxWidth: 430,
+
+                            maxHeight: '88%',
+
+                            backgroundColor:
+                                '#101010',
+
+                            borderRadius: 24,
+
+                            borderWidth: 1,
+
+                            borderColor:
+                                '#343434',
+
+                            padding: 16,
+                        }}
+                    >
+                        {/* HEADER */}
+
+                        <View
+                            style={{
+                                flexDirection:
+                                    'row',
+
+                                alignItems:
+                                    'center',
+
+                                marginBottom: 12,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 44,
+                                    height: 44,
+
+                                    borderRadius: 22,
+
+                                    backgroundColor:
+                                        'rgba(198,255,0,0.08)',
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+
+                                    marginRight: 10,
+                                }}
+                            >
+                                <Ionicons
+                                    name="trending-up-outline"
+                                    size={23}
+                                    color={
+                                        COLORS.primary
+                                    }
+                                />
+                            </View>
+
+                            <View
+                                style={{
+                                    flex: 1,
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textLight,
+
+                                        fontSize: 17,
+
+                                        fontWeight:
+                                            '900',
+                                    }}
+                                >
+                                    Evolución de registros
+                                </Text>
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textMuted,
+
+                                        fontSize: 9,
+
+                                        marginTop: 2,
+                                    }}
+                                >
+                                    Índice semanal de constancia · 0 a 10
+                                </Text>
+                            </View>
+
+                            <Pressable
+                                onPress={() =>
+                                    setActivityEvolutionVisible(
+                                        false
+                                    )
+                                }
+                                style={{
+                                    width: 34,
+                                    height: 34,
+
+                                    borderRadius: 17,
+
+                                    backgroundColor:
+                                        '#1B1B1B',
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+                                }}
+                            >
+                                <Ionicons
+                                    name="close"
+                                    size={19}
+                                    color="#AAAAAA"
+                                />
+                            </Pressable>
+                        </View>
+
+
+                        {activityData?.totals
+                            .totalRecords ===
+                            0 ? (
+                            <View
+                                style={{
+                                    minHeight: 180,
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+                                }}
+                            >
+                                <Ionicons
+                                    name="analytics-outline"
+                                    size={34}
+                                    color="#666666"
+                                />
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textMuted,
+
+                                        fontSize: 11,
+
+                                        textAlign:
+                                            'center',
+
+                                        marginTop: 10,
+                                    }}
+                                >
+                                    Todavía no hay registros suficientes para mostrar tu evolución.
+                                </Text>
+                            </View>
+                        ) : (
+                            <>
+                                {/* GRÁFICO */}
+
+                                <View
+                                    style={{
+                                        width: '100%',
+
+                                        overflow:
+                                            'hidden',
+                                    }}
+                                    onLayout={(
+                                        event
+                                    ) =>
+                                        setActivityChartViewportWidth(
+                                            event
+                                                .nativeEvent
+                                                .layout.width
+                                        )
+                                    }
+                                >
+                                    {activityChartViewportWidth >
+                                        0 &&
+                                        activityHistory.length >
+                                        0 && (
+                                            <ScrollView
+                                                ref={
+                                                    activityChartScrollRef
+                                                }
+
+                                                horizontal
+
+                                                showsHorizontalScrollIndicator={
+                                                    false
+                                                }
+
+                                                contentContainerStyle={{
+                                                    paddingRight: 6,
+                                                }}
+
+                                                onContentSizeChange={() => {
+                                                    if (
+                                                        !activityEvolutionVisible ||
+                                                        activityChartAutoScrolledRef
+                                                            .current
+                                                    ) {
+                                                        return;
+                                                    }
+
+                                                    activityChartScrollRef
+                                                        .current
+                                                        ?.scrollToEnd({
+                                                            animated: true,
+                                                        });
+
+                                                    activityChartAutoScrolledRef
+                                                        .current = true;
+                                                }}
+                                            >
+                                                <LineChart
+                                                    data={{
+                                                        labels:
+                                                            activityHistory.map(
+                                                                (
+                                                                    week
+                                                                ) =>
+                                                                    formatActivityShortDate(
+                                                                        week.weekStart
+                                                                    )
+                                                            ),
+
+                                                        datasets:
+                                                            [
+                                                                /*
+                                                                 * DATOS REALES
+                                                                 */
+                                                                {
+                                                                    data:
+                                                                        activityHistory.map(
+                                                                            (
+                                                                                week
+                                                                            ) =>
+                                                                                week.consistencyScore
+                                                                        ),
+
+                                                                    color:
+                                                                        () =>
+                                                                            COLORS.primary,
+
+                                                                    strokeWidth:
+                                                                        3,
+                                                                },
+
+                                                                /*
+                                                                 * Dataset invisible.
+                                                                 *
+                                                                 * Obliga al gráfico
+                                                                 * a mantener la
+                                                                 * escala hasta 10.
+                                                                 */
+                                                                {
+                                                                    data:
+                                                                        activityHistory.map(
+                                                                            () =>
+                                                                                10
+                                                                        ),
+
+                                                                    color:
+                                                                        () =>
+                                                                            'rgba(0,0,0,0)',
+
+                                                                    strokeWidth:
+                                                                        0,
+
+                                                                    withDots:
+                                                                        false,
+                                                                },
+                                                            ],
+                                                    }}
+
+                                                    width={
+                                                        activityChartWidth
+                                                    }
+
+                                                    height={
+                                                        220
+                                                    }
+
+                                                    fromZero
+
+                                                    segments={
+                                                        5
+                                                    }
+
+                                                    withShadow={
+                                                        false
+                                                    }
+
+                                                    chartConfig={{
+                                                        backgroundGradientFrom:
+                                                            '#151515',
+
+                                                        backgroundGradientTo:
+                                                            '#151515',
+
+                                                        decimalPlaces:
+                                                            0,
+
+                                                        color:
+                                                            (
+                                                                opacity =
+                                                                    1
+                                                            ) =>
+                                                                `rgba(255,255,255,${opacity})`,
+
+                                                        labelColor:
+                                                            (
+                                                                opacity =
+                                                                    1
+                                                            ) =>
+                                                                `rgba(175,175,175,${opacity})`,
+
+                                                        propsForDots:
+                                                        {
+                                                            r: '5',
+
+                                                            strokeWidth:
+                                                                '2',
+
+                                                            stroke:
+                                                                '#111111',
+                                                        },
+
+                                                        propsForBackgroundLines:
+                                                        {
+                                                            stroke:
+                                                                'rgba(255,255,255,0.08)',
+                                                        },
+                                                    }}
+
+                                                    onDataPointClick={({
+                                                        index,
+                                                    }) => {
+                                                        const week =
+                                                            activityHistory[
+                                                            index
+                                                            ];
+
+                                                        if (
+                                                            week
+                                                        ) {
+                                                            setSelectedActivityWeek(
+                                                                week
+                                                            );
+                                                        }
+                                                    }}
+
+                                                    getDotColor={(
+                                                        _value,
+                                                        index
+                                                    ) => {
+                                                        const week =
+                                                            activityHistory[
+                                                            index
+                                                            ];
+
+                                                        if (!week) {
+                                                            return COLORS.primary;
+                                                        }
+
+                                                        /*
+                                                         * Seleccionada:
+                                                         * blanco.
+                                                         */
+                                                        if (
+                                                            selectedActivityWeek
+                                                                ?.weekStart ===
+                                                            week.weekStart
+                                                        ) {
+                                                            return '#FFFFFF';
+                                                        }
+
+                                                        /*
+                                                         * Semana actual:
+                                                         * verde principal.
+                                                         */
+                                                        if (
+                                                            isCurrentActivityWeek(
+                                                                week
+                                                            )
+                                                        ) {
+                                                            return COLORS.primary;
+                                                        }
+
+                                                        /*
+                                                         * Históricas:
+                                                         * verde un poco más suave.
+                                                         */
+                                                        return '#84CC16';
+                                                    }}
+
+                                                    style={{
+                                                        borderRadius:
+                                                            18,
+
+                                                        marginLeft:
+                                                            -8,
+                                                    }}
+                                                />
+                                            </ScrollView>
+                                        )}
+                                </View>
+
+
+                                {/* DETALLE DEL PUNTO */}
+
+                                {selectedActivityWeek ? (
+                                    <View
+                                        style={{
+                                            backgroundColor:
+                                                '#181818',
+
+                                            borderRadius: 14,
+
+                                            borderWidth: 1,
+
+                                            borderColor:
+                                                'rgba(198,255,0,0.30)',
+
+                                            padding: 11,
+
+                                            marginTop: 10,
+                                        }}
+                                    >
+                                        <Text
+                                            style={{
+                                                color:
+                                                    COLORS.textLight,
+
+                                                fontSize: 11,
+
+                                                fontWeight:
+                                                    '900',
+                                            }}
+                                        >
+                                            Semana{' '}
+                                            {formatActivityShortDate(
+                                                selectedActivityWeek.weekStart
+                                            )}
+                                            {' - '}
+                                            {formatActivityShortDate(
+                                                selectedActivityWeek.weekEnd
+                                            )}
+                                        </Text>
+
+                                        <Text
+                                            style={{
+                                                color:
+                                                    COLORS.primary,
+
+                                                fontSize: 11,
+
+                                                fontWeight:
+                                                    '900',
+
+                                                marginTop: 6,
+                                            }}
+                                        >
+                                            Constancia:{' '}
+                                            {
+                                                selectedActivityWeek.consistencyScore
+                                            }
+                                            /10
+                                        </Text>
+
+                                        <Text
+                                            style={{
+                                                color:
+                                                    '#969696',
+
+                                                fontSize: 9,
+
+                                                lineHeight: 15,
+
+                                                marginTop: 5,
+                                            }}
+                                        >
+                                            {
+                                                selectedActivityWeek.activeDays
+                                            }{' '}
+                                            días activos ·{' '}
+                                            {
+                                                selectedActivityWeek.totalRecords
+                                            }{' '}
+                                            registros
+                                            {'\n'}
+                                            Rutinas{' '}
+                                            {
+                                                selectedActivityWeek.routineRecords
+                                            }
+                                            {' · '}
+                                            Ejercicios{' '}
+                                            {
+                                                selectedActivityWeek.exerciseRecords
+                                            }
+                                            {' · '}
+                                            Running{' '}
+                                            {
+                                                selectedActivityWeek.runningSessions
+                                            }
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <Text
+                                        style={{
+                                            color:
+                                                '#777777',
+
+                                            fontSize: 9,
+
+                                            textAlign:
+                                                'center',
+
+                                            marginTop: 8,
+                                        }}
+                                    >
+                                        Toca un punto del gráfico para ver el detalle de esa semana.
+                                    </Text>
+                                )}
+                            </>
+                        )}
+
+
+                        {/* CERRAR */}
+
+                        <Pressable
+                            onPress={() =>
+                                setActivityEvolutionVisible(
+                                    false
+                                )
+                            }
+                            style={({ pressed }) => ({
+                                height: 44,
+
+                                borderRadius: 14,
+
+                                marginTop: 14,
+
+                                backgroundColor:
+                                    pressed
+                                        ? '#B4E800'
+                                        : COLORS.primary,
+
+                                alignItems:
+                                    'center',
+
+                                justifyContent:
+                                    'center',
+                            })}
+                        >
+                            <Text
+                                style={{
+                                    color: '#111111',
+
+                                    fontSize: 11,
+
+                                    fontWeight:
+                                        '900',
+                                }}
+                            >
+                                Volver
+                            </Text>
+                        </Pressable>
                     </View>
                 </View>
             </Modal>

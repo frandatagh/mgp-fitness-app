@@ -292,10 +292,10 @@ export default function AppHeader({
                                         borderWidth: 2,
                                         borderColor: '#444444',
 
-                                        paddingHorizontal: 9,
+                                        paddingHorizontal: 4,
                                         paddingVertical: 2,
 
-                                        minWidth: 54,
+                                        minWidth: 52,
                                         minHeight: 20,
 
                                         flexDirection: 'row',

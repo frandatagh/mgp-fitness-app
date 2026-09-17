@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Image, Modal, Pressable, ScrollView, Text, View, Animated } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, Text, View, Animated, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ type AppHeaderProps = {
     profileBadge?: {
         text: string;
         showStar?: boolean;
+        loading?: boolean;
     } | null;
 };
 
@@ -291,12 +292,11 @@ export default function AppHeader({
                                         borderWidth: 2,
                                         borderColor: '#444444',
 
-                                        paddingHorizontal:
-                                            profileBadge.showStar
-                                                ? 9
-                                                : 11,
+                                        paddingHorizontal: 9,
+                                        paddingVertical: 2,
 
-                                        paddingVertical: 1,
+                                        minWidth: 54,
+                                        minHeight: 20,
 
                                         flexDirection: 'row',
                                         alignItems: 'center',
@@ -305,30 +305,40 @@ export default function AppHeader({
                                         maxWidth: 120,
                                     }}
                                 >
-                                    <Text
-                                        numberOfLines={1}
-                                        style={{
-                                            color: '#111111',
-                                            fontSize:
-                                                profileBadge.showStar
-                                                    ? 12
-                                                    : 10,
-
-                                            fontWeight: '900',
-                                        }}
-                                    >
-                                        {profileBadge.text}
-                                    </Text>
-
-                                    {profileBadge.showStar && (
-                                        <Ionicons
-                                            name="star"
-                                            size={12}
+                                    {profileBadge.loading ? (
+                                        <ActivityIndicator
+                                            size={10}
                                             color="#111111"
-                                            style={{
-                                                marginLeft: 3,
-                                            }}
                                         />
+                                    ) : (
+                                        <>
+                                            <Text
+                                                numberOfLines={1}
+                                                style={{
+                                                    color: '#111111',
+
+                                                    fontSize:
+                                                        profileBadge.showStar
+                                                            ? 12
+                                                            : 10,
+
+                                                    fontWeight: '900',
+                                                }}
+                                            >
+                                                {profileBadge.text}
+                                            </Text>
+
+                                            {profileBadge.showStar && (
+                                                <Ionicons
+                                                    name="star"
+                                                    size={12}
+                                                    color="#111111"
+                                                    style={{
+                                                        marginLeft: 3,
+                                                    }}
+                                                />
+                                            )}
+                                        </>
                                     )}
                                 </View>
                             ) : profileGreeting ? (
@@ -336,12 +346,18 @@ export default function AppHeader({
                                     style={{
                                         marginTop: -5,
                                         right: -10,
-                                        backgroundColor: COLORS.primary,
+
+                                        backgroundColor:
+                                            COLORS.primary,
+
                                         borderRadius: 999,
+
                                         borderWidth: 2,
                                         borderColor: '#444444',
+
                                         paddingHorizontal: 7,
                                         paddingVertical: 1,
+
                                         maxWidth: 95,
                                     }}
                                 >

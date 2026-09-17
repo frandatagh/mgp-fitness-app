@@ -644,6 +644,16 @@ export default function HomeScreen() {
     const [profileData, setProfileData] = useState<MyProfileResponse | null>(null);
     const [statsData, setStatsData] = useState<MyStatisticsResponse | null>(null);
 
+    const [
+        homeStatsLoading,
+        setHomeStatsLoading,
+    ] = useState(true);
+
+    const [
+        homeStatsError,
+        setHomeStatsError,
+    ] = useState(false);
+
     const [createRoutineModalVisible, setCreateRoutineModalVisible] = useState(false);
 
     const [
@@ -683,6 +693,39 @@ export default function HomeScreen() {
 
     const homeProfileBadge =
         useMemo(() => {
+            /*
+             * ===================================
+             * TODAVÍA CARGANDO
+             * ===================================
+             */
+
+            if (homeStatsLoading) {
+                return {
+                    text: '',
+                    showStar: false,
+                    loading: true,
+                };
+            }
+
+            /*
+             * ===================================
+             * ERROR DE RED / BACKEND
+             * ===================================
+             *
+             * No mostramos "Entrena ahora!"
+             * porque no sabemos si realmente
+             * el usuario no tiene registros.
+             */
+
+            if (homeStatsError) {
+                return {
+                    text: '--',
+                    showStar: false,
+                    loading: false,
+                };
+            }
+
+
             const weeklyAverage =
                 statsData
                     ?.performance
@@ -703,17 +746,13 @@ export default function HomeScreen() {
 
 
             /*
-             * ===================================
-             * 1 — PRIORIDAD: SEMANA ACTUAL
-             * ===================================
+             * 1 — SEMANA
              */
 
             if (
                 weeklyAverage != null &&
                 Number.isFinite(
-                    Number(
-                        weeklyAverage
-                    )
+                    Number(weeklyAverage)
                 )
             ) {
                 return {
@@ -723,22 +762,19 @@ export default function HomeScreen() {
                         ).toFixed(1),
 
                     showStar: true,
+                    loading: false,
                 };
             }
 
 
             /*
-             * ===================================
-             * 2 — SEGUNDA OPCIÓN: MES ACTUAL
-             * ===================================
+             * 2 — MES
              */
 
             if (
                 monthlyAverage != null &&
                 Number.isFinite(
-                    Number(
-                        monthlyAverage
-                    )
+                    Number(monthlyAverage)
                 )
             ) {
                 return {
@@ -748,22 +784,19 @@ export default function HomeScreen() {
                         ).toFixed(1),
 
                     showStar: true,
+                    loading: false,
                 };
             }
 
 
             /*
-             * ===================================
-             * 3 — ÚLTIMA VALORACIÓN HISTÓRICA
-             * ===================================
+             * 3 — ÚLTIMA VALORACIÓN
              */
 
             if (
                 latestAverage != null &&
                 Number.isFinite(
-                    Number(
-                        latestAverage
-                    )
+                    Number(latestAverage)
                 )
             ) {
                 return {
@@ -773,23 +806,30 @@ export default function HomeScreen() {
                         ).toFixed(1),
 
                     showStar: true,
+                    loading: false,
                 };
             }
 
 
             /*
-             * ===================================
-             * 4 — USUARIO SIN VALORACIONES
-             * ===================================
+             * 4 — AHORA SÍ:
+             *
+             * La consulta terminó correctamente
+             * y realmente no encontramos
+             * ninguna valoración.
              */
 
             return {
-                text:
-                    'Entrena ahora!',
-
+                text: 'Entrena ahora!',
                 showStar: false,
+                loading: false,
             };
-        }, [statsData]);
+
+        }, [
+            statsData,
+            homeStatsLoading,
+            homeStatsError,
+        ]);
 
     const [
         activeHomeTab,
@@ -869,32 +909,71 @@ export default function HomeScreen() {
     ] = useState<string | null>(null);
 
     useEffect(() => {
-        const loadHomeProfileAndStats = async () => {
-            try {
-                if (!isAuthenticated) {
-                    setProfileData(null);
-                    setStatsData(null);
-                    setProfileImageUrl(null);
-                    setProfileDisplayName(null);
-                    return;
+        const loadHomeProfileAndStats =
+            async () => {
+                try {
+                    if (!isAuthenticated) {
+                        setProfileData(null);
+                        setStatsData(null);
+                        setProfileImageUrl(null);
+                        setProfileDisplayName(null);
+
+                        setHomeStatsLoading(false);
+                        setHomeStatsError(false);
+
+                        return;
+                    }
+
+                    /*
+                     * IMPORTANTE:
+                     * todavía NO sabemos si
+                     * el usuario tiene estadísticas.
+                     */
+                    setHomeStatsLoading(true);
+                    setHomeStatsError(false);
+
+                    const [profile, stats] =
+                        await Promise.all([
+                            getMyProfile(),
+                            getMyStatistics(),
+                        ]);
+
+                    setProfileData(profile);
+                    setStatsData(stats);
+
+                    setProfileImageUrl(
+                        profile.profile
+                            .profileImageUrl
+                    );
+
+                    setProfileDisplayName(
+                        profile.user.name ??
+                        profile.user.email
+                    );
+
+                } catch (error) {
+                    console.log(
+                        'Error cargando perfil/estadísticas en Home:',
+                        error
+                    );
+
+                    /*
+                     * Un error de conexión NO significa
+                     * que el usuario no tenga registros.
+                     */
+                    setHomeStatsError(true);
+
+                } finally {
+                    /*
+                     * Recién acá sabemos que
+                     * terminó el intento de carga.
+                     */
+                    setHomeStatsLoading(false);
                 }
+            };
 
-                const [profile, stats] = await Promise.all([
-                    getMyProfile(),
-                    getMyStatistics(),
-                ]);
+        void loadHomeProfileAndStats();
 
-                setProfileData(profile);
-                setStatsData(stats);
-
-                setProfileImageUrl(profile.profile.profileImageUrl);
-                setProfileDisplayName(profile.user.name ?? profile.user.email);
-            } catch (error) {
-                console.log('Error cargando perfil/estadísticas en Home:', error);
-            }
-        };
-
-        loadHomeProfileAndStats();
     }, [isAuthenticated]);
 
 
@@ -1272,7 +1351,7 @@ export default function HomeScreen() {
                 {/* TABS SUPERIORES */}
                 <View
                     style={{
-                        marginTop: 1,
+                        marginTop: 2,
                         marginBottom: 7,
 
                         position: 'relative',
@@ -1334,12 +1413,12 @@ export default function HomeScreen() {
                                                         : '#777777',
 
                                                 fontSize:
-                                                    12,
+                                                    13,
 
                                                 fontWeight:
                                                     active
-                                                        ? '900'
-                                                        : '700',
+                                                        ? '600'
+                                                        : '500',
                                             }}
                                         >
                                             {label}

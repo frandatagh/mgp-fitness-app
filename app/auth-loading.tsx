@@ -90,8 +90,8 @@ export default function AuthLoadingScreen() {
             <Image
                 source={require('../assets/img/icontwist.png')}
                 style={{
-                    width: 190,
-                    height: 110,
+                    width: 240,
+                    height: 160,
                     marginBottom: 24,
                 }}
                 resizeMode="contain"

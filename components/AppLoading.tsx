@@ -14,7 +14,7 @@ export default function AppLoading({ text = 'Cargando...' }: AppLoadingProps) {
         >
             <Image
                 source={require('../assets/img/iconhome.png')}
-                style={{ width: 130, height: 130, marginBottom: 18 }}
+                style={{ width: 150, height: 150, marginBottom: 1 }}
                 resizeMode="contain"
             />
 

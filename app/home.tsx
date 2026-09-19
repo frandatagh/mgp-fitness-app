@@ -1,5 +1,5 @@
 // app/home.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, View, Text, Pressable, ScrollView, Image, Modal, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
@@ -1166,6 +1166,12 @@ export default function HomeScreen() {
 
 
     /*
+* Evita que varios eventos del pager
+* disparen la misma petición al mismo tiempo.
+*/
+    const activityRequestInFlightRef =
+        useRef(false);
+    /*
      * Controlamos si Semana y Mes
      * ya hicieron su animación.
      */
@@ -1193,24 +1199,46 @@ export default function HomeScreen() {
             )
         ).current;
 
-    useEffect(() => {
-        /*
-         * La pestaña 1 es
-         * Actividad & Ayuda.
-         */
-        if (
-            !isAuthenticated ||
-            activeHomeTab !== 1 ||
-            activityLoadedRef.current
-        ) {
-            return;
-        }
-
-        let cancelled = false;
-
-        const loadActivity =
+    const loadActivityOnce =
+        useCallback(
             async () => {
+                /*
+                 * No autenticado:
+                 * no hacemos nada.
+                 */
+                if (!isAuthenticated) {
+                    return;
+                }
+
+
+                /*
+                 * Ya tenemos los datos:
+                 * no repetimos petición.
+                 */
+                if (
+                    activityLoadedRef
+                        .current
+                ) {
+                    return;
+                }
+
+
+                /*
+                 * Ya existe una petición
+                 * ejecutándose.
+                 */
+                if (
+                    activityRequestInFlightRef
+                        .current
+                ) {
+                    return;
+                }
+
+
                 try {
+                    activityRequestInFlightRef
+                        .current = true;
+
                     setActivityLoading(
                         true
                     );
@@ -1219,29 +1247,28 @@ export default function HomeScreen() {
                         null
                     );
 
+
                     const data =
                         await getTrainingActivity();
 
-                    if (cancelled) {
-                        return;
-                    }
 
+                    /*
+                     * Guardamos primero
+                     * los datos.
+                     */
                     setActivityData(
                         data
                     );
 
+
                     /*
-                     * Solamente marcamos como
-                     * cargado si funcionó.
+                     * Y recién después
+                     * marcamos que ya cargó.
                      */
-                    activityLoadedRef.current =
-                        true;
+                    activityLoadedRef
+                        .current = true;
 
                 } catch (error) {
-                    if (cancelled) {
-                        return;
-                    }
-
                     console.error(
                         'Error cargando actividad:',
                         error
@@ -1252,23 +1279,30 @@ export default function HomeScreen() {
                     );
 
                 } finally {
-                    if (!cancelled) {
-                        setActivityLoading(
-                            false
-                        );
-                    }
+                    activityRequestInFlightRef
+                        .current = false;
+
+                    setActivityLoading(
+                        false
+                    );
                 }
-            };
+            },
+            [
+                isAuthenticated,
+            ]
+        );
+    useEffect(() => {
+        if (
+            activeHomeTab !== 1
+        ) {
+            return;
+        }
 
-        void loadActivity();
-
-        return () => {
-            cancelled = true;
-        };
+        void loadActivityOnce();
 
     }, [
         activeHomeTab,
-        isAuthenticated,
+        loadActivityOnce,
     ]);
 
     useEffect(() => {
@@ -1550,6 +1584,43 @@ export default function HomeScreen() {
         };
     }, [isAuthenticated]);
 
+    useEffect(() => {
+        if (isAuthenticated) {
+            return;
+        }
+
+        activityLoadedRef
+            .current = false;
+
+        activityRequestInFlightRef
+            .current = false;
+
+        activityAnimatedModesRef
+            .current = {
+            week: false,
+            month: false,
+        };
+
+        setActivityData(
+            null
+        );
+
+        setActivityError(
+            null
+        );
+
+        setActivityLoading(
+            false
+        );
+
+        setSelectedActivityDay(
+            null
+        );
+
+    }, [
+        isAuthenticated,
+    ]);
+
 
 
     const handleLogout = async () => {
@@ -1778,6 +1849,8 @@ export default function HomeScreen() {
         });
     }, [homePanelWidth]);
 
+
+
     const handleOpenTechnique =
         async () => {
             setTechniqueVisible(
@@ -1881,20 +1954,35 @@ export default function HomeScreen() {
         index: 0 | 1 | 2
     ) => {
         /*
-         * Guardamos qué pestaña queremos
-         * alcanzar programáticamente.
+         * Si el usuario eligió
+         * Actividad & Ayuda,
+         * comenzamos la carga YA.
+         *
+         * No esperamos que termine
+         * la animación horizontal.
          */
+        if (index === 1) {
+            void loadActivityOnce();
+        }
+
+
         homeTabTargetRef.current =
             index;
 
-        setActiveHomeTab(index);
+        setActiveHomeTab(
+            index
+        );
 
-        if (homePanelWidth <= 0) {
+
+        if (
+            homePanelWidth <= 0
+        ) {
             homeTabTargetRef.current =
                 null;
 
             return;
         }
+
 
         homePagerRef.current?.scrollTo({
             x:
@@ -1904,6 +1992,8 @@ export default function HomeScreen() {
             animated: true,
         });
     };
+
+
 
     return (
         <SafeAreaView
@@ -2151,9 +2241,56 @@ export default function HomeScreen() {
                                             },
                                         },
                                     ],
-
                                     {
-                                        useNativeDriver: false,
+                                        useNativeDriver:
+                                            false,
+
+                                        /*
+                                         * En móvil no dependemos
+                                         * solamente de
+                                         * onMomentumScrollEnd.
+                                         *
+                                         * En cuanto detectamos que
+                                         * el usuario se está acercando
+                                         * a la segunda página,
+                                         * comenzamos a cargar.
+                                         */
+                                        listener: (
+                                            event: any
+                                        ) => {
+                                            if (
+                                                homePanelWidth <=
+                                                0
+                                            ) {
+                                                return;
+                                            }
+
+                                            const x =
+                                                event.nativeEvent
+                                                    .contentOffset.x;
+
+                                            const pagePosition =
+                                                x /
+                                                homePanelWidth;
+
+
+                                            /*
+                                             * La página Actividad
+                                             * está en posición 1.
+                                             *
+                                             * Empezamos a cargar
+                                             * desde aproximadamente
+                                             * mitad del desplazamiento.
+                                             */
+                                            if (
+                                                pagePosition >=
+                                                0.55 &&
+                                                pagePosition <=
+                                                1.45
+                                            ) {
+                                                void loadActivityOnce();
+                                            }
+                                        },
                                     }
                                 )}
 
@@ -2178,6 +2315,17 @@ export default function HomeScreen() {
                                                 index
                                             )
                                         ) as 0 | 1 | 2;
+                                    /*
+* Refuerzo adicional.
+*
+* Si el pager confirma que
+* terminamos en Actividad,
+* garantizamos que exista
+* una carga.
+*/
+                                    if (safeIndex === 1) {
+                                        void loadActivityOnce();
+                                    }
 
                                     /*
                                      * Si nosotros ordenamos
@@ -2694,6 +2842,76 @@ export default function HomeScreen() {
                                                 </View>
                                             )}
 
+                                        {!activityLoading &&
+                                            !activityError &&
+                                            !activityData && (
+                                                <Pressable
+                                                    onPress={() =>
+                                                        void loadActivityOnce()
+                                                    }
+                                                    style={{
+                                                        minHeight: 120,
+
+                                                        backgroundColor:
+                                                            '#141414',
+
+                                                        borderRadius: 18,
+
+                                                        borderWidth: 1,
+
+                                                        borderColor:
+                                                            '#2F2F2F',
+
+                                                        alignItems:
+                                                            'center',
+
+                                                        justifyContent:
+                                                            'center',
+
+                                                        padding: 16,
+                                                    }}
+                                                >
+                                                    <Ionicons
+                                                        name="refresh-outline"
+                                                        size={22}
+                                                        color={
+                                                            COLORS.primary
+                                                        }
+                                                    />
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                COLORS.textLight,
+
+                                                            fontSize: 10,
+
+                                                            fontWeight:
+                                                                '900',
+
+                                                            marginTop: 7,
+                                                        }}
+                                                    >
+                                                        Cargar registros
+                                                    </Text>
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                COLORS.textMuted,
+
+                                                            fontSize: 8,
+
+                                                            marginTop: 4,
+
+                                                            textAlign:
+                                                                'center',
+                                                        }}
+                                                    >
+                                                        Toca aquí si tus registros todavía no aparecen.
+                                                    </Text>
+                                                </Pressable>
+                                            )}
 
                                         {/* CALENDARIO */}
 

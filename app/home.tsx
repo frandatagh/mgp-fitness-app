@@ -1044,10 +1044,6 @@ export default function HomeScreen() {
         ).current;
 
 
-    const homeTabTargetRef =
-        useRef<0 | 1 | 2 | null>(
-            null
-        );
 
     // PRECAUCIONES
 
@@ -1306,10 +1302,7 @@ export default function HomeScreen() {
     ]);
 
     useEffect(() => {
-        if (
-            activeHomeTab !== 1 ||
-            !activityData
-        ) {
+        if (!activityData) {
             return;
         }
 
@@ -1396,7 +1389,6 @@ export default function HomeScreen() {
         });
 
     }, [
-        activeHomeTab,
         activityData,
         activityCalendarMode,
     ]);
@@ -1954,36 +1946,26 @@ export default function HomeScreen() {
         index: 0 | 1 | 2
     ) => {
         /*
-         * Si el usuario eligió
-         * Actividad & Ayuda,
-         * comenzamos la carga YA.
-         *
-         * No esperamos que termine
-         * la animación horizontal.
+         * Si vamos a Actividad,
+         * comenzamos la carga inmediatamente.
          */
         if (index === 1) {
             void loadActivityOnce();
         }
 
+        /*
+         * La pestaña visual cambia
+         * inmediatamente.
+         */
+        setActiveHomeTab(index);
 
-        homeTabTargetRef.current =
-            index;
-
-        setActiveHomeTab(
-            index
-        );
-
-
-        if (
-            homePanelWidth <= 0
-        ) {
-            homeTabTargetRef.current =
-                null;
-
+        if (homePanelWidth <= 0) {
             return;
         }
 
-
+        /*
+         * Movemos físicamente el pager.
+         */
         homePagerRef.current?.scrollTo({
             x:
                 homePanelWidth *
@@ -2245,22 +2227,11 @@ export default function HomeScreen() {
                                         useNativeDriver:
                                             false,
 
-                                        /*
-                                         * En móvil no dependemos
-                                         * solamente de
-                                         * onMomentumScrollEnd.
-                                         *
-                                         * En cuanto detectamos que
-                                         * el usuario se está acercando
-                                         * a la segunda página,
-                                         * comenzamos a cargar.
-                                         */
                                         listener: (
                                             event: any
                                         ) => {
                                             if (
-                                                homePanelWidth <=
-                                                0
+                                                homePanelWidth <= 0
                                             ) {
                                                 return;
                                             }
@@ -2275,13 +2246,48 @@ export default function HomeScreen() {
 
 
                                             /*
-                                             * La página Actividad
-                                             * está en posición 1.
+                                             * =================================
+                                             * SINCRONIZAR PESTAÑA CON EL SWIPE
+                                             * =================================
                                              *
-                                             * Empezamos a cargar
-                                             * desde aproximadamente
-                                             * mitad del desplazamiento.
+                                             * 0 = Mis rutinas
+                                             * 1 = Actividad
+                                             * 2 = Notificaciones
                                              */
+
+                                            const nextIndex =
+                                                Math.max(
+                                                    0,
+                                                    Math.min(
+                                                        2,
+                                                        Math.round(
+                                                            pagePosition
+                                                        )
+                                                    )
+                                                ) as
+                                                | 0
+                                                | 1
+                                                | 2;
+
+
+                                            setActiveHomeTab(
+                                                (current) =>
+                                                    current ===
+                                                        nextIndex
+                                                        ? current
+                                                        : nextIndex
+                                            );
+
+
+                                            /*
+                                             * =================================
+                                             * PRECARGAR ACTIVIDAD
+                                             * =================================
+                                             *
+                                             * Cuando ya estamos acercándonos
+                                             * a página 1 empezamos la petición.
+                                             */
+
                                             if (
                                                 pagePosition >=
                                                 0.55 &&
@@ -2297,6 +2303,12 @@ export default function HomeScreen() {
                                 onMomentumScrollEnd={(
                                     event
                                 ) => {
+                                    if (
+                                        homePanelWidth <= 0
+                                    ) {
+                                        return;
+                                    }
+
                                     const x =
                                         event.nativeEvent
                                             .contentOffset.x;
@@ -2314,59 +2326,28 @@ export default function HomeScreen() {
                                                 2,
                                                 index
                                             )
-                                        ) as 0 | 1 | 2;
-                                    /*
-* Refuerzo adicional.
-*
-* Si el pager confirma que
-* terminamos en Actividad,
-* garantizamos que exista
-* una carga.
-*/
-                                    if (safeIndex === 1) {
-                                        void loadActivityOnce();
-                                    }
+                                        ) as
+                                        | 0
+                                        | 1
+                                        | 2;
+
 
                                     /*
-                                     * Si nosotros ordenamos
-                                     * un cambio de pestaña,
-                                     * ignoramos cualquier evento
-                                     * atrasado de la pestaña anterior.
-                                     */
-                                    const target =
-                                        homeTabTargetRef.current;
-
-                                    if (target !== null) {
-                                        const targetX =
-                                            homePanelWidth *
-                                            target;
-
-                                        const arrived =
-                                            Math.abs(
-                                                x -
-                                                targetX
-                                            ) < 4;
-
-                                        if (arrived) {
-                                            setActiveHomeTab(
-                                                target
-                                            );
-
-                                            homeTabTargetRef.current =
-                                                null;
-                                        }
-
-                                        return;
-                                    }
-
-                                    /*
-                                     * Si fue un swipe normal
-                                     * del usuario, actualizamos
-                                     * normalmente.
+                                     * Al terminar el movimiento
+                                     * hacemos una sincronización final.
                                      */
                                     setActiveHomeTab(
                                         safeIndex
                                     );
+
+
+                                    /*
+                                     * Refuerzo de carga para
+                                     * Actividad.
+                                     */
+                                    if (safeIndex === 1) {
+                                        void loadActivityOnce();
+                                    }
                                 }}
                             >
 

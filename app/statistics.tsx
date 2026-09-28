@@ -470,7 +470,7 @@ function StatisticsQuickButton({
                                 ? '#292929'
                                 : '#1B1B1B',
 
-                    borderWidth: 3,
+                    borderWidth: 2,
                     borderColor: COLORS.primary,
 
                     opacity:

@@ -1065,10 +1065,7 @@ export default function HomeScreen() {
         setAdviceLoading,
     ] = useState(false);
 
-    const [
-        adviceModalVisible,
-        setAdviceModalVisible,
-    ] = useState(false);
+
 
     // ===================================
     // ACTIVIDAD / CONSTANCIA
@@ -1729,8 +1726,6 @@ export default function HomeScreen() {
     const primaryRoutine =
         sortedRoutines[0] ?? null;
 
-    const homeAdvice =
-        adviceItems[0] ?? null;
 
     const activityVisibleDays =
         activityCalendarMode ===
@@ -2378,11 +2373,16 @@ export default function HomeScreen() {
                                         }
 
                                         contentContainerStyle={{
+                                            /*
+                                             * Permite que el contenido ocupe
+                                             * toda la altura disponible del panel.
+                                             */
+                                            flexGrow: 1,
+
                                             padding: 12,
 
                                             paddingBottom:
-                                                routines.length >
-                                                    0
+                                                routines.length > 0
                                                     ? 145
                                                     : 14,
                                         }}
@@ -2390,18 +2390,72 @@ export default function HomeScreen() {
                                         {/* CARGANDO */}
 
                                         {loadingRoutines && (
-                                            <Text
+                                            <View
                                                 style={{
-                                                    color:
-                                                        COLORS.textMuted,
+                                                    flex: 1,
 
-                                                    fontSize: 13,
+                                                    minHeight: 280,
 
-                                                    marginBottom: 8,
+                                                    alignItems:
+                                                        'center',
+
+                                                    justifyContent:
+                                                        'center',
                                                 }}
                                             >
-                                                Cargando tus rutinas...
-                                            </Text>
+                                                {/* CONTENEDOR DEL LOADER */}
+
+                                                <View
+                                                    style={{
+
+                                                        alignItems:
+                                                            'center',
+
+                                                        justifyContent:
+                                                            'center',
+                                                    }}
+                                                >
+                                                    <ActivityIndicator
+                                                        size="large"
+                                                        color={
+                                                            COLORS.primary
+                                                        }
+                                                    />
+                                                </View>
+
+
+                                                {/* TEXTO */}
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.textLight,
+
+                                                        fontSize: 12,
+
+                                                        fontWeight:
+                                                            '800',
+
+                                                        marginTop: 13,
+                                                    }}
+                                                >
+                                                    Cargando tus rutinas
+                                                </Text>
+
+
+                                                <Text
+                                                    style={{
+                                                        color:
+                                                            COLORS.textMuted,
+
+                                                        fontSize: 9,
+
+                                                        marginTop: 4,
+                                                    }}
+                                                >
+                                                    Preparando tu entrenamiento...
+                                                </Text>
+                                            </View>
                                         )}
 
                                         {/* ERROR */}
@@ -2449,75 +2503,74 @@ export default function HomeScreen() {
 
                                         {/* RUTINAS */}
 
-                                        {sortedRoutines.map(
-                                            (routine) => (
-                                                <RoutineCard
-                                                    key={
-                                                        routine.id
-                                                    }
+                                        {!loadingRoutines &&
+                                            sortedRoutines.map(
+                                                (routine) => (
+                                                    <RoutineCard
+                                                        key={routine.id}
 
-                                                    title={
-                                                        routine.title
-                                                    }
+                                                        title={
+                                                            routine.title
+                                                        }
 
-                                                    description={
-                                                        routine.notes
-                                                    }
+                                                        description={
+                                                            routine.notes
+                                                        }
 
-                                                    highlighted={
-                                                        routine.id ===
-                                                        latestRoutineId
-                                                    }
+                                                        highlighted={
+                                                            routine.id ===
+                                                            latestRoutineId
+                                                        }
 
-                                                    isRecent={
-                                                        routine.id ===
-                                                        latestRoutineId
-                                                    }
+                                                        isRecent={
+                                                            routine.id ===
+                                                            latestRoutineId
+                                                        }
 
-                                                    exercisesPreview={
-                                                        routine.exercises ??
-                                                        []
-                                                    }
+                                                        exercisesPreview={
+                                                            routine.exercises ??
+                                                            []
+                                                        }
 
-                                                    onOpen={() => {
-                                                        router.push({
-                                                            pathname:
-                                                                '/routine/[id]',
+                                                        onOpen={() => {
+                                                            router.push({
+                                                                pathname:
+                                                                    '/routine/[id]',
 
-                                                            params: {
-                                                                id:
-                                                                    routine.id,
-                                                            },
-                                                        });
-                                                    }}
+                                                                params: {
+                                                                    id:
+                                                                        routine.id,
+                                                                },
+                                                            });
+                                                        }}
 
-                                                    onEdit={() => {
-                                                        router.push({
-                                                            pathname:
-                                                                '/routine/edit/[id]',
+                                                        onEdit={() => {
+                                                            router.push({
+                                                                pathname:
+                                                                    '/routine/edit/[id]',
 
-                                                            params: {
-                                                                id:
-                                                                    routine.id,
-                                                            },
-                                                        });
-                                                    }}
+                                                                params: {
+                                                                    id:
+                                                                        routine.id,
+                                                                },
+                                                            });
+                                                        }}
 
-                                                    onDelete={() =>
-                                                        handleRequestDeleteRoutine(
-                                                            routine
-                                                        )
-                                                    }
+                                                        onDelete={() =>
+                                                            handleRequestDeleteRoutine(
+                                                                routine
+                                                            )
+                                                        }
 
-                                                    onShare={() => {
-                                                        console.log(
-                                                            'Compartir / exportar rutina',
-                                                            routine.id
-                                                        );
-                                                    }}
-                                                />
-                                            )
-                                        )}
+                                                        onShare={() => {
+                                                            console.log(
+                                                                'Compartir / exportar rutina',
+                                                                routine.id
+                                                            );
+                                                        }}
+                                                    />
+                                                )
+                                            )}
                                     </ScrollView>
 
                                     {/* PROGRESO SEMANAL */}
@@ -2642,7 +2695,7 @@ export default function HomeScreen() {
                                                 justifyContent:
                                                     'space-between',
 
-                                                marginBottom: 12,
+                                                marginBottom: 6,
                                             }}
                                         >
                                             <View
@@ -2653,29 +2706,18 @@ export default function HomeScreen() {
                                                 <Text
                                                     style={{
                                                         color:
-                                                            COLORS.textLight,
-
-                                                        fontSize: 16,
-
-                                                        fontWeight:
-                                                            '900',
-                                                    }}
-                                                >
-                                                    Registros de entrenamiento
-                                                </Text>
-
-                                                <Text
-                                                    style={{
-                                                        color:
                                                             COLORS.textMuted,
 
-                                                        fontSize: 9,
-
-                                                        marginTop: 2,
+                                                        fontSize: 13,
+                                                        marginLeft: 5,
+                                                        fontWeight:
+                                                            '700',
                                                     }}
                                                 >
-                                                    Registro visual de tu constancia
+                                                    Registros de entrenamientos
                                                 </Text>
+
+
                                             </View>
 
 
@@ -2717,7 +2759,7 @@ export default function HomeScreen() {
                                                     borderWidth: 1,
 
                                                     borderColor:
-                                                        'rgba(198,255,0,0.30)',
+                                                        'rgba(198,255,0,0.14)',
                                                 })}
                                             >
                                                 <Ionicons
@@ -2736,7 +2778,7 @@ export default function HomeScreen() {
                                                         fontSize: 9,
 
                                                         fontWeight:
-                                                            '800',
+                                                            '700',
 
                                                         marginLeft: 5,
                                                     }}
@@ -3822,6 +3864,357 @@ export default function HomeScreen() {
                                         </Pressable>
 
 
+
+                                        {/* ================================================= */}
+                                        {/* CONSEJOS PERSONALIZADOS — CONTENIDO FIJO          */}
+                                        {/* ================================================= */}
+
+                                        <View
+                                            style={{
+                                                marginTop: 18,
+                                            }}
+                                        >
+                                            {/* HEADER */}
+
+                                            <View
+                                                style={{
+                                                    flexDirection: 'row',
+
+                                                    alignItems: 'center',
+
+                                                    marginBottom: 10,
+                                                }}
+                                            >
+                                                <View
+                                                    style={{
+                                                        width: 36,
+                                                        height: 36,
+                                                        marginLeft: 5,
+
+                                                        borderRadius: 18,
+
+                                                        backgroundColor:
+                                                            'rgba(198,255,0,0.08)',
+
+                                                        borderWidth: 3,
+
+                                                        borderColor:
+                                                            'rgba(198,255,0,0.25)',
+
+                                                        alignItems: 'center',
+
+                                                        justifyContent: 'center',
+
+                                                        marginRight: 9,
+                                                    }}
+                                                >
+                                                    <Ionicons
+                                                        name="bulb-outline"
+                                                        size={23}
+                                                        color={COLORS.primary}
+                                                    />
+                                                </View>
+
+                                                <View
+                                                    style={{
+                                                        flex: 1,
+                                                    }}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                COLORS.textLight,
+
+                                                            fontSize: 15,
+
+                                                            fontWeight: '900',
+                                                        }}
+                                                    >
+                                                        Consejos para mejorar tu rendimiento
+                                                    </Text>
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                COLORS.textMuted,
+
+                                                            fontSize: 9,
+
+                                                            lineHeight: 13,
+
+                                                            marginTop: 2,
+                                                        }}
+                                                    >
+                                                        Recomendaciones basadas en tus registros y estadísticas.
+                                                    </Text>
+                                                </View>
+                                            </View>
+
+
+                                            {/* CARGANDO */}
+
+                                            {adviceLoading ? (
+                                                <View
+                                                    style={{
+                                                        minHeight: 90,
+
+                                                        backgroundColor:
+                                                            '#181818',
+
+                                                        borderRadius: 16,
+
+                                                        borderWidth: 1,
+
+                                                        borderColor:
+                                                            '#303030',
+
+                                                        alignItems:
+                                                            'center',
+
+                                                        justifyContent:
+                                                            'center',
+                                                    }}
+                                                >
+                                                    <ActivityIndicator
+                                                        size="small"
+                                                        color={COLORS.primary}
+                                                    />
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                COLORS.textMuted,
+
+                                                            fontSize: 9,
+
+                                                            marginTop: 7,
+                                                        }}
+                                                    >
+                                                        Analizando tus registros...
+                                                    </Text>
+                                                </View>
+
+                                            ) : adviceItems.length === 0 ? (
+
+                                                /* SIN CONSEJOS */
+
+                                                <View
+                                                    style={{
+                                                        backgroundColor:
+                                                            '#181818',
+
+                                                        borderRadius: 16,
+
+                                                        borderWidth: 1,
+
+                                                        borderColor:
+                                                            '#303030',
+
+                                                        padding: 16,
+
+                                                        alignItems:
+                                                            'center',
+                                                    }}
+                                                >
+                                                    <Ionicons
+                                                        name="analytics-outline"
+                                                        size={28}
+                                                        color="#666666"
+                                                    />
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                COLORS.textLight,
+
+                                                            fontSize: 12,
+
+                                                            fontWeight: '900',
+
+                                                            textAlign:
+                                                                'center',
+
+                                                            marginTop: 8,
+                                                        }}
+                                                    >
+                                                        Todavía no hay suficientes datos
+                                                    </Text>
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                COLORS.textMuted,
+
+                                                            fontSize: 9,
+
+                                                            lineHeight: 15,
+
+                                                            textAlign:
+                                                                'center',
+
+                                                            marginTop: 5,
+                                                        }}
+                                                    >
+                                                        Continúa registrando entrenamientos y valoraciones para recibir recomendaciones personalizadas.
+                                                    </Text>
+                                                </View>
+
+                                            ) : (
+
+                                                /* LISTA DE CONSEJOS */
+
+                                                <View>
+                                                    {adviceItems.map(
+                                                        (
+                                                            advice,
+                                                            index
+                                                        ) => (
+                                                            <View
+                                                                key={
+                                                                    `${advice.type ?? 'advice'}-${index}`
+                                                                }
+
+                                                                style={{
+                                                                    backgroundColor:
+                                                                        '#181818',
+
+                                                                    borderRadius: 16,
+
+                                                                    borderWidth: 1,
+
+                                                                    borderColor:
+                                                                        '#303030',
+
+                                                                    padding: 13,
+
+                                                                    marginBottom: 9,
+                                                                }}
+                                                            >
+                                                                {/* CABECERA */}
+
+                                                                <View
+                                                                    style={{
+                                                                        flexDirection:
+                                                                            'row',
+
+                                                                        alignItems:
+                                                                            'flex-start',
+                                                                    }}
+                                                                >
+                                                                    <View
+                                                                        style={{
+                                                                            width: 30,
+                                                                            height: 30,
+
+                                                                            borderRadius: 15,
+
+                                                                            backgroundColor:
+                                                                                '#181818',
+
+                                                                            borderWidth: 3,
+
+                                                                            borderColor:
+                                                                                'rgba(198,255,0,0.22)',
+
+                                                                            alignItems:
+                                                                                'center',
+
+                                                                            justifyContent:
+                                                                                'center',
+
+                                                                            marginRight: 9,
+                                                                        }}
+                                                                    >
+                                                                        <Text
+                                                                            style={{
+                                                                                color:
+                                                                                    COLORS.primary,
+
+                                                                                fontSize: 15,
+
+                                                                                fontWeight:
+                                                                                    '900',
+                                                                            }}
+                                                                        >
+                                                                            {index + 1}
+                                                                        </Text>
+                                                                    </View>
+
+
+                                                                    <View
+                                                                        style={{
+                                                                            flex: 1,
+
+                                                                            minWidth: 0,
+                                                                        }}
+                                                                    >
+                                                                        <Text
+                                                                            style={{
+                                                                                color:
+                                                                                    COLORS.textLight,
+
+                                                                                fontSize: 12,
+
+                                                                                fontWeight:
+                                                                                    '900',
+
+                                                                                lineHeight: 17,
+                                                                            }}
+                                                                        >
+                                                                            {advice.title}
+                                                                        </Text>
+
+                                                                        {advice.type && (
+                                                                            <Text
+                                                                                style={{
+                                                                                    color:
+                                                                                        COLORS.primary,
+
+                                                                                    fontSize: 8,
+
+                                                                                    fontWeight:
+                                                                                        '800',
+
+                                                                                    marginTop: 2,
+
+                                                                                    textTransform:
+                                                                                        'uppercase',
+
+                                                                                    letterSpacing:
+                                                                                        0.5,
+                                                                                }}
+                                                                            >
+                                                                                {advice.type}
+                                                                            </Text>
+                                                                        )}
+                                                                    </View>
+                                                                </View>
+
+
+                                                                {/* DESCRIPCIÓN */}
+
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            '#A7A7A7',
+
+                                                                        fontSize: 10,
+
+                                                                        lineHeight: 16,
+
+                                                                        marginTop: 8,
+                                                                    }}
+                                                                >
+                                                                    {advice.description}
+                                                                </Text>
+                                                            </View>
+                                                        )
+                                                    )}
+                                                </View>
+                                            )}
+                                        </View>
+
+
                                         {/* SEPARADOR */}
 
                                         <View
@@ -3834,23 +4227,6 @@ export default function HomeScreen() {
                                                 marginVertical: 18,
                                             }}
                                         />
-
-
-                                        <Text
-                                            style={{
-                                                color:
-                                                    COLORS.textLight,
-
-                                                fontSize: 14,
-
-                                                fontWeight:
-                                                    '900',
-
-                                                marginBottom: 10,
-                                            }}
-                                        >
-                                            Ayuda y recursos
-                                        </Text>
 
 
                                         {/* PRECAUCIONES */}
@@ -3881,30 +4257,7 @@ export default function HomeScreen() {
                                         />
 
 
-                                        {/* CONSEJOS */}
 
-                                        <HomeHelpCard
-                                            icon="sparkles-outline"
-
-                                            title={
-                                                homeAdvice?.title ??
-                                                'Consejos personalizados'
-                                            }
-
-                                            description={
-                                                adviceLoading
-                                                    ? 'Analizando tus registros...'
-                                                    : homeAdvice
-                                                        ? homeAdvice.description
-                                                        : 'Registra entrenamientos para recibir recomendaciones personalizadas.'
-                                            }
-
-                                            onPress={() =>
-                                                setAdviceModalVisible(
-                                                    true
-                                                )
-                                            }
-                                        />
 
 
                                         {/* MEJORAR TÉCNICA */}
@@ -4081,7 +4434,7 @@ export default function HomeScreen() {
                         onPress={() => setCreateRoutineModalVisible(true)}
                         style={({ pressed }) => ({
                             width: 78,
-                            height: 65,
+                            height: 60,
                             borderRadius: 16,
                             backgroundColor: 'rgb(26, 26, 26)',
                             alignItems: 'center',
@@ -4103,7 +4456,7 @@ export default function HomeScreen() {
                         onPress={() => router.push('/liverun')}
                         style={({ pressed }) => ({
                             flex: 1,
-                            height: 65,
+                            height: 60,
                             borderRadius: 18,
                             backgroundColor: pressed ? '#B8F000' : COLORS.primary,
                             alignItems: 'center',
@@ -4114,23 +4467,10 @@ export default function HomeScreen() {
                             borderColor: '#444444',
                         })}
                     >
-                        <Text
-                            style={{
-                                color: '#111111',
-                                fontSize: 16,
-                                fontWeight: '700',
-                                marginLeft: 2,
-                                marginRight: 2,
-                                marginTop: -2,
-                            }}
-                            numberOfLines={1}
-                        >
-                            RUNNING
-                        </Text>
 
                         <Ionicons
                             name="play"
-                            size={30}
+                            size={40}
                             color="rgb(26, 26, 26)"
                             style={{ marginTop: 2 }}
                         />
@@ -4141,7 +4481,7 @@ export default function HomeScreen() {
                         onPress={() => router.push('/statistics')}
                         style={({ pressed }) => ({
                             width: 78,
-                            height: 65,
+                            height: 60,
                             borderRadius: 16,
                             borderWidth: 3,
                             borderColor: '#444444',
@@ -6085,523 +6425,7 @@ export default function HomeScreen() {
                     </View>
                 </View>
             </Modal>
-            {/* ===================================================== */}
-            {/* MODAL — CONSEJOS PERSONALIZADOS                      */}
-            {/* ===================================================== */}
 
-            <Modal
-                visible={adviceModalVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() =>
-                    setAdviceModalVisible(false)
-                }
-            >
-                <View
-                    style={{
-                        flex: 1,
-
-                        backgroundColor:
-                            'rgba(0,0,0,0.78)',
-
-                        justifyContent:
-                            'center',
-
-                        alignItems:
-                            'center',
-
-                        padding: 20,
-                    }}
-                >
-                    <View
-                        style={{
-                            width: '100%',
-                            maxWidth: 410,
-
-                            maxHeight: '88%',
-
-                            backgroundColor:
-                                '#101010',
-
-                            borderRadius: 24,
-
-                            borderWidth: 1,
-
-                            borderColor:
-                                '#343434',
-
-                            padding: 18,
-                        }}
-                    >
-                        {/* HEADER */}
-
-                        <View
-                            style={{
-                                flexDirection:
-                                    'row',
-
-                                alignItems:
-                                    'center',
-
-                                marginBottom: 14,
-                            }}
-                        >
-                            <View
-                                style={{
-                                    width: 46,
-                                    height: 46,
-
-                                    borderRadius: 23,
-
-                                    backgroundColor:
-                                        'rgba(198,255,0,0.08)',
-
-                                    borderWidth: 1,
-
-                                    borderColor:
-                                        'rgba(198,255,0,0.30)',
-
-                                    alignItems:
-                                        'center',
-
-                                    justifyContent:
-                                        'center',
-                                }}
-                            >
-                                <Ionicons
-                                    name="sparkles-outline"
-                                    size={24}
-                                    color={
-                                        COLORS.primary
-                                    }
-                                />
-                            </View>
-
-                            <View
-                                style={{
-                                    flex: 1,
-                                    marginLeft: 11,
-                                }}
-                            >
-                                <Text
-                                    style={{
-                                        color:
-                                            COLORS.textLight,
-
-                                        fontSize: 18,
-
-                                        fontWeight:
-                                            '900',
-                                    }}
-                                >
-                                    Consejos personalizados
-                                </Text>
-
-                                <Text
-                                    style={{
-                                        color:
-                                            COLORS.textMuted,
-
-                                        fontSize: 10,
-
-                                        lineHeight: 14,
-
-                                        marginTop: 3,
-                                    }}
-                                >
-                                    Recomendaciones basadas en tus registros y estadísticas.
-                                </Text>
-                            </View>
-                        </View>
-
-
-                        {/* CONTENIDO */}
-
-                        {adviceLoading ? (
-                            <View
-                                style={{
-                                    paddingVertical: 40,
-
-                                    alignItems:
-                                        'center',
-
-                                    justifyContent:
-                                        'center',
-                                }}
-                            >
-                                <ActivityIndicator
-                                    size="small"
-                                    color={
-                                        COLORS.primary
-                                    }
-                                />
-
-                                <Text
-                                    style={{
-                                        color:
-                                            COLORS.textMuted,
-
-                                        fontSize: 10,
-
-                                        marginTop: 9,
-                                    }}
-                                >
-                                    Analizando tus registros...
-                                </Text>
-                            </View>
-                        ) : adviceItems.length === 0 ? (
-                            /*
-                             * SIN CONSEJOS
-                             */
-                            <View
-                                style={{
-                                    backgroundColor:
-                                        '#181818',
-
-                                    borderRadius: 16,
-
-                                    borderWidth: 1,
-
-                                    borderColor:
-                                        '#303030',
-
-                                    padding: 18,
-
-                                    alignItems:
-                                        'center',
-                                }}
-                            >
-                                <Ionicons
-                                    name="analytics-outline"
-                                    size={30}
-                                    color="#777777"
-                                />
-
-                                <Text
-                                    style={{
-                                        color:
-                                            COLORS.textLight,
-
-                                        fontSize: 13,
-
-                                        fontWeight:
-                                            '900',
-
-                                        textAlign:
-                                            'center',
-
-                                        marginTop: 9,
-                                    }}
-                                >
-                                    Todavía no hay suficientes datos
-                                </Text>
-
-                                <Text
-                                    style={{
-                                        color:
-                                            COLORS.textMuted,
-
-                                        fontSize: 10,
-
-                                        lineHeight: 16,
-
-                                        textAlign:
-                                            'center',
-
-                                        marginTop: 5,
-                                    }}
-                                >
-                                    Continúa registrando entrenamientos y valoraciones para recibir recomendaciones más personalizadas.
-                                </Text>
-                            </View>
-                        ) : (
-                            /*
-                             * LISTA DE CONSEJOS
-                             */
-                            <ScrollView
-                                showsVerticalScrollIndicator={
-                                    false
-                                }
-
-                                contentContainerStyle={{
-                                    paddingBottom: 4,
-                                }}
-                            >
-                                {adviceItems.map(
-                                    (
-                                        advice,
-                                        index
-                                    ) => (
-                                        <View
-                                            key={
-                                                `${advice.type ?? 'advice'}-${index}`
-                                            }
-                                            style={{
-                                                backgroundColor:
-                                                    '#181818',
-
-                                                borderRadius: 16,
-
-                                                borderWidth: 1,
-
-                                                borderColor:
-                                                    '#303030',
-
-                                                padding: 13,
-
-                                                marginBottom: 9,
-                                            }}
-                                        >
-                                            {/* CABECERA CONSEJO */}
-
-                                            <View
-                                                style={{
-                                                    flexDirection:
-                                                        'row',
-
-                                                    alignItems:
-                                                        'flex-start',
-                                                }}
-                                            >
-                                                <View
-                                                    style={{
-                                                        width: 30,
-                                                        height: 30,
-
-                                                        borderRadius: 15,
-
-                                                        backgroundColor:
-                                                            'rgba(198,255,0,0.08)',
-
-                                                        borderWidth: 1,
-
-                                                        borderColor:
-                                                            'rgba(198,255,0,0.22)',
-
-                                                        alignItems:
-                                                            'center',
-
-                                                        justifyContent:
-                                                            'center',
-
-                                                        marginRight: 9,
-                                                    }}
-                                                >
-                                                    <Text
-                                                        style={{
-                                                            color:
-                                                                COLORS.primary,
-
-                                                            fontSize: 10,
-
-                                                            fontWeight:
-                                                                '900',
-                                                        }}
-                                                    >
-                                                        {index + 1}
-                                                    </Text>
-                                                </View>
-
-                                                <View
-                                                    style={{
-                                                        flex: 1,
-                                                        minWidth: 0,
-                                                    }}
-                                                >
-                                                    <Text
-                                                        style={{
-                                                            color:
-                                                                COLORS.textLight,
-
-                                                            fontSize: 13,
-
-                                                            fontWeight:
-                                                                '900',
-
-                                                            lineHeight: 17,
-                                                        }}
-                                                    >
-                                                        {advice.title}
-                                                    </Text>
-
-                                                    {advice.type && (
-                                                        <Text
-                                                            style={{
-                                                                color:
-                                                                    COLORS.primary,
-
-                                                                fontSize: 8,
-
-                                                                fontWeight:
-                                                                    '800',
-
-                                                                marginTop: 3,
-
-                                                                textTransform:
-                                                                    'uppercase',
-
-                                                                letterSpacing:
-                                                                    0.5,
-                                                            }}
-                                                        >
-                                                            {advice.type}
-                                                        </Text>
-                                                    )}
-                                                </View>
-                                            </View>
-
-                                            {/* DESCRIPCIÓN */}
-
-                                            <Text
-                                                style={{
-                                                    color:
-                                                        '#A7A7A7',
-
-                                                    fontSize: 10,
-
-                                                    lineHeight: 16,
-
-                                                    marginTop: 9,
-                                                }}
-                                            >
-                                                {advice.description}
-                                            </Text>
-                                        </View>
-                                    )
-                                )}
-                            </ScrollView>
-                        )}
-
-
-                        {/* BOTONES INFERIORES */}
-
-                        <View
-                            style={{
-                                flexDirection: 'row',
-
-                                gap: 8,
-
-                                marginTop: 14,
-                            }}
-                        >
-                            {/* ESTADÍSTICAS */}
-
-                            <Pressable
-                                onPress={() => {
-                                    setAdviceModalVisible(
-                                        false
-                                    );
-
-                                    router.push(
-                                        '/statistics'
-                                    );
-                                }}
-                                style={({ pressed }) => ({
-                                    flex: 1.3,
-
-                                    minHeight: 46,
-
-                                    borderRadius: 14,
-
-                                    backgroundColor:
-                                        pressed
-                                            ? '#B4E800'
-                                            : COLORS.primary,
-
-                                    alignItems:
-                                        'center',
-
-                                    justifyContent:
-                                        'center',
-
-                                    paddingHorizontal:
-                                        8,
-                                })}
-                            >
-                                <Text
-                                    style={{
-                                        color:
-                                            '#111111',
-
-                                        fontSize: 10,
-
-                                        fontWeight:
-                                            '900',
-
-                                        textAlign:
-                                            'center',
-                                    }}
-                                >
-                                    Ver más estadísticas
-                                </Text>
-                            </Pressable>
-
-
-                            {/* VOLVER HOME */}
-
-                            <Pressable
-                                onPress={() => {
-                                    /*
-                                     * Primero ordenamos al pager
-                                     * volver realmente a página 0.
-                                     */
-                                    goToHomeTab(0);
-
-                                    /*
-                                     * Después cerramos el modal.
-                                     */
-                                    setAdviceModalVisible(
-                                        false
-                                    );
-                                }}
-                                style={({ pressed }) => ({
-                                    flex: 1,
-
-                                    minHeight: 46,
-
-                                    borderRadius: 14,
-
-                                    backgroundColor:
-                                        pressed
-                                            ? '#303030'
-                                            : '#222222',
-
-                                    borderWidth: 1,
-
-                                    borderColor:
-                                        '#343434',
-
-                                    alignItems:
-                                        'center',
-
-                                    justifyContent:
-                                        'center',
-
-                                    paddingHorizontal:
-                                        8,
-                                })}
-                            >
-                                <Text
-                                    style={{
-                                        color:
-                                            '#C7C7C7',
-
-                                        fontSize: 10,
-
-                                        fontWeight:
-                                            '800',
-
-                                        textAlign:
-                                            'center',
-                                    }}
-                                >
-                                    Volver al Home
-                                </Text>
-                            </Pressable>
-                        </View>
-                    </View>
-                </View>
-            </Modal>
             {/* ===================================================== */}
             {/* MODAL — EVOLUCIÓN DE CONSTANCIA                       */}
             {/* ===================================================== */}

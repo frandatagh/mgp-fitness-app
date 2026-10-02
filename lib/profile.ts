@@ -12,6 +12,10 @@ export type MainGoalMetric =
     | 'minutes'
     | 'avg_effort';
 
+export type MainGoalStartMode =
+    | 'current_period'
+    | 'from_zero';
+
 export type ProfileUser = {
     id: string;
     email: string;
@@ -39,6 +43,12 @@ export type UserProfile = {
 
     createdAt: string;
     updatedAt: string;
+
+    mainGoalStartMode?:
+    MainGoalStartMode | null;
+
+    mainGoalStartedAt?:
+    string | null;
 };
 
 export type MyProfileResponse = {
@@ -61,6 +71,12 @@ export type UpdateMyProfilePayload = {
     mainGoalPeriod?: MainGoalPeriod | null;
     mainGoalMetric?: MainGoalMetric | null;
     mainGoalTarget?: number | null;
+
+    mainGoalStartMode?:
+    MainGoalStartMode | null;
+
+    mainGoalStartedAt?:
+    string | null;
 };
 
 export async function getMyProfile(): Promise<MyProfileResponse> {
@@ -88,7 +104,9 @@ export async function getMyProfile(): Promise<MyProfileResponse> {
 
 export async function updateMyProfile(
     payload: UpdateMyProfilePayload
+
 ): Promise<MyProfileResponse & { message: string }> {
+
     const res = await apiFetch('/profile/me', {
         method: 'PATCH',
         headers: {
@@ -97,10 +115,14 @@ export async function updateMyProfile(
         body: JSON.stringify(payload),
     });
 
+
+
     const data = (await res.json().catch(() => null)) as
         | (MyProfileResponse & { message: string })
         | { message?: string }
         | null;
+
+
 
     if (!res.ok) {
         throw new Error(
@@ -108,6 +130,8 @@ export async function updateMyProfile(
             'No se pudo actualizar el perfil'
         );
     }
+
+
 
     return data as MyProfileResponse & { message: string };
 }

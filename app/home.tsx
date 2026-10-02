@@ -2701,14 +2701,25 @@ export default function HomeScreen() {
                                             <View
                                                 style={{
                                                     flex: 1,
+                                                    flexDirection: 'row',
+
+                                                    marginLeft: 5,
                                                 }}
                                             >
+                                                <Ionicons
+                                                    name="git-commit-outline"
+                                                    size={19}
+                                                    color={
+                                                        COLORS.primary
+                                                    }
+                                                />
                                                 <Text
                                                     style={{
                                                         color:
                                                             COLORS.textMuted,
 
                                                         fontSize: 13,
+
                                                         marginLeft: 5,
                                                         fontWeight:
                                                             '700',
@@ -3838,20 +3849,14 @@ export default function HomeScreen() {
                                                         : 1,
                                             })}
                                         >
-                                            <Ionicons
-                                                name="trending-up-outline"
-                                                size={17}
-                                                color={
-                                                    COLORS.primary
-                                                }
-                                            />
+
 
                                             <Text
                                                 style={{
                                                     color:
                                                         COLORS.textLight,
 
-                                                    fontSize: 10,
+                                                    fontSize: 11,
 
                                                     fontWeight:
                                                         '900',

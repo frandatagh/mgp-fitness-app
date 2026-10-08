@@ -4,7 +4,6 @@ import {
     Text,
     ScrollView,
     Pressable,
-    Image,
     TextInput,
     ActivityIndicator,
     Alert,
@@ -1028,12 +1027,12 @@ function getGoalStartDate(
 function ProfileNavButton({
     icon,
     onPress,
-    accent = false,
+    iconOffsetY = 0,
     disabled = false,
 }: {
     icon: keyof typeof Ionicons.glyphMap;
     onPress: () => void;
-    accent?: boolean;
+    iconOffsetY?: number;
     disabled?: boolean;
 }) {
     return (
@@ -1057,15 +1056,11 @@ function ProfileNavButton({
                         : '#242424',
 
                 borderWidth: 3,
-
-                borderColor:
-                    accent
-                        ? 'rgba(198,255,0,0.55)'
-                        : '#353535',
+                borderColor: '#353535',
 
                 opacity:
                     disabled
-                        ? 0.45
+                        ? 0.7
                         : pressed
                             ? 0.8
                             : 1,
@@ -1074,11 +1069,15 @@ function ProfileNavButton({
             <Ionicons
                 name={icon}
                 size={28}
-                color={
-                    accent
-                        ? COLORS.primary
-                        : '#FFFFFF'
-                }
+                color="#FFFFFF"
+                style={{
+                    transform: [
+                        {
+                            translateY:
+                                iconOffsetY,
+                        },
+                    ],
+                }}
             />
         </Pressable>
     );
@@ -1270,7 +1269,12 @@ export default function ProfileScreen() {
             ? `${profileData.profile.heightCm} cm`
             : 'No disponible';
 
-    const displayWeeklyKm = formatDistanceKm(statsData?.running.weeklyDistanceMeters);
+    const displayTotalHistoricalKm =
+        formatDistanceKm(
+            statsData
+                ?.summary
+                .totalDistanceMeters
+        );
 
 
     const mainGoal = profileData?.profile;
@@ -1316,17 +1320,6 @@ export default function ProfileScreen() {
             : 'No disponible';
 
     const goalAverageEffort = formatAverageEffort(statsData?.summary.avgEffort);
-
-    const initials = useMemo(() => {
-        return (
-            displayName
-                .split(' ')
-                .filter(Boolean)
-                .map(word => word[0]?.toUpperCase())
-                .join('')
-                .slice(0, 2) || 'U'
-        );
-    }, [displayName]);
 
     const profileTrainingPoints =
         useMemo<
@@ -1695,6 +1688,185 @@ export default function ProfileScreen() {
         null;
 
 
+    const profileHistoricalAverage =
+        useMemo(() => {
+            /*
+             * =====================================
+             * RUNNING
+             * =====================================
+             */
+
+            const runningRatings =
+                profileRunSessions
+                    .map(
+                        (
+                            session
+                        ) =>
+                            getProfileRunRating(
+                                session
+                            )
+                    )
+                    .filter(
+                        (
+                            rating
+                        ): rating is number =>
+                            rating != null &&
+                            Number.isFinite(
+                                rating
+                            )
+                    );
+
+
+            /*
+             * =====================================
+             * RUTINAS / EJERCICIOS
+             * =====================================
+             *
+             * Mantenemos la misma lógica
+             * que usamos en el gráfico:
+             *
+             * - Si el día tiene valoración
+             *   de rutina, usamos esa.
+             *
+             * - Si no tiene valoración de
+             *   rutina pero sí ejercicios,
+             *   usamos el promedio de esos
+             *   ejercicios.
+             */
+
+            const trainingRatings:
+                number[] = [];
+
+
+            profileHistoryDays.forEach(
+                (day) => {
+                    const routineRatings =
+                        day.records
+                            .filter(
+                                (
+                                    record
+                                ) =>
+                                    record.type ===
+                                    'routine' &&
+                                    record.rating !=
+                                    null
+                            )
+                            .map(
+                                (
+                                    record
+                                ) =>
+                                    Number(
+                                        record.rating
+                                    )
+                            )
+                            .filter(
+                                Number.isFinite
+                            );
+
+
+                    if (
+                        routineRatings.length >
+                        0
+                    ) {
+                        trainingRatings.push(
+                            ...routineRatings
+                        );
+
+                        return;
+                    }
+
+
+                    const exerciseRatings =
+                        day.records
+                            .filter(
+                                (
+                                    record
+                                ) =>
+                                    record.type ===
+                                    'exercise' &&
+                                    record.rating !=
+                                    null
+                            )
+                            .map(
+                                (
+                                    record
+                                ) =>
+                                    Number(
+                                        record.rating
+                                    )
+                            )
+                            .filter(
+                                Number.isFinite
+                            );
+
+
+                    if (
+                        exerciseRatings.length >
+                        0
+                    ) {
+                        const average =
+                            exerciseRatings.reduce(
+                                (
+                                    total,
+                                    value
+                                ) =>
+                                    total +
+                                    value,
+                                0
+                            ) /
+                            exerciseRatings.length;
+
+
+                        trainingRatings.push(
+                            average
+                        );
+                    }
+                }
+            );
+
+
+            /*
+             * =====================================
+             * PROMEDIO GENERAL
+             * =====================================
+             */
+
+            const allRatings = [
+                ...runningRatings,
+                ...trainingRatings,
+            ];
+
+
+            if (
+                allRatings.length ===
+                0
+            ) {
+                return null;
+            }
+
+
+            const average =
+                allRatings.reduce(
+                    (
+                        total,
+                        value
+                    ) =>
+                        total +
+                        value,
+                    0
+                ) /
+                allRatings.length;
+
+
+            return Number(
+                average.toFixed(1)
+            );
+
+        }, [
+            profileRunSessions,
+            profileHistoryDays,
+        ]);
+
     const profileActivityTotals =
         useMemo(() => {
             let routineRecords = 0;
@@ -1947,16 +2119,7 @@ export default function ProfileScreen() {
         );
     }
 
-    if (loading) {
-        return (
-            <SafeAreaView
-                className="flex-1 items-center justify-center"
-                style={{ backgroundColor: COLORS.background }}
-            >
-                <ActivityIndicator size="large" color={COLORS.primary} />
-            </SafeAreaView>
-        );
-    }
+
 
     if (screenError) {
         return (
@@ -2162,603 +2325,1143 @@ export default function ProfileScreen() {
     return (
         <SafeAreaView
             className="flex-1"
-            style={{ backgroundColor: COLORS.background }}
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
         >
-            <View
-                className="flex-1 px-4 pt-1 pb-2"
-                style={{ maxWidth: 800, alignSelf: 'center' }}
-            >
-                <AppHeader showProfile={false} />
+            {/* ========================================= */}
+            {/* CONTENEDOR GENERAL                       */}
+            {/* MISMA ESTRUCTURA QUE STATISTICS          */}
+            {/* ========================================= */}
 
-                {/* TÍTULO */}
-                <View className="self-start px-4 mb-3">
-                    <Text className="text-md text-gray-500">
-                        Perfil de usuario
-                    </Text>
+            <View
+                className="flex-1 w-full px-2"
+                style={{
+                    maxWidth: 800,
+                    alignSelf: 'center',
+                }}
+            >
+                {/* ===================================== */}
+                {/* HEADER                                */}
+                {/* ===================================== */}
+
+                <View className="px-2">
+                    <AppHeader
+                        showProfile={true}
+                        profileGreeting="Sigue así"
+                    />
                 </View>
 
-                {/* PANEL PRINCIPAL */}
-                <View
-                    className="flex-1 rounded-3xl px-3 py-4"
-                    style={{ borderWidth: 2, borderColor: COLORS.primary }}
+
+                {/* ===================================== */}
+                {/* TÍTULO                                */}
+                {/* ===================================== */}
+
+                <Text
+                    className="ml-5 pl-1 text-md text-gray-500"
                 >
+                    Perfil de usuario
+                </Text>
+
+
+                {/* ===================================== */}
+                {/* PANEL PRINCIPAL                       */}
+                {/* ===================================== */}
+
+                <View
+                    style={{
+                        borderWidth: 2,
+
+                        borderColor:
+                            COLORS.primary,
+
+                        borderRadius: 22,
+
+                        backgroundColor:
+                            '#101010',
+
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        flex: 1,
+
+                        overflow: 'hidden',
+                    }}
+                >
+                    {/* ================================= */}
+                    {/* SCROLL SIEMPRE PRESENTE           */}
+                    {/* ================================= */}
+
                     <ScrollView
-                        showsVerticalScrollIndicator={false}
+                        showsVerticalScrollIndicator={
+                            false
+                        }
+
                         horizontal={false}
-                        contentContainerStyle={{ paddingHorizontal: 8 }}
+
+                        contentContainerStyle={{
+                            padding: 18,
+
+                            paddingBottom:
+                                loading
+                                    ? 18
+                                    : 100,
+
+                            /*
+                             * Fundamental para que
+                             * el loader pueda ocupar
+                             * toda la altura interior.
+                             */
+                            flexGrow: 1,
+                        }}
                     >
-                        {/* NOTIFICACIÓN PERFIL VACÍO */}
-                        {showEmptyProfileNotice && (
+                        {loading ? (
+
+                            /* ========================= */
+                            /* LOADING                   */
+                            /* ========================= */
+
                             <View
-                                className="rounded-2xl px-4 py-3 mb-4"
                                 style={{
-                                    backgroundColor: '#1A1A1A',
-                                    borderWidth: 1,
-                                    borderColor: '#2F2F2F',
+                                    flex: 1,
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+
+                                    minHeight: 250,
                                 }}
                             >
-                                <View className="flex-row items-start justify-between">
-                                    <Text
-                                        className="text-[13px] leading-5 flex-1 pr-3"
-                                        style={{ color: COLORS.textLight }}
-                                    >
-                                        Actualiza los datos de tu perfil para ver mejores resultados.
-                                    </Text>
+                                <View
+                                    style={{
+                                        width: 62,
+                                        height: 62,
+                                        alignItems:
+                                            'center',
 
-                                    <Pressable onPress={() => setNoticeDismissed(true)}>
-                                        <Text
-                                            className="text-[16px] font-semibold"
-                                            style={{ color: COLORS.textMuted }}
-                                        >
-                                            ✕
-                                        </Text>
-                                    </Pressable>
+                                        justifyContent:
+                                            'center',
+                                    }}
+                                >
+                                    <ActivityIndicator
+                                        size="large"
+
+                                        color={
+                                            COLORS.primary
+                                        }
+                                    />
                                 </View>
+
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textLight,
+
+                                        fontSize: 13,
+
+                                        fontWeight:
+                                            '900',
+
+                                        marginTop: 5,
+                                    }}
+                                >
+                                    Cargando tu perfil
+                                </Text>
+
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textMuted,
+
+                                        fontSize: 10,
+
+                                        marginTop: 5,
+                                    }}
+                                >
+                                    Preparando tus datos y estadísticas...
+                                </Text>
                             </View>
-                        )}
 
-                        {/* DATOS DEL PERFIL */}
-                        <View className="mb-4">
-                            <View
-                                className="rounded-2xl px-2 py-2"
-                                style={{ backgroundColor: '#111111' }}
-                            >
-                                {/* Cabecera */}
-                                <View className="flex-row items-center mb-4">
-                                    <View className="mr-4 items-center">
-                                        <View
-                                            className="w-20 h-20 rounded-full items-center justify-center overflow-hidden"
-                                            style={{ backgroundColor: COLORS.primary, borderWidth: 4, borderColor: '#2F2F2F' }}
-                                        >
-                                            {profileData?.profile.profileImageUrl ? (
-                                                <Image
-                                                    source={{ uri: profileData.profile.profileImageUrl }}
-                                                    style={{ width: '100%', height: '100%' }}
-                                                    resizeMode="cover"
-                                                />
-                                            ) : (
-                                                <Text
-                                                    className="text-[20px] font-bold"
-                                                    style={{ color: '#111111' }}
-                                                >
-                                                    {initials}
-                                                </Text>
-                                            )}
-                                        </View>
+                        ) : (
 
-                                        {isEditingProfile && (
-                                            <Pressable
-                                                onPress={handlePickProfileImage}
-                                                disabled={uploadingPhoto}
-                                                className="mt-2 px-3 py-2 rounded-xl items-center justify-center"
-                                                style={{ backgroundColor: '#444444' }}
+                            /* ========================= */
+                            /* PERFIL CARGADO             */
+                            /* ========================= */
+
+                            <>
+                                {/* NOTIFICACIÓN PERFIL VACÍO */}
+                                {showEmptyProfileNotice && (
+                                    <View
+                                        className="rounded-2xl px-4 py-3 mb-4"
+                                        style={{
+                                            backgroundColor: '#1A1A1A',
+                                            borderWidth: 1,
+                                            borderColor: '#2F2F2F',
+                                        }}
+                                    >
+                                        <View className="flex-row items-start justify-between">
+                                            <Text
+                                                className="text-[13px] leading-5 flex-1 pr-3"
+                                                style={{ color: COLORS.textLight }}
                                             >
+                                                Actualiza los datos de tu perfil para ver mejores resultados.
+                                            </Text>
+
+                                            <Pressable onPress={() => setNoticeDismissed(true)}>
                                                 <Text
-                                                    className="text-[11px]"
-                                                    style={{ color: COLORS.textLight }}
+                                                    className="text-[16px] font-semibold"
+                                                    style={{ color: COLORS.textMuted }}
                                                 >
-                                                    {uploadingPhoto ? 'Subiendo...' : 'Cambiar foto'}
+                                                    ✕
                                                 </Text>
                                             </Pressable>
-                                        )}
+                                        </View>
                                     </View>
+                                )}
 
-                                    <View className="flex-1">
-                                        {isEditingProfile ? (
-                                            <TextInput
-                                                value={nameInput}
-                                                onChangeText={setNameInput}
-                                                placeholder="Tu nombre"
-                                                placeholderTextColor={COLORS.textMuted}
-                                                className="rounded-xl px-3 py-2 mb-2"
-                                                style={{
-                                                    backgroundColor: '#1A1A1A',
-                                                    color: COLORS.textLight,
-                                                    borderWidth: 1,
-                                                    borderColor: '#2F2F2F',
-                                                }}
-                                            />
-                                        ) : (
+                                {/* DATOS DEL PERFIL */}
+                                <View className="mb-4">
+                                    <View
+                                        className="rounded-2xl px-2 py-2"
+                                        style={{ backgroundColor: '#111111' }}
+                                    >
+                                        {/* Cabecera */}
+                                        <View className="flex-row items-center mb-4">
+                                            <View className="mr-4 items-center">
+                                                <View
+                                                    style={{
+                                                        marginRight: 16,
+                                                        alignItems: 'center',
+                                                    }}
+                                                >
+                                                    <Pressable
+                                                        onPress={
+                                                            handlePickProfileImage
+                                                        }
+                                                        disabled={
+                                                            uploadingPhoto
+                                                        }
+                                                        style={({ pressed }) => ({
+                                                            width: 82,
+                                                            height: 82,
+
+                                                            borderRadius: 41,
+
+                                                            backgroundColor:
+                                                                pressed
+                                                                    ? '#4A4A4A'
+                                                                    : '#343434',
+
+                                                            borderWidth: 3,
+
+                                                            borderColor:
+                                                                pressed
+                                                                    ? '#5A5A5A'
+                                                                    : '#474747',
+
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+
+                                                            paddingHorizontal: 8,
+
+                                                            opacity:
+                                                                uploadingPhoto
+                                                                    ? 0.65
+                                                                    : 1,
+                                                        })}
+                                                    >
+                                                        {uploadingPhoto ? (
+                                                            <ActivityIndicator
+                                                                size="small"
+                                                                color={
+                                                                    COLORS.textLight
+                                                                }
+                                                            />
+                                                        ) : (
+                                                            <>
+                                                                <Ionicons
+                                                                    name="camera-outline"
+                                                                    size={22}
+                                                                    color="#D0D0D0"
+                                                                />
+
+                                                                <Text
+                                                                    style={{
+                                                                        color: '#D0D0D0',
+
+                                                                        fontSize: 9,
+
+                                                                        fontWeight: '700',
+
+                                                                        textAlign: 'center',
+
+                                                                        lineHeight: 11,
+                                                                    }}
+                                                                >
+                                                                    Cambiar foto
+                                                                    {'\n'}
+                                                                    de perfil
+                                                                </Text>
+                                                            </>
+                                                        )}
+                                                    </Pressable>
+                                                </View>
+
+
+                                            </View>
+
+                                            <View className="flex-1">
+                                                {isEditingProfile ? (
+                                                    <TextInput
+                                                        value={nameInput}
+                                                        onChangeText={setNameInput}
+                                                        placeholder="Tu nombre"
+                                                        placeholderTextColor={COLORS.textMuted}
+                                                        className="rounded-xl px-3 py-2 mb-2"
+                                                        style={{
+                                                            backgroundColor: '#1A1A1A',
+                                                            color: COLORS.textLight,
+                                                            borderWidth: 1,
+                                                            borderColor: '#2F2F2F',
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <Text
+                                                        className="text-[16px] font-semibold"
+                                                        style={{ color: COLORS.textLight }}
+                                                    >
+                                                        {displayName}
+                                                    </Text>
+                                                )}
+
+                                                <Text
+                                                    className="text-[13px] mt-1"
+                                                    style={{ color: COLORS.textMuted }}
+                                                >
+                                                    {displayEmail}
+                                                </Text>
+
+                                                <Text
+                                                    className="text-[12px] font-medium mt-1"
+                                                    style={{ color: COLORS.textMuted }}
+                                                >
+                                                    fecha de creación: {displayCreatedAt}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Línea divisoria */}
+                                        <View
+                                            className="h-px mb-4"
+                                            style={{ backgroundColor: '#3A3A3A' }}
+                                        />
+
+                                        {/* Peso / Altura / Plan en horizontal */}
+                                        <View className="flex-row items-start mb-4">
+                                            <View className="flex-1 mr-2 min-w-0">
+                                                <Text
+                                                    className="text-[12px] font-semibold"
+                                                    style={{ color: COLORS.textMuted }}
+                                                >
+                                                    Peso
+                                                </Text>
+
+                                                {isEditingProfile ? (
+                                                    <TextInput
+                                                        value={weightInput}
+                                                        onChangeText={setWeightInput}
+                                                        keyboardType="numeric"
+                                                        placeholder="Ej: 80"
+                                                        placeholderTextColor={COLORS.textMuted}
+                                                        className="rounded-xl px-3 py-2 mt-2"
+                                                        style={{
+                                                            backgroundColor: '#1A1A1A',
+                                                            color: COLORS.textLight,
+                                                            borderWidth: 1,
+                                                            borderColor: '#2F2F2F',
+                                                            width: '100%',
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <Text
+                                                        className="text-[14px] mt-1"
+                                                        style={{ color: COLORS.textLight }}
+                                                    >
+                                                        {displayWeight}
+                                                    </Text>
+                                                )}
+                                            </View>
+
+                                            <View className="flex-1 mr-2 min-w-0">
+                                                <Text
+                                                    className="text-[12px] font-semibold"
+                                                    style={{ color: COLORS.textMuted }}
+                                                >
+                                                    Altura
+                                                </Text>
+
+                                                {isEditingProfile ? (
+                                                    <TextInput
+                                                        value={heightInput}
+                                                        onChangeText={setHeightInput}
+                                                        keyboardType="numeric"
+                                                        placeholder="Ej: 175"
+                                                        placeholderTextColor={COLORS.textMuted}
+                                                        className="rounded-xl px-3 py-2 mt-2"
+                                                        style={{
+                                                            backgroundColor: '#1A1A1A',
+                                                            color: COLORS.textLight,
+                                                            borderWidth: 1,
+                                                            borderColor: '#2F2F2F',
+                                                            width: '100%',
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <Text
+                                                        className="text-[14px] mt-1"
+                                                        style={{ color: COLORS.textLight }}
+                                                    >
+                                                        {displayHeight}
+                                                    </Text>
+                                                )}
+                                            </View>
+
+                                            <View className="flex-1 min-w-0">
+                                                <Text
+                                                    className="text-[12px] font-semibold"
+                                                    style={{ color: COLORS.textMuted }}
+                                                >
+                                                    Plan
+                                                </Text>
+                                                <Text
+                                                    className="text-[14px] mt-1"
+                                                    style={{ color: COLORS.textLight }}
+                                                    numberOfLines={1}
+                                                >
+                                                    {displayPlan}
+                                                </Text>
+                                            </View>
+                                        </View>
+
+                                        {/* Kilómetros reales */}
+                                        <View>
                                             <Text
-                                                className="text-[16px] font-semibold"
-                                                style={{ color: COLORS.textLight }}
+                                                className="text-[12px] font-semibold"
+                                                style={{ color: COLORS.textMuted }}
                                             >
-                                                {displayName}
+                                                Kilómetros recorridos total histórico
                                             </Text>
-                                        )}
 
-                                        <Text
-                                            className="text-[13px] mt-1"
-                                            style={{ color: COLORS.textMuted }}
-                                        >
-                                            {displayEmail}
-                                        </Text>
-
-                                        <Text
-                                            className="text-[12px] font-medium mt-1"
-                                            style={{ color: COLORS.textMuted }}
-                                        >
-                                            fecha de creación: {displayCreatedAt}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {/* Línea divisoria */}
-                                <View
-                                    className="h-px mb-4 mx-1"
-                                    style={{ backgroundColor: '#3A3A3A' }}
-                                />
-
-                                {/* Peso / Altura / Plan en horizontal */}
-                                <View className="flex-row items-start mb-4">
-                                    <View className="flex-1 mr-2 min-w-0">
-                                        <Text
-                                            className="text-[12px] font-semibold"
-                                            style={{ color: COLORS.textMuted }}
-                                        >
-                                            Peso
-                                        </Text>
-
-                                        {isEditingProfile ? (
-                                            <TextInput
-                                                value={weightInput}
-                                                onChangeText={setWeightInput}
-                                                keyboardType="numeric"
-                                                placeholder="Ej: 80"
-                                                placeholderTextColor={COLORS.textMuted}
-                                                className="rounded-xl px-3 py-2 mt-2"
-                                                style={{
-                                                    backgroundColor: '#1A1A1A',
-                                                    color: COLORS.textLight,
-                                                    borderWidth: 1,
-                                                    borderColor: '#2F2F2F',
-                                                    width: '100%',
-                                                }}
-                                            />
-                                        ) : (
                                             <Text
                                                 className="text-[14px] mt-1"
                                                 style={{ color: COLORS.textLight }}
                                             >
-                                                {displayWeight}
+                                                {displayTotalHistoricalKm}
                                             </Text>
-                                        )}
-                                    </View>
 
-                                    <View className="flex-1 mr-2 min-w-0">
-                                        <Text
-                                            className="text-[12px] font-semibold"
-                                            style={{ color: COLORS.textMuted }}
-                                        >
-                                            Altura
-                                        </Text>
-
-                                        {isEditingProfile ? (
-                                            <TextInput
-                                                value={heightInput}
-                                                onChangeText={setHeightInput}
-                                                keyboardType="numeric"
-                                                placeholder="Ej: 175"
-                                                placeholderTextColor={COLORS.textMuted}
-                                                className="rounded-xl px-3 py-2 mt-2"
+                                            <View
                                                 style={{
-                                                    backgroundColor: '#1A1A1A',
-                                                    color: COLORS.textLight,
-                                                    borderWidth: 1,
-                                                    borderColor: '#2F2F2F',
-                                                    width: '100%',
+                                                    marginTop: 12,
                                                 }}
-                                            />
-                                        ) : (
-                                            <Text
-                                                className="text-[14px] mt-1"
-                                                style={{ color: COLORS.textLight }}
                                             >
-                                                {displayHeight}
-                                            </Text>
-                                        )}
-                                    </View>
+                                                <Text
+                                                    className="text-[12px] font-semibold"
+                                                    style={{
+                                                        color:
+                                                            COLORS.textMuted,
+                                                    }}
+                                                >
+                                                    Promedio total histórico
+                                                </Text>
 
-                                    <View className="flex-1 min-w-0">
-                                        <Text
-                                            className="text-[12px] font-semibold"
-                                            style={{ color: COLORS.textMuted }}
-                                        >
-                                            Plan
-                                        </Text>
-                                        <Text
-                                            className="text-[14px] mt-1"
-                                            style={{ color: COLORS.textLight }}
-                                            numberOfLines={1}
-                                        >
-                                            {displayPlan}
-                                        </Text>
+                                                <Text
+                                                    className="text-[14px] mt-1"
+                                                    style={{
+                                                        color:
+                                                            COLORS.textLight,
+                                                    }}
+                                                >
+                                                    {profileHistoricalAverage !=
+                                                        null
+                                                        ? `${profileHistoricalAverage.toFixed(
+                                                            1
+                                                        )} puntos`
+                                                        : 'No disponible'}
+                                                </Text>
+
+                                                <Text
+                                                    style={{
+                                                        color: '#777777',
+
+                                                        fontSize: 11,
+
+                                                        marginTop: 2,
+                                                    }}
+                                                >
+                                                    Promedio general de running y entrenamientos valorados
+                                                </Text>
+                                            </View>
+
+                                            <View
+                                                className="h-px my-4"
+                                                style={{ backgroundColor: '#2F2F2F' }}
+                                            />
+
+
+                                            {/* ======================================= */}
+                                            {/* PROGRESO DEL OBJETIVO                   */}
+                                            {/* ======================================= */}
+
+                                            <View
+                                                style={{
+                                                    backgroundColor:
+                                                        '#181818',
+
+                                                    borderRadius: 16,
+
+                                                    borderWidth: 1,
+
+                                                    borderColor:
+                                                        profileGoalProgress
+                                                            ? 'rgba(198,255,0,0.26)'
+                                                            : '#303030',
+
+                                                    padding: 13,
+                                                }}
+                                            >
+                                                {profileGoalProgress ? (
+                                                    <>
+                                                        {/* CABECERA */}
+
+                                                        <View
+                                                            style={{
+                                                                flexDirection:
+                                                                    'row',
+
+                                                                alignItems:
+                                                                    'center',
+                                                            }}
+                                                        >
+                                                            <View
+                                                                style={{
+                                                                    width: 34,
+                                                                    height: 34,
+
+                                                                    borderRadius: 17,
+
+                                                                    backgroundColor:
+                                                                        'rgba(198,255,0,0.08)',
+
+                                                                    alignItems:
+                                                                        'center',
+
+                                                                    justifyContent:
+                                                                        'center',
+
+                                                                    marginRight: 9,
+                                                                }}
+                                                            >
+                                                                <Ionicons
+                                                                    name={
+                                                                        profileGoalProgress
+                                                                            .completed
+                                                                            ? 'checkmark'
+                                                                            : 'flag-outline'
+                                                                    }
+                                                                    size={18}
+                                                                    color={
+                                                                        COLORS.primary
+                                                                    }
+                                                                />
+                                                            </View>
+
+
+                                                            <View
+                                                                style={{
+                                                                    flex: 1,
+                                                                }}
+                                                            >
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            COLORS.textLight,
+
+                                                                        fontSize: 13,
+
+                                                                        fontWeight:
+                                                                            '900',
+                                                                    }}
+                                                                >
+                                                                    Progreso de tu objetivo
+                                                                </Text>
+
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            COLORS.textMuted,
+
+                                                                        fontSize: 9,
+
+                                                                        marginTop: 2,
+                                                                    }}
+                                                                >
+                                                                    {
+                                                                        profileGoalProgress
+                                                                            .contextLabel
+                                                                    }
+                                                                </Text>
+                                                            </View>
+
+
+                                                            {/* PORCENTAJE */}
+
+                                                            <View
+                                                                style={{
+                                                                    backgroundColor:
+                                                                        'rgba(198,255,0,0.10)',
+
+                                                                    borderRadius: 999,
+
+                                                                    paddingHorizontal:
+                                                                        9,
+
+                                                                    paddingVertical:
+                                                                        4,
+                                                                }}
+                                                            >
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            COLORS.primary,
+
+                                                                        fontSize: 11,
+
+                                                                        fontWeight:
+                                                                            '900',
+                                                                    }}
+                                                                >
+                                                                    {
+                                                                        profileGoalProgress
+                                                                            .progressPercent
+                                                                    }%
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+
+
+                                                        {/* ACTUAL / OBJETIVO */}
+
+                                                        <View
+                                                            style={{
+                                                                flexDirection:
+                                                                    'row',
+
+                                                                justifyContent:
+                                                                    'space-between',
+
+                                                                alignItems:
+                                                                    'flex-end',
+
+                                                                gap: 10,
+
+                                                                marginTop: 13,
+                                                            }}
+                                                        >
+                                                            <View
+                                                                style={{
+                                                                    flex: 1,
+                                                                }}
+                                                            >
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            '#777777',
+
+                                                                        fontSize: 8,
+
+                                                                        fontWeight:
+                                                                            '800',
+                                                                    }}
+                                                                >
+                                                                    REALIZADO
+                                                                </Text>
+
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            COLORS.textLight,
+
+                                                                        fontSize: 13,
+
+                                                                        fontWeight:
+                                                                            '900',
+
+                                                                        marginTop: 3,
+                                                                    }}
+                                                                >
+                                                                    {
+                                                                        profileGoalProgress
+                                                                            .currentLabel
+                                                                    }
+                                                                </Text>
+                                                            </View>
+
+
+                                                            <View
+                                                                style={{
+                                                                    flex: 1,
+
+                                                                    alignItems:
+                                                                        'flex-end',
+                                                                }}
+                                                            >
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            '#777777',
+
+                                                                        fontSize: 8,
+
+                                                                        fontWeight:
+                                                                            '800',
+                                                                    }}
+                                                                >
+                                                                    OBJETIVO
+                                                                </Text>
+
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            COLORS.primary,
+
+                                                                        fontSize: 12,
+
+                                                                        fontWeight:
+                                                                            '900',
+
+                                                                        marginTop: 3,
+
+                                                                        textAlign:
+                                                                            'right',
+                                                                    }}
+                                                                >
+                                                                    {
+                                                                        profileGoalProgress
+                                                                            .targetLabel
+                                                                    }
+                                                                </Text>
+                                                            </View>
+                                                        </View>
+
+
+                                                        {/* BARRA */}
+
+                                                        <View
+                                                            style={{
+                                                                height: 15,
+
+                                                                borderRadius: 999,
+
+                                                                backgroundColor:
+                                                                    '#282828',
+
+                                                                overflow:
+                                                                    'hidden',
+
+                                                                marginTop: 13,
+                                                                padding: 3,
+                                                            }}
+                                                        >
+                                                            <View
+                                                                style={{
+                                                                    height: '100%',
+                                                                    width:
+                                                                        `${profileGoalProgress.progressPercent}%`,
+
+                                                                    borderRadius:
+                                                                        999,
+
+                                                                    backgroundColor:
+                                                                        COLORS.primary,
+                                                                }}
+                                                            />
+                                                        </View>
+
+
+                                                        {/* FALTANTE */}
+
+                                                        <View
+                                                            style={{
+                                                                flexDirection:
+                                                                    'row',
+
+                                                                alignItems:
+                                                                    'center',
+
+                                                                marginTop: 9,
+                                                            }}
+                                                        >
+                                                            <Ionicons
+                                                                name={
+                                                                    profileGoalProgress
+                                                                        .completed
+                                                                        ? 'checkmark-circle'
+                                                                        : 'time-outline'
+                                                                }
+                                                                size={14}
+                                                                color={
+                                                                    profileGoalProgress
+                                                                        .completed
+                                                                        ? COLORS.primary
+                                                                        : '#888888'
+                                                                }
+                                                            />
+
+                                                            <Text
+                                                                style={{
+                                                                    flex: 1,
+
+                                                                    color:
+                                                                        profileGoalProgress
+                                                                            .completed
+                                                                            ? COLORS.primary
+                                                                            : '#A0A0A0',
+
+                                                                    fontSize: 9,
+
+                                                                    fontWeight:
+                                                                        profileGoalProgress
+                                                                            .completed
+                                                                            ? '900'
+                                                                            : '700',
+
+                                                                    marginLeft: 6,
+                                                                }}
+                                                            >
+                                                                {
+                                                                    profileGoalProgress
+                                                                        .remainingLabel
+                                                                }
+                                                            </Text>
+                                                        </View>
+                                                    </>
+                                                ) : (
+                                                    /*
+                                                     * Usuario sin objetivo.
+                                                     */
+                                                    <View
+                                                        style={{
+                                                            flexDirection:
+                                                                'row',
+
+                                                            alignItems:
+                                                                'center',
+                                                        }}
+                                                    >
+                                                        <Ionicons
+                                                            name="flag-outline"
+                                                            size={20}
+                                                            color="#666666"
+                                                        />
+
+                                                        <View
+                                                            style={{
+                                                                flex: 1,
+
+                                                                marginLeft: 9,
+                                                            }}
+                                                        >
+                                                            <Text
+                                                                style={{
+                                                                    color:
+                                                                        COLORS.textLight,
+
+                                                                    fontSize: 11,
+
+                                                                    fontWeight:
+                                                                        '900',
+                                                                }}
+                                                            >
+                                                                Progreso del objetivo
+                                                            </Text>
+
+                                                            <Text
+                                                                style={{
+                                                                    color:
+                                                                        COLORS.textMuted,
+
+                                                                    fontSize: 9,
+
+                                                                    lineHeight: 14,
+
+                                                                    marginTop: 2,
+                                                                }}
+                                                            >
+                                                                Definí un objetivo para comenzar a visualizar tu progreso.
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                            </View>
+                                        </View>
                                     </View>
                                 </View>
 
-                                {/* Kilómetros reales */}
-                                <View>
+                                {/* TU OBJETIVO */}
+                                <View className="mb-4">
                                     <Text
-                                        className="text-[12px] font-semibold"
-                                        style={{ color: COLORS.textMuted }}
+                                        className="text-[15px] font-semibold px-2 mb-1"
+                                        style={{ color: COLORS.accent }}
                                     >
-                                        Kilómetros recorridos esta semana
-                                    </Text>
-
-                                    <Text
-                                        className="text-[16px] font-semibold mt-1"
-                                        style={{ color: COLORS.textLight }}
-                                    >
-                                        {displayWeeklyKm}
+                                        Tu objetivo
                                     </Text>
 
                                     <View
-                                        className="h-px my-4 mx-1"
-                                        style={{ backgroundColor: '#2F2F2F' }}
-                                    />
+                                        className="rounded-2xl px-3 py-3"
+                                        style={{
+                                            backgroundColor: '#111111',
+                                            borderWidth: 1,
+                                            borderColor: '#2F2F2F',
+                                        }}
+                                    >
+                                        {hasMainGoal ? (
+                                            <>
+                                                <View
+                                                    style={{
+                                                        backgroundColor: '#1A1A1A',
+                                                        borderRadius: 18,
+                                                        padding: 14,
+                                                        borderWidth: 1,
+                                                        borderColor: 'rgba(198,255,0,0.25)',
+                                                    }}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            color: COLORS.textLight,
+                                                            fontSize: 15,
+                                                            fontWeight: '900',
+                                                            marginBottom: 4,
+                                                        }}
+                                                    >
+                                                        Objetivo principal
+                                                    </Text>
 
+                                                    <Text
+                                                        style={{
+                                                            color: COLORS.textMuted,
+                                                            fontSize: 12,
+                                                            lineHeight: 18,
+                                                            marginBottom: 10,
+                                                        }}
+                                                    >
+                                                        Este objetivo se usará para mostrar tu progreso en el Home.
+                                                    </Text>
 
-                                    {/* ======================================= */}
-                                    {/* PROGRESO DEL OBJETIVO                   */}
-                                    {/* ======================================= */}
+                                                    <GoalInfoRow
+                                                        label="Tipo de entrenamiento"
+                                                        value={`${goalTypeLabel} - ${goalPeriodLabel}`}
+                                                        accent
+                                                    />
+
+                                                    <GoalInfoRow
+                                                        label="Medición"
+                                                        value={goalMetricLabel}
+                                                    />
+
+                                                    <GoalInfoRow
+                                                        label="Objetivo"
+                                                        value={goalTargetLabel}
+                                                        accent
+                                                    />
+
+                                                    {mainGoal?.mainGoalType === 'running' ? (
+                                                        <>
+                                                            <GoalInfoRow
+                                                                label="Kilómetros recorridos"
+                                                                value={goalRunningDistance}
+                                                            />
+
+                                                            <GoalInfoRow
+                                                                label="Cantidad de entrenamientos"
+                                                                value={goalTrainingCount}
+                                                            />
+
+                                                            <GoalInfoRow
+                                                                label="Minutos de running"
+                                                                value={goalRunningMinutes}
+                                                            />
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <GoalInfoRow
+                                                                label="Entrenamientos registrados"
+                                                                value={goalTrainingCount}
+                                                            />
+
+                                                            <GoalInfoRow
+                                                                label="Promedio de esfuerzo"
+                                                                value={goalAverageEffort}
+                                                            />
+
+                                                            <GoalInfoRow
+                                                                label="Estado del objetivo"
+                                                                value="En seguimiento"
+                                                            />
+                                                        </>
+                                                    )}
+                                                </View>
+
+                                                <Pressable
+                                                    onPress={openGoalModal}
+                                                    className="px-4 py-3 rounded-xl items-center justify-center mt-3"
+                                                    style={{
+                                                        backgroundColor: '#444444',
+                                                    }}
+                                                >
+                                                    <Text
+                                                        className="text-[14px] font-semibold"
+                                                        style={{ color: COLORS.textLight }}
+                                                    >
+                                                        Editar objetivo
+                                                    </Text>
+                                                </Pressable>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <View
+                                                    style={{
+                                                        backgroundColor: '#1A1A1A',
+                                                        borderRadius: 18,
+                                                        padding: 14,
+                                                        borderWidth: 1,
+                                                        borderColor: '#2F2F2F',
+                                                    }}
+                                                >
+                                                    <Text
+                                                        style={{
+                                                            color: COLORS.textLight,
+                                                            fontSize: 15,
+                                                            fontWeight: '900',
+                                                            marginBottom: 6,
+                                                        }}
+                                                    >
+                                                        Todavía no definiste tu objetivo
+                                                    </Text>
+
+                                                    <Text
+                                                        style={{
+                                                            color: COLORS.textMuted,
+                                                            fontSize: 12,
+                                                            lineHeight: 18,
+                                                        }}
+                                                    >
+                                                        Podés elegir un objetivo de running o rutinas, semanal o mensual.
+                                                        Luego se mostrará tu progreso en esta pantalla y en el Home.
+                                                    </Text>
+                                                </View>
+
+                                                <Pressable
+                                                    onPress={openGoalModal}
+                                                    className="px-4 py-3 rounded-xl items-center justify-center mt-3"
+                                                    style={{
+                                                        backgroundColor: COLORS.primary,
+                                                    }}
+                                                >
+                                                    <Text
+                                                        className="text-[14px] font-semibold"
+                                                        style={{ color: '#111111' }}
+                                                    >
+                                                        Crear objetivo
+                                                    </Text>
+                                                </Pressable>
+                                            </>
+                                        )}
+                                    </View>
+                                </View>
+
+                                {/* ================================================= */}
+                                {/* TUS ESTADÍSTICAS                                  */}
+                                {/* ================================================= */}
+
+                                <View
+                                    style={{
+                                        marginBottom: 16,
+                                    }}
+                                >
+                                    <Text
+                                        style={{
+                                            color:
+                                                COLORS.accent,
+
+                                            fontSize: 15,
+
+                                            fontWeight: '700',
+
+                                            paddingHorizontal: 8,
+
+                                            marginBottom: 7,
+                                        }}
+                                    >
+                                        Tus estadísticas
+                                    </Text>
+
 
                                     <View
                                         style={{
                                             backgroundColor:
-                                                '#181818',
+                                                '#111111',
 
-                                            borderRadius: 16,
+                                            borderRadius: 20,
 
                                             borderWidth: 1,
 
                                             borderColor:
-                                                profileGoalProgress
-                                                    ? 'rgba(198,255,0,0.26)'
-                                                    : '#303030',
+                                                '#2F2F2F',
 
-                                            padding: 13,
+                                            padding: 11,
                                         }}
                                     >
-                                        {profileGoalProgress ? (
-                                            <>
-                                                {/* CABECERA */}
+                                        {/* GRÁFICO INTERACTIVO */}
+
+                                        <Pressable
+                                            onPress={() =>
+                                                setStatisticsConfirmVisible(
+                                                    true
+                                                )
+                                            }
+                                            style={({ pressed }) => ({
+                                                backgroundColor:
+                                                    pressed
+                                                        ? '#1D1D1D'
+                                                        : '#181818',
+
+                                                borderRadius: 17,
+
+                                                borderWidth: 1,
+
+                                                borderColor:
+                                                    pressed
+                                                        ? 'rgba(198,255,0,0.40)'
+                                                        : '#303030',
+
+                                                overflow: 'hidden',
+
+                                                paddingTop: 12,
+
+                                                opacity:
+                                                    pressed
+                                                        ? 0.9
+                                                        : 1,
+                                            })}
+                                        >
+                                            {/* CABECERA */}
 
-                                                <View
-                                                    style={{
-                                                        flexDirection:
-                                                            'row',
-
-                                                        alignItems:
-                                                            'center',
-                                                    }}
-                                                >
-                                                    <View
-                                                        style={{
-                                                            width: 34,
-                                                            height: 34,
-
-                                                            borderRadius: 17,
-
-                                                            backgroundColor:
-                                                                'rgba(198,255,0,0.08)',
-
-                                                            alignItems:
-                                                                'center',
-
-                                                            justifyContent:
-                                                                'center',
-
-                                                            marginRight: 9,
-                                                        }}
-                                                    >
-                                                        <Ionicons
-                                                            name={
-                                                                profileGoalProgress
-                                                                    .completed
-                                                                    ? 'checkmark'
-                                                                    : 'flag-outline'
-                                                            }
-                                                            size={18}
-                                                            color={
-                                                                COLORS.primary
-                                                            }
-                                                        />
-                                                    </View>
-
-
-                                                    <View
-                                                        style={{
-                                                            flex: 1,
-                                                        }}
-                                                    >
-                                                        <Text
-                                                            style={{
-                                                                color:
-                                                                    COLORS.textLight,
-
-                                                                fontSize: 13,
-
-                                                                fontWeight:
-                                                                    '900',
-                                                            }}
-                                                        >
-                                                            Progreso de tu objetivo
-                                                        </Text>
-
-                                                        <Text
-                                                            style={{
-                                                                color:
-                                                                    COLORS.textMuted,
-
-                                                                fontSize: 9,
-
-                                                                marginTop: 2,
-                                                            }}
-                                                        >
-                                                            {
-                                                                profileGoalProgress
-                                                                    .contextLabel
-                                                            }
-                                                        </Text>
-                                                    </View>
-
-
-                                                    {/* PORCENTAJE */}
-
-                                                    <View
-                                                        style={{
-                                                            backgroundColor:
-                                                                'rgba(198,255,0,0.10)',
-
-                                                            borderRadius: 999,
-
-                                                            paddingHorizontal:
-                                                                9,
-
-                                                            paddingVertical:
-                                                                4,
-                                                        }}
-                                                    >
-                                                        <Text
-                                                            style={{
-                                                                color:
-                                                                    COLORS.primary,
-
-                                                                fontSize: 11,
-
-                                                                fontWeight:
-                                                                    '900',
-                                                            }}
-                                                        >
-                                                            {
-                                                                profileGoalProgress
-                                                                    .progressPercent
-                                                            }%
-                                                        </Text>
-                                                    </View>
-                                                </View>
-
-
-                                                {/* ACTUAL / OBJETIVO */}
-
-                                                <View
-                                                    style={{
-                                                        flexDirection:
-                                                            'row',
-
-                                                        justifyContent:
-                                                            'space-between',
-
-                                                        alignItems:
-                                                            'flex-end',
-
-                                                        gap: 10,
-
-                                                        marginTop: 13,
-                                                    }}
-                                                >
-                                                    <View
-                                                        style={{
-                                                            flex: 1,
-                                                        }}
-                                                    >
-                                                        <Text
-                                                            style={{
-                                                                color:
-                                                                    '#777777',
-
-                                                                fontSize: 8,
-
-                                                                fontWeight:
-                                                                    '800',
-                                                            }}
-                                                        >
-                                                            REALIZADO
-                                                        </Text>
-
-                                                        <Text
-                                                            style={{
-                                                                color:
-                                                                    COLORS.textLight,
-
-                                                                fontSize: 13,
-
-                                                                fontWeight:
-                                                                    '900',
-
-                                                                marginTop: 3,
-                                                            }}
-                                                        >
-                                                            {
-                                                                profileGoalProgress
-                                                                    .currentLabel
-                                                            }
-                                                        </Text>
-                                                    </View>
-
-
-                                                    <View
-                                                        style={{
-                                                            flex: 1,
-
-                                                            alignItems:
-                                                                'flex-end',
-                                                        }}
-                                                    >
-                                                        <Text
-                                                            style={{
-                                                                color:
-                                                                    '#777777',
-
-                                                                fontSize: 8,
-
-                                                                fontWeight:
-                                                                    '800',
-                                                            }}
-                                                        >
-                                                            OBJETIVO
-                                                        </Text>
-
-                                                        <Text
-                                                            style={{
-                                                                color:
-                                                                    COLORS.primary,
-
-                                                                fontSize: 12,
-
-                                                                fontWeight:
-                                                                    '900',
-
-                                                                marginTop: 3,
-
-                                                                textAlign:
-                                                                    'right',
-                                                            }}
-                                                        >
-                                                            {
-                                                                profileGoalProgress
-                                                                    .targetLabel
-                                                            }
-                                                        </Text>
-                                                    </View>
-                                                </View>
-
-
-                                                {/* BARRA */}
-
-                                                <View
-                                                    style={{
-                                                        height: 12,
-
-                                                        borderRadius: 999,
-
-                                                        backgroundColor:
-                                                            '#282828',
-
-                                                        overflow:
-                                                            'hidden',
-
-                                                        marginTop: 13,
-                                                    }}
-                                                >
-                                                    <View
-                                                        style={{
-                                                            height: '100%',
-
-                                                            width:
-                                                                `${profileGoalProgress.progressPercent}%`,
-
-                                                            borderRadius:
-                                                                999,
-
-                                                            backgroundColor:
-                                                                COLORS.primary,
-                                                        }}
-                                                    />
-                                                </View>
-
-
-                                                {/* FALTANTE */}
-
-                                                <View
-                                                    style={{
-                                                        flexDirection:
-                                                            'row',
-
-                                                        alignItems:
-                                                            'center',
-
-                                                        marginTop: 9,
-                                                    }}
-                                                >
-                                                    <Ionicons
-                                                        name={
-                                                            profileGoalProgress
-                                                                .completed
-                                                                ? 'checkmark-circle'
-                                                                : 'time-outline'
-                                                        }
-                                                        size={14}
-                                                        color={
-                                                            profileGoalProgress
-                                                                .completed
-                                                                ? COLORS.primary
-                                                                : '#888888'
-                                                        }
-                                                    />
-
-                                                    <Text
-                                                        style={{
-                                                            flex: 1,
-
-                                                            color:
-                                                                profileGoalProgress
-                                                                    .completed
-                                                                    ? COLORS.primary
-                                                                    : '#A0A0A0',
-
-                                                            fontSize: 9,
-
-                                                            fontWeight:
-                                                                profileGoalProgress
-                                                                    .completed
-                                                                    ? '900'
-                                                                    : '700',
-
-                                                            marginLeft: 6,
-                                                        }}
-                                                    >
-                                                        {
-                                                            profileGoalProgress
-                                                                .remainingLabel
-                                                        }
-                                                    </Text>
-                                                </View>
-                                            </>
-                                        ) : (
-                                            /*
-                                             * Usuario sin objetivo.
-                                             */
                                             <View
                                                 style={{
                                                     flexDirection:
@@ -2766,33 +3469,29 @@ export default function ProfileScreen() {
 
                                                     alignItems:
                                                         'center',
+
+                                                    justifyContent:
+                                                        'space-between',
+
+                                                    paddingHorizontal:
+                                                        12,
+
+                                                    marginBottom: 4,
                                                 }}
                                             >
-                                                <Ionicons
-                                                    name="flag-outline"
-                                                    size={20}
-                                                    color="#666666"
-                                                />
-
-                                                <View
-                                                    style={{
-                                                        flex: 1,
-
-                                                        marginLeft: 9,
-                                                    }}
-                                                >
+                                                <View>
                                                     <Text
                                                         style={{
                                                             color:
                                                                 COLORS.textLight,
 
-                                                            fontSize: 11,
+                                                            fontSize: 13,
 
                                                             fontWeight:
                                                                 '900',
                                                         }}
                                                     >
-                                                        Progreso del objetivo
+                                                        Rendimiento reciente
                                                     </Text>
 
                                                     <Text
@@ -2802,711 +3501,410 @@ export default function ProfileScreen() {
 
                                                             fontSize: 9,
 
-                                                            lineHeight: 14,
-
                                                             marginTop: 2,
                                                         }}
                                                     >
-                                                        Definí un objetivo para comenzar a visualizar tu progreso.
+                                                        Últimos registros valorados
+                                                    </Text>
+                                                </View>
+
+                                                <Ionicons
+                                                    name="open-outline"
+                                                    size={18}
+                                                    color={
+                                                        COLORS.primary
+                                                    }
+                                                />
+                                            </View>
+
+
+                                            {/* LEYENDA */}
+
+                                            <View
+                                                style={{
+                                                    flexDirection:
+                                                        'row',
+
+                                                    alignItems:
+                                                        'center',
+
+                                                    paddingHorizontal:
+                                                        12,
+
+                                                    marginTop: 8,
+
+                                                    gap: 14,
+                                                }}
+                                            >
+                                                <View
+                                                    style={{
+                                                        flexDirection:
+                                                            'row',
+
+                                                        alignItems:
+                                                            'center',
+                                                    }}
+                                                >
+                                                    <View
+                                                        style={{
+                                                            width: 8,
+                                                            height: 8,
+
+                                                            borderRadius: 4,
+
+                                                            backgroundColor:
+                                                                COLORS.primary,
+
+                                                            marginRight: 5,
+                                                        }}
+                                                    />
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#AFAFAF',
+
+                                                            fontSize: 8,
+                                                        }}
+                                                    >
+                                                        Rutinas / ejercicios
+                                                    </Text>
+                                                </View>
+
+
+                                                <View
+                                                    style={{
+                                                        flexDirection:
+                                                            'row',
+
+                                                        alignItems:
+                                                            'center',
+                                                    }}
+                                                >
+                                                    <View
+                                                        style={{
+                                                            width: 8,
+                                                            height: 8,
+
+                                                            borderRadius: 4,
+
+                                                            backgroundColor:
+                                                                '#4DD0E1',
+
+                                                            marginRight: 5,
+                                                        }}
+                                                    />
+
+                                                    <Text
+                                                        style={{
+                                                            color:
+                                                                '#AFAFAF',
+
+                                                            fontSize: 8,
+                                                        }}
+                                                    >
+                                                        Running
                                                     </Text>
                                                 </View>
                                             </View>
-                                        )}
-                                    </View>
-                                </View>
-                            </View>
-                        </View>
 
-                        {/* TU OBJETIVO */}
-                        <View className="mb-4">
-                            <Text
-                                className="text-[15px] font-semibold px-2 mb-1"
-                                style={{ color: COLORS.accent }}
-                            >
-                                Tu objetivo
-                            </Text>
 
-                            <View
-                                className="rounded-2xl px-3 py-3"
-                                style={{
-                                    backgroundColor: '#111111',
-                                    borderWidth: 1,
-                                    borderColor: '#2F2F2F',
-                                }}
-                            >
-                                {hasMainGoal ? (
-                                    <>
-                                        <View
-                                            style={{
-                                                backgroundColor: '#1A1A1A',
-                                                borderRadius: 18,
-                                                padding: 14,
-                                                borderWidth: 1,
-                                                borderColor: 'rgba(198,255,0,0.25)',
-                                            }}
-                                        >
-                                            <Text
+                                            {/* GRÁFICO */}
+
+                                            <View
+                                                onLayout={(
+                                                    event
+                                                ) => {
+                                                    setProfileStatsChartWidth(
+                                                        event
+                                                            .nativeEvent
+                                                            .layout.width
+                                                    );
+                                                }}
                                                 style={{
-                                                    color: COLORS.textLight,
-                                                    fontSize: 15,
-                                                    fontWeight: '900',
-                                                    marginBottom: 4,
+                                                    marginTop: 6,
                                                 }}
                                             >
-                                                Objetivo principal
-                                            </Text>
+                                                {profileCombinedChart
+                                                    .pointCount >
+                                                    0 &&
+                                                    profileStatsChartWidth >
+                                                    0 ? (
+                                                    <LineChart
+                                                        data={{
+                                                            labels:
+                                                                profileCombinedChart
+                                                                    .labels,
 
-                                            <Text
-                                                style={{
-                                                    color: COLORS.textMuted,
-                                                    fontSize: 12,
-                                                    lineHeight: 18,
-                                                    marginBottom: 10,
-                                                }}
-                                            >
-                                                Este objetivo se usará para mostrar tu progreso en el Home.
-                                            </Text>
+                                                            datasets:
+                                                                profileCombinedChart
+                                                                    .datasets,
+                                                        }}
 
-                                            <GoalInfoRow
-                                                label="Tipo de entrenamiento"
-                                                value={`${goalTypeLabel} - ${goalPeriodLabel}`}
-                                                accent
-                                            />
+                                                        width={
+                                                            profileStatsChartWidth
+                                                        }
 
-                                            <GoalInfoRow
-                                                label="Medición"
-                                                value={goalMetricLabel}
-                                            />
+                                                        height={190}
 
-                                            <GoalInfoRow
-                                                label="Objetivo"
-                                                value={goalTargetLabel}
-                                                accent
-                                            />
+                                                        fromZero
 
-                                            {mainGoal?.mainGoalType === 'running' ? (
-                                                <>
-                                                    <GoalInfoRow
-                                                        label="Kilómetros recorridos"
-                                                        value={goalRunningDistance}
+                                                        segments={5}
+
+                                                        withShadow={
+                                                            false
+                                                        }
+
+                                                        chartConfig={{
+                                                            backgroundGradientFrom:
+                                                                '#181818',
+
+                                                            backgroundGradientTo:
+                                                                '#181818',
+
+                                                            decimalPlaces:
+                                                                0,
+
+                                                            color:
+                                                                (
+                                                                    opacity =
+                                                                        1
+                                                                ) =>
+                                                                    `rgba(255,255,255,${opacity})`,
+
+                                                            labelColor:
+                                                                (
+                                                                    opacity =
+                                                                        1
+                                                                ) =>
+                                                                    `rgba(140,140,140,${opacity})`,
+
+                                                            propsForDots:
+                                                            {
+                                                                r: '4',
+
+                                                                strokeWidth:
+                                                                    '2',
+
+                                                                stroke:
+                                                                    '#111111',
+                                                            },
+
+                                                            propsForBackgroundLines:
+                                                            {
+                                                                stroke:
+                                                                    'rgba(255,255,255,0.06)',
+                                                            },
+                                                        }}
+
+                                                        style={{
+                                                            marginLeft:
+                                                                -10,
+
+                                                            borderRadius:
+                                                                16,
+                                                        }}
                                                     />
+                                                ) : (
+                                                    <View
+                                                        style={{
+                                                            minHeight: 150,
 
-                                                    <GoalInfoRow
-                                                        label="Cantidad de entrenamientos"
-                                                        value={goalTrainingCount}
-                                                    />
+                                                            alignItems:
+                                                                'center',
 
-                                                    <GoalInfoRow
-                                                        label="Minutos de running"
-                                                        value={goalRunningMinutes}
-                                                    />
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <GoalInfoRow
-                                                        label="Entrenamientos registrados"
-                                                        value={goalTrainingCount}
-                                                    />
+                                                            justifyContent:
+                                                                'center',
 
-                                                    <GoalInfoRow
-                                                        label="Promedio de esfuerzo"
-                                                        value={goalAverageEffort}
-                                                    />
+                                                            padding: 16,
+                                                        }}
+                                                    >
+                                                        <Ionicons
+                                                            name="analytics-outline"
+                                                            size={29}
+                                                            color="#666666"
+                                                        />
 
-                                                    <GoalInfoRow
-                                                        label="Estado del objetivo"
-                                                        value="En seguimiento"
-                                                    />
-                                                </>
-                                            )}
-                                        </View>
+                                                        <Text
+                                                            style={{
+                                                                color:
+                                                                    COLORS.textMuted,
 
-                                        <Pressable
-                                            onPress={openGoalModal}
-                                            className="px-4 py-3 rounded-xl items-center justify-center mt-3"
-                                            style={{
-                                                backgroundColor: '#444444',
-                                            }}
-                                        >
-                                            <Text
-                                                className="text-[14px] font-semibold"
-                                                style={{ color: COLORS.textLight }}
-                                            >
-                                                Editar objetivo
-                                            </Text>
-                                        </Pressable>
-                                    </>
-                                ) : (
-                                    <>
-                                        <View
-                                            style={{
-                                                backgroundColor: '#1A1A1A',
-                                                borderRadius: 18,
-                                                padding: 14,
-                                                borderWidth: 1,
-                                                borderColor: '#2F2F2F',
-                                            }}
-                                        >
-                                            <Text
-                                                style={{
-                                                    color: COLORS.textLight,
-                                                    fontSize: 15,
-                                                    fontWeight: '900',
-                                                    marginBottom: 6,
-                                                }}
-                                            >
-                                                Todavía no definiste tu objetivo
-                                            </Text>
+                                                                fontSize: 10,
 
-                                            <Text
-                                                style={{
-                                                    color: COLORS.textMuted,
-                                                    fontSize: 12,
-                                                    lineHeight: 18,
-                                                }}
-                                            >
-                                                Podés elegir un objetivo de running o rutinas, semanal o mensual.
-                                                Luego se mostrará tu progreso en esta pantalla y en el Home.
-                                            </Text>
-                                        </View>
+                                                                textAlign:
+                                                                    'center',
 
-                                        <Pressable
-                                            onPress={openGoalModal}
-                                            className="px-4 py-3 rounded-xl items-center justify-center mt-3"
-                                            style={{
-                                                backgroundColor: COLORS.primary,
-                                            }}
-                                        >
-                                            <Text
-                                                className="text-[14px] font-semibold"
-                                                style={{ color: '#111111' }}
-                                            >
-                                                Crear objetivo
-                                            </Text>
-                                        </Pressable>
-                                    </>
-                                )}
-                            </View>
-                        </View>
-
-                        {/* ================================================= */}
-                        {/* TUS ESTADÍSTICAS                                  */}
-                        {/* ================================================= */}
-
-                        <View
-                            style={{
-                                marginBottom: 16,
-                            }}
-                        >
-                            <Text
-                                style={{
-                                    color:
-                                        COLORS.accent,
-
-                                    fontSize: 15,
-
-                                    fontWeight: '700',
-
-                                    paddingHorizontal: 8,
-
-                                    marginBottom: 7,
-                                }}
-                            >
-                                Tus estadísticas
-                            </Text>
+                                                                marginTop: 8,
+                                                            }}
+                                                        >
+                                                            Registrá al menos dos valoraciones para comenzar a visualizar tu evolución.
+                                                        </Text>
+                                                    </View>
+                                                )}
+                                            </View>
 
 
-                            <View
-                                style={{
-                                    backgroundColor:
-                                        '#111111',
+                                            {/* ACCIÓN */}
 
-                                    borderRadius: 20,
-
-                                    borderWidth: 1,
-
-                                    borderColor:
-                                        '#2F2F2F',
-
-                                    padding: 11,
-                                }}
-                            >
-                                {/* GRÁFICO INTERACTIVO */}
-
-                                <Pressable
-                                    onPress={() =>
-                                        setStatisticsConfirmVisible(
-                                            true
-                                        )
-                                    }
-                                    style={({ pressed }) => ({
-                                        backgroundColor:
-                                            pressed
-                                                ? '#1D1D1D'
-                                                : '#181818',
-
-                                        borderRadius: 17,
-
-                                        borderWidth: 1,
-
-                                        borderColor:
-                                            pressed
-                                                ? 'rgba(198,255,0,0.40)'
-                                                : '#303030',
-
-                                        overflow: 'hidden',
-
-                                        paddingTop: 12,
-
-                                        opacity:
-                                            pressed
-                                                ? 0.9
-                                                : 1,
-                                    })}
-                                >
-                                    {/* CABECERA */}
-
-                                    <View
-                                        style={{
-                                            flexDirection:
-                                                'row',
-
-                                            alignItems:
-                                                'center',
-
-                                            justifyContent:
-                                                'space-between',
-
-                                            paddingHorizontal:
-                                                12,
-
-                                            marginBottom: 4,
-                                        }}
-                                    >
-                                        <View>
-                                            <Text
-                                                style={{
-                                                    color:
-                                                        COLORS.textLight,
-
-                                                    fontSize: 13,
-
-                                                    fontWeight:
-                                                        '900',
-                                                }}
-                                            >
-                                                Rendimiento reciente
-                                            </Text>
-
-                                            <Text
-                                                style={{
-                                                    color:
-                                                        COLORS.textMuted,
-
-                                                    fontSize: 9,
-
-                                                    marginTop: 2,
-                                                }}
-                                            >
-                                                Últimos registros valorados
-                                            </Text>
-                                        </View>
-
-                                        <Ionicons
-                                            name="open-outline"
-                                            size={18}
-                                            color={
-                                                COLORS.primary
-                                            }
-                                        />
-                                    </View>
-
-
-                                    {/* LEYENDA */}
-
-                                    <View
-                                        style={{
-                                            flexDirection:
-                                                'row',
-
-                                            alignItems:
-                                                'center',
-
-                                            paddingHorizontal:
-                                                12,
-
-                                            marginTop: 8,
-
-                                            gap: 14,
-                                        }}
-                                    >
-                                        <View
-                                            style={{
-                                                flexDirection:
-                                                    'row',
-
-                                                alignItems:
-                                                    'center',
-                                            }}
-                                        >
                                             <View
                                                 style={{
-                                                    width: 8,
-                                                    height: 8,
+                                                    borderTopWidth: 1,
 
-                                                    borderRadius: 4,
+                                                    borderTopColor:
+                                                        '#292929',
 
-                                                    backgroundColor:
-                                                        COLORS.primary,
+                                                    marginHorizontal:
+                                                        12,
 
-                                                    marginRight: 5,
-                                                }}
-                                            />
+                                                    paddingVertical:
+                                                        9,
 
-                                            <Text
-                                                style={{
-                                                    color:
-                                                        '#AFAFAF',
-
-                                                    fontSize: 8,
-                                                }}
-                                            >
-                                                Rutinas / ejercicios
-                                            </Text>
-                                        </View>
-
-
-                                        <View
-                                            style={{
-                                                flexDirection:
-                                                    'row',
-
-                                                alignItems:
-                                                    'center',
-                                            }}
-                                        >
-                                            <View
-                                                style={{
-                                                    width: 8,
-                                                    height: 8,
-
-                                                    borderRadius: 4,
-
-                                                    backgroundColor:
-                                                        '#4DD0E1',
-
-                                                    marginRight: 5,
-                                                }}
-                                            />
-
-                                            <Text
-                                                style={{
-                                                    color:
-                                                        '#AFAFAF',
-
-                                                    fontSize: 8,
-                                                }}
-                                            >
-                                                Running
-                                            </Text>
-                                        </View>
-                                    </View>
-
-
-                                    {/* GRÁFICO */}
-
-                                    <View
-                                        onLayout={(
-                                            event
-                                        ) => {
-                                            setProfileStatsChartWidth(
-                                                event
-                                                    .nativeEvent
-                                                    .layout.width
-                                            );
-                                        }}
-                                        style={{
-                                            marginTop: 6,
-                                        }}
-                                    >
-                                        {profileCombinedChart
-                                            .pointCount >
-                                            0 &&
-                                            profileStatsChartWidth >
-                                            0 ? (
-                                            <LineChart
-                                                data={{
-                                                    labels:
-                                                        profileCombinedChart
-                                                            .labels,
-
-                                                    datasets:
-                                                        profileCombinedChart
-                                                            .datasets,
-                                                }}
-
-                                                width={
-                                                    profileStatsChartWidth
-                                                }
-
-                                                height={190}
-
-                                                fromZero
-
-                                                segments={5}
-
-                                                withShadow={
-                                                    false
-                                                }
-
-                                                chartConfig={{
-                                                    backgroundGradientFrom:
-                                                        '#181818',
-
-                                                    backgroundGradientTo:
-                                                        '#181818',
-
-                                                    decimalPlaces:
-                                                        0,
-
-                                                    color:
-                                                        (
-                                                            opacity =
-                                                                1
-                                                        ) =>
-                                                            `rgba(255,255,255,${opacity})`,
-
-                                                    labelColor:
-                                                        (
-                                                            opacity =
-                                                                1
-                                                        ) =>
-                                                            `rgba(140,140,140,${opacity})`,
-
-                                                    propsForDots:
-                                                    {
-                                                        r: '4',
-
-                                                        strokeWidth:
-                                                            '2',
-
-                                                        stroke:
-                                                            '#111111',
-                                                    },
-
-                                                    propsForBackgroundLines:
-                                                    {
-                                                        stroke:
-                                                            'rgba(255,255,255,0.06)',
-                                                    },
-                                                }}
-
-                                                style={{
-                                                    marginLeft:
-                                                        -10,
-
-                                                    borderRadius:
-                                                        16,
-                                                }}
-                                            />
-                                        ) : (
-                                            <View
-                                                style={{
-                                                    minHeight: 150,
+                                                    flexDirection:
+                                                        'row',
 
                                                     alignItems:
                                                         'center',
 
                                                     justifyContent:
                                                         'center',
-
-                                                    padding: 16,
                                                 }}
                                             >
-                                                <Ionicons
-                                                    name="analytics-outline"
-                                                    size={29}
-                                                    color="#666666"
-                                                />
-
                                                 <Text
                                                     style={{
                                                         color:
-                                                            COLORS.textMuted,
+                                                            COLORS.primary,
 
-                                                        fontSize: 10,
+                                                        fontSize: 9,
 
-                                                        textAlign:
-                                                            'center',
-
-                                                        marginTop: 8,
+                                                        fontWeight:
+                                                            '800',
                                                     }}
                                                 >
-                                                    Registrá al menos dos valoraciones para comenzar a visualizar tu evolución.
+                                                    Toca para ver estadísticas completas
                                                 </Text>
+
+                                                <Ionicons
+                                                    name="chevron-forward"
+                                                    size={13}
+                                                    color={
+                                                        COLORS.primary
+                                                    }
+                                                    style={{
+                                                        marginLeft: 4,
+                                                    }}
+                                                />
                                             </View>
-                                        )}
-                                    </View>
+                                        </Pressable>
 
 
-                                    {/* ACCIÓN */}
+                                        {/* MÉTRICAS */}
 
-                                    <View
-                                        style={{
-                                            borderTopWidth: 1,
-
-                                            borderTopColor:
-                                                '#292929',
-
-                                            marginHorizontal:
-                                                12,
-
-                                            paddingVertical:
-                                                9,
-
-                                            flexDirection:
-                                                'row',
-
-                                            alignItems:
-                                                'center',
-
-                                            justifyContent:
-                                                'center',
-                                        }}
-                                    >
-                                        <Text
+                                        <View
                                             style={{
-                                                color:
-                                                    COLORS.primary,
+                                                flexDirection: 'row',
 
-                                                fontSize: 9,
+                                                flexWrap: 'wrap',
 
-                                                fontWeight:
-                                                    '800',
+                                                justifyContent:
+                                                    'space-between',
+
+                                                gap: 8,
+
+                                                marginTop: 10,
                                             }}
                                         >
-                                            Toca para ver estadísticas completas
+                                            <ProfileMetricCard
+                                                icon="star-outline"
+                                                label="Promedio actual"
+                                                value={
+                                                    profileCurrentAverage !=
+                                                        null
+                                                        ? `${Number(
+                                                            profileCurrentAverage
+                                                        ).toFixed(
+                                                            1
+                                                        )} ★`
+                                                        : '--'
+                                                }
+                                                wide
+                                            />
+
+
+                                            <ProfileMetricCard
+                                                icon="calendar-outline"
+                                                label="Días activos"
+                                                value={String(
+                                                    profileActivityTotals
+                                                        .activeDays
+                                                )}
+                                            />
+
+
+                                            <ProfileMetricCard
+                                                icon="barbell-outline"
+                                                label="Rutinas completadas"
+                                                value={String(
+                                                    profileActivityTotals
+                                                        .routineRecords
+                                                )}
+                                            />
+
+
+                                            <ProfileMetricCard
+                                                icon="fitness-outline"
+                                                label="Ejercicios registrados"
+                                                value={String(
+                                                    profileActivityTotals
+                                                        .exerciseRecords
+                                                )}
+                                            />
+
+
+                                            <ProfileMetricCard
+                                                icon="walk-outline"
+                                                label="Corridas totales"
+                                                value={String(
+                                                    profileActivityTotals
+                                                        .runningSessions
+                                                )}
+                                            />
+                                        </View>
+                                    </View>
+                                </View>
+
+                                {/* Línea divisoria */}
+                                <View
+                                    className="h-px mb-4 mx-1"
+                                    style={{ backgroundColor: '#3A3A3A' }}
+                                />
+
+                                {/* TIPO DE CUENTA */}
+                                <View className="mb-3">
+                                    <View
+                                        className="rounded-2xl px-4 py-2"
+                                        style={{ backgroundColor: '#111111' }}
+                                    >
+                                        <Text
+                                            className="text-[15px] font-semibold"
+                                            style={{ color: COLORS.textLight }}
+                                        >
+                                            Tipo de cuenta: Plan {displayPlan}
                                         </Text>
 
-                                        <Ionicons
-                                            name="chevron-forward"
-                                            size={13}
-                                            color={
-                                                COLORS.primary
-                                            }
+                                        <Text
+                                            className="text-[12px] mt-2"
                                             style={{
-                                                marginLeft: 4,
+                                                color: COLORS.textMuted,
+                                                textDecorationLine: 'underline',
                                             }}
-                                        />
+                                        >
+                                            cambiar tipo plan
+                                        </Text>
                                     </View>
-                                </Pressable>
-
-
-                                {/* MÉTRICAS */}
-
-                                <View
-                                    style={{
-                                        flexDirection: 'row',
-
-                                        flexWrap: 'wrap',
-
-                                        justifyContent:
-                                            'space-between',
-
-                                        gap: 8,
-
-                                        marginTop: 10,
-                                    }}
-                                >
-                                    <ProfileMetricCard
-                                        icon="star-outline"
-                                        label="Promedio actual"
-                                        value={
-                                            profileCurrentAverage !=
-                                                null
-                                                ? `${Number(
-                                                    profileCurrentAverage
-                                                ).toFixed(
-                                                    1
-                                                )} ★`
-                                                : '--'
-                                        }
-                                        wide
-                                    />
-
-
-                                    <ProfileMetricCard
-                                        icon="calendar-outline"
-                                        label="Días activos"
-                                        value={String(
-                                            profileActivityTotals
-                                                .activeDays
-                                        )}
-                                    />
-
-
-                                    <ProfileMetricCard
-                                        icon="barbell-outline"
-                                        label="Rutinas completadas"
-                                        value={String(
-                                            profileActivityTotals
-                                                .routineRecords
-                                        )}
-                                    />
-
-
-                                    <ProfileMetricCard
-                                        icon="fitness-outline"
-                                        label="Ejercicios registrados"
-                                        value={String(
-                                            profileActivityTotals
-                                                .exerciseRecords
-                                        )}
-                                    />
-
-
-                                    <ProfileMetricCard
-                                        icon="walk-outline"
-                                        label="Corridas totales"
-                                        value={String(
-                                            profileActivityTotals
-                                                .runningSessions
-                                        )}
-                                    />
                                 </View>
-                            </View>
-                        </View>
-
-                        {/* Línea divisoria */}
-                        <View
-                            className="h-px mb-4 mx-1"
-                            style={{ backgroundColor: '#3A3A3A' }}
-                        />
-
-                        {/* TIPO DE CUENTA */}
-                        <View className="mb-3">
-                            <View
-                                className="rounded-2xl px-4 py-2"
-                                style={{ backgroundColor: '#111111' }}
-                            >
-                                <Text
-                                    className="text-[15px] font-semibold"
-                                    style={{ color: COLORS.textLight }}
-                                >
-                                    Tipo de cuenta: Plan {displayPlan}
-                                </Text>
-
-                                <Text
-                                    className="text-[12px] mt-2"
-                                    style={{
-                                        color: COLORS.textMuted,
-                                        textDecorationLine: 'underline',
-                                    }}
-                                >
-                                    cambiar tipo plan
-                                </Text>
-                            </View>
-                        </View>
+                            </>
+                        )}
                     </ScrollView>
                 </View>
 
@@ -3569,7 +3967,7 @@ export default function ProfileScreen() {
 
                         <ProfileNavButton
                             icon="create-outline"
-                            accent
+                            iconOffsetY={-3}
                             onPress={() =>
                                 setEditProfileConfirmVisible(
                                     true
@@ -3597,7 +3995,7 @@ export default function ProfileScreen() {
 
                             marginHorizontal: 8,
                             marginTop: 10,
-                            marginBottom: 8,
+                            marginBottom: 10,
                         }}
                     >
                         {/* CANCELAR */}
@@ -3631,21 +4029,14 @@ export default function ProfileScreen() {
                                         : 1,
                             })}
                         >
-                            <Ionicons
-                                name="close-outline"
-                                size={25}
-                                color="#FFBABA"
-                            />
-
                             <Text
                                 style={{
                                     color: '#FFBABA',
 
-                                    fontSize: 9,
+                                    fontSize: 15,
 
-                                    fontWeight: '800',
+                                    fontWeight: '600',
 
-                                    marginTop: 1,
                                 }}
                             >
                                 Cancelar
@@ -3691,21 +4082,13 @@ export default function ProfileScreen() {
                                 />
                             ) : (
                                 <>
-                                    <Ionicons
-                                        name="checkmark-outline"
-                                        size={25}
-                                        color="#111111"
-                                    />
-
                                     <Text
                                         style={{
                                             color: '#111111',
 
-                                            fontSize: 9,
+                                            fontSize: 15,
 
-                                            fontWeight: '900',
-
-                                            marginTop: 1,
+                                            fontWeight: '700',
                                         }}
                                     >
                                         Guardar

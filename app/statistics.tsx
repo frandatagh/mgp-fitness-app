@@ -415,7 +415,7 @@ function StatisticsNavButton({
 
                 opacity:
                     disabled
-                        ? 0.45
+                        ? 0.7
                         : pressed
                             ? 0.8
                             : 1,
@@ -2236,7 +2236,7 @@ export default function StatisticsScreen() {
 
 
                 <Text
-                    className="ml-5 pl-1 pb-1 text-md text-gray-500"
+                    className="ml-5 pl-1  text-md text-gray-500"
                 >
                     Tus estadísticas
                 </Text>
@@ -2255,17 +2255,96 @@ export default function StatisticsScreen() {
                 >
                     <ScrollView
                         ref={statsScrollRef}
-                        showsVerticalScrollIndicator={false}
+
+                        showsVerticalScrollIndicator={
+                            false
+                        }
+
+                        scrollEnabled={
+                            !loadingStats
+                        }
+
+                        style={{
+                            flex: 1,
+                        }}
+
                         contentContainerStyle={{
                             padding: 18,
-                            paddingBottom: 100,
+
+                            paddingBottom:
+                                loadingStats
+                                    ? 18
+                                    : 100,
+
+                            /*
+                             * Hace que el contenido ocupe
+                             * como mínimo toda la altura
+                             * disponible del marco.
+                             */
+                            flexGrow: 1,
                         }}
                     >
                         {loadingStats && (
-                            <View style={{ paddingVertical: 30, alignItems: 'center' }}>
-                                <ActivityIndicator size="small" color={COLORS.primary} />
-                                <Text style={{ color: COLORS.textMuted, marginTop: 8 }}>
-                                    Cargando estadísticas...
+                            <View
+                                style={{
+                                    flex: 1,
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        width: 62,
+                                        height: 62,
+                                        alignItems:
+                                            'center',
+
+                                        justifyContent:
+                                            'center',
+                                    }}
+                                >
+                                    <ActivityIndicator
+                                        size="large"
+
+                                        color={
+                                            COLORS.primary
+                                        }
+                                    />
+                                </View>
+
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textLight,
+
+                                        fontSize: 13,
+
+                                        fontWeight:
+                                            '900',
+
+                                        marginTop: 5,
+                                    }}
+                                >
+                                    Cargando tus estadísticas
+                                </Text>
+
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textMuted,
+
+                                        fontSize: 10,
+
+                                        marginTop: 5,
+                                    }}
+                                >
+                                    Ajustando tus datos y rendimiento...
                                 </Text>
                             </View>
                         )}

@@ -2230,8 +2230,11 @@ export default function StatisticsScreen() {
             <View className="flex-1 w-full px-2"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
-                <View className='px-2'>
-                    <AppHeader showProfile={false} />
+                <View className="px-2">
+                    <AppHeader
+                        showProfile={true}
+                        profileGreeting="A mejorar"
+                    />
                 </View>
 
 

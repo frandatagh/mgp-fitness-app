@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, ScrollView, Text, View, Alert, ActivityIndicator, Modal } from 'react-native';
+import { Pressable, ScrollView, Text, View, Alert, ActivityIndicator, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
@@ -77,6 +77,46 @@ function getRecordLabel(type: HistoryRecord['type']) {
     if (type === 'run') return 'Running';
     if (type === 'routine') return 'Rutina';
     return 'Ejercicio';
+}
+
+function HistoryNavButton({
+    icon,
+    onPress,
+}: {
+    icon: React.ReactNode;
+    onPress: () => void;
+}) {
+    return (
+        <Pressable
+            onPress={onPress}
+            style={({ pressed }) => ({
+                flex: 1,
+                minWidth: 0,
+
+                height: 58,
+
+                borderRadius: 17,
+
+                alignItems: 'center',
+                justifyContent: 'center',
+
+                backgroundColor:
+                    pressed
+                        ? '#333333'
+                        : '#242424',
+
+                borderWidth: 3,
+                borderColor: '#353535',
+
+                opacity:
+                    pressed
+                        ? 0.8
+                        : 1,
+            })}
+        >
+            {icon}
+        </Pressable>
+    );
 }
 
 export default function StatisticsHistoryScreen() {
@@ -197,376 +237,616 @@ export default function StatisticsHistoryScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView
+            className="flex-1"
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
+        >
             <View
-                className="flex-1 w-full px-4"
-                style={{ maxWidth: 800, alignSelf: 'center' }}
+                className="flex-1 w-full px-2"
+                style={{
+                    maxWidth: 800,
+                    alignSelf: 'center',
+                }}
             >
-                <AppHeader />
+                {/* ===================================== */}
+                {/* HEADER                                */}
+                {/* ===================================== */}
 
-                <View className="self-start px-1 mb-2">
-                    <Text className='ml-2  text-md text-gray-500'>
-                        Historial de registros
-                    </Text>
+                <View className="px-2">
+                    <AppHeader
+                        showProfile={true}
+                        profileGreeting="¡Constancia!"
+                    />
                 </View>
 
+
+                {/* ===================================== */}
+                {/* TÍTULO                                */}
+                {/* ===================================== */}
+
+                <Text
+                    className="ml-5 pl-1 text-md text-gray-500"
+                >
+                    Historial de registros
+                </Text>
+
+
+                {/* ===================================== */}
+                {/* PANEL PRINCIPAL                       */}
+                {/* ===================================== */}
+
                 <View
-                    className="flex-1 mt-2 rounded-3xl overflow-hidden"
                     style={{
                         borderWidth: 2,
-                        borderColor: COLORS.primary,
-                        backgroundColor: '#101010',
+
+                        borderColor:
+                            COLORS.primary,
+
+                        borderRadius: 22,
+
+                        backgroundColor:
+                            '#101010',
+
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        flex: 1,
+
+                        overflow: 'hidden',
                     }}
                 >
                     <ScrollView
-                        showsVerticalScrollIndicator={false}
+                        showsVerticalScrollIndicator={
+                            false
+                        }
+
+                        scrollEnabled={
+                            !loadingHistory
+                        }
+
+                        style={{
+                            flex: 1,
+                        }}
+
                         contentContainerStyle={{
-                            padding: 12,
-                            paddingBottom: 20,
+                            padding: 18,
+
+                            paddingBottom:
+                                loadingHistory
+                                    ? 18
+                                    : 100,
+
+                            flexGrow: 1,
                         }}
                     >
-                        <View className="self-start px-2 mb-4">
-                            <Text
+                        {loadingHistory ? (
+
+                            /*
+                             * ==========================================
+                             * LOADING
+                             * ==========================================
+                             */
+
+                            <View
                                 style={{
-                                    color: COLORS.textMuted,
-                                    fontSize: 13,
-                                    lineHeight: 18,
-                                    marginTop: 4,
+                                    flex: 1,
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
                                 }}
                             >
-                                Revisa tus sesiones de running, valoraciones de rutinas y ejercicios agrupados por fecha.
-                                También puedes borrar registros equivocados.
-                            </Text>
-                        </View>
-                        {loadingHistory && (
-                            <View style={{ paddingVertical: 30, alignItems: 'center' }}>
-                                <ActivityIndicator size="small" color={COLORS.primary} />
-                                <Text style={{ color: COLORS.textMuted, marginTop: 8 }}>
-                                    Cargando historial...
+                                <View
+                                    style={{
+                                        width: 62,
+                                        height: 62,
+
+                                        alignItems:
+                                            'center',
+
+                                        justifyContent:
+                                            'center',
+                                    }}
+                                >
+                                    <ActivityIndicator
+                                        size="large"
+                                        color={
+                                            COLORS.primary
+                                        }
+                                    />
+                                </View>
+
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textLight,
+
+                                        fontSize: 13,
+
+                                        fontWeight:
+                                            '900',
+
+                                        marginTop: 5,
+                                    }}
+                                >
+                                    Cargando tu historial
+                                </Text>
+
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textMuted,
+
+                                        fontSize: 10,
+
+                                        marginTop: 5,
+
+                                        textAlign: 'center',
+                                    }}
+                                >
+                                    Preparando tus registros...
                                 </Text>
                             </View>
-                        )}
 
-                        {historyError && !loadingHistory && (
-                            <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                                <Text style={{ color: '#FF6B6B', textAlign: 'center' }}>
+                        ) : historyError ? (
+
+                            /*
+                             * ==========================================
+                             * ERROR
+                             * ==========================================
+                             */
+
+                            <View
+                                style={{
+                                    flex: 1,
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+
+                                    paddingHorizontal: 20,
+                                }}
+                            >
+                                <Ionicons
+                                    name="alert-circle-outline"
+                                    size={32}
+                                    color="#FF6B6B"
+                                />
+
+                                <Text
+                                    style={{
+                                        color: '#FF6B6B',
+
+                                        textAlign: 'center',
+
+                                        fontSize: 13,
+
+                                        marginTop: 10,
+                                    }}
+                                >
                                     {historyError}
                                 </Text>
                             </View>
-                        )}
 
-                        {!loadingHistory && !historyError && historyItems.length === 0 && (
-                            <View style={{ paddingVertical: 30, alignItems: 'center' }}>
-                                <Ionicons name="document-text-outline" size={32} color={COLORS.textMuted} />
-                                <Text
-                                    style={{
-                                        color: COLORS.textMuted,
-                                        textAlign: 'center',
-                                        marginTop: 10,
-                                        fontSize: 13,
-                                    }}
-                                >
-                                    Todavía no hay registros guardados.
-                                </Text>
-                            </View>
-                        )}
-                        {!loadingHistory && !historyError && historyItems.map((day) => {
-                            const isOpen = !!openDates[day.date];
+                        ) : (
 
-                            return (
+                            <>
+
                                 <View
-                                    key={day.date}
+                                    className="self-start px-2 mb-4"
+                                >
+                                    <Text
+                                        style={{
+                                            color:
+                                                COLORS.textMuted,
+
+                                            fontSize: 13,
+
+                                            lineHeight: 18,
+
+                                            marginTop: 4,
+                                        }}
+                                    >
+                                        Revisa tus sesiones de running, valoraciones
+                                        de rutinas y ejercicios agrupados por fecha.
+                                        También puedes borrar registros equivocados.
+                                    </Text>
+                                </View>
+                                {historyError && !loadingHistory && (
+                                    <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                                        <Text style={{ color: '#FF6B6B', textAlign: 'center' }}>
+                                            {historyError}
+                                        </Text>
+                                    </View>
+                                )}
+
+                                {historyItems.length === 0 && (
+                                    <View style={{ paddingVertical: 30, alignItems: 'center' }}>
+                                        <Ionicons name="document-text-outline" size={32} color={COLORS.textMuted} />
+                                        <Text
+                                            style={{
+                                                color: COLORS.textMuted,
+                                                textAlign: 'center',
+                                                marginTop: 10,
+                                                fontSize: 13,
+                                            }}
+                                        >
+                                            Todavía no hay registros guardados.
+                                        </Text>
+                                    </View>
+                                )}
+                                {historyItems.map((day) => {
+
+                                    const isOpen = !!openDates[day.date];
+
+                                    return (
+                                        <View
+                                            key={day.date}
+                                            style={{
+                                                marginBottom: 10,
+                                                backgroundColor: '#151515',
+                                                borderRadius: 18,
+                                                borderWidth: 1,
+                                                borderColor: '#2f2f2f',
+                                                overflow: 'hidden',
+                                            }}
+                                        >
+                                            <Pressable
+                                                onPress={() => toggleDate(day.date)}
+                                                style={{
+                                                    paddingHorizontal: 14,
+                                                    paddingVertical: 13,
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                }}
+                                            >
+                                                <View>
+                                                    <Text
+                                                        style={{
+                                                            color: COLORS.textLight,
+                                                            fontSize: 14,
+                                                            fontWeight: '800',
+                                                        }}
+                                                    >
+                                                        {day.label}
+                                                    </Text>
+
+                                                    <Text
+                                                        style={{
+                                                            color: COLORS.textMuted,
+                                                            fontSize: 11,
+                                                            marginTop: 2,
+                                                        }}
+                                                    >
+                                                        {day.records.length} registros
+                                                    </Text>
+                                                </View>
+
+                                                <Ionicons
+                                                    name={isOpen ? 'chevron-up' : 'chevron-down'}
+                                                    size={20}
+                                                    color={COLORS.primary}
+                                                />
+                                            </Pressable>
+
+                                            {isOpen && (
+                                                <View style={{ paddingHorizontal: 10, paddingBottom: 10 }}>
+                                                    {day.records.map((record) => (
+                                                        <View
+                                                            key={record.id}
+                                                            style={{
+                                                                backgroundColor: '#1b1b1b',
+                                                                borderRadius: 14,
+                                                                borderWidth: 1,
+                                                                borderColor: '#2c2c2c',
+                                                                padding: 11,
+                                                                marginTop: 8,
+                                                            }}
+                                                        >
+                                                            <View className="flex-row items-start justify-between">
+                                                                <View className="flex-row flex-1" style={{ gap: 9 }}>
+                                                                    <View
+                                                                        style={{
+                                                                            width: 32,
+                                                                            height: 32,
+                                                                            borderRadius: 16,
+                                                                            backgroundColor: '#111111',
+                                                                            borderWidth: 1,
+                                                                            borderColor: '#333333',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                        }}
+                                                                    >
+                                                                        {getRecordIcon(record.type)}
+                                                                    </View>
+
+                                                                    <View style={{ flex: 1 }}>
+                                                                        <Text
+                                                                            style={{
+                                                                                color: COLORS.textLight,
+                                                                                fontSize: 13,
+                                                                                fontWeight: '800',
+                                                                            }}
+                                                                        >
+                                                                            {record.title}
+                                                                        </Text>
+
+                                                                        <Text
+                                                                            style={{
+                                                                                color: COLORS.textMuted,
+                                                                                fontSize: 11,
+                                                                                lineHeight: 16,
+                                                                                marginTop: 3,
+                                                                            }}
+                                                                        >
+                                                                            {record.subtitle}
+                                                                        </Text>
+
+                                                                        {record.rating != null && (
+                                                                            <Text
+                                                                                style={{
+                                                                                    color: COLORS.primary,
+                                                                                    fontSize: 11,
+                                                                                    fontWeight: '800',
+                                                                                    marginTop: 4,
+                                                                                }}
+                                                                            >
+                                                                                Valoración: {record.rating}/10
+                                                                            </Text>
+                                                                        )}
+                                                                    </View>
+                                                                </View>
+
+                                                                <Pressable
+                                                                    onPress={() => handleDeleteRecord(record)}
+                                                                    hitSlop={8}
+                                                                    style={{
+                                                                        width: 30,
+                                                                        height: 30,
+                                                                        borderRadius: 15,
+                                                                        backgroundColor: '#2a1212',
+                                                                        borderWidth: 1,
+                                                                        borderColor: '#7f1d1d',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        marginLeft: 8,
+                                                                    }}
+                                                                >
+                                                                    <Ionicons name="trash-outline" size={16} color="#FF6B6B" />
+                                                                </Pressable>
+                                                            </View>
+                                                        </View>
+                                                    ))}
+                                                </View>
+                                            )}
+
+                                        </View>
+
+                                    );
+
+                                })}
+                                <View
                                     style={{
-                                        marginBottom: 10,
+                                        marginTop: 14,
                                         backgroundColor: '#151515',
                                         borderRadius: 18,
                                         borderWidth: 1,
                                         borderColor: '#2f2f2f',
-                                        overflow: 'hidden',
+                                        padding: 14,
                                     }}
                                 >
-                                    <Pressable
-                                        onPress={() => toggleDate(day.date)}
-                                        style={{
-                                            paddingHorizontal: 14,
-                                            paddingVertical: 13,
-                                            flexDirection: 'row',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                        }}
-                                    >
-                                        <View>
-                                            <Text
-                                                style={{
-                                                    color: COLORS.textLight,
-                                                    fontSize: 14,
-                                                    fontWeight: '800',
-                                                }}
-                                            >
-                                                {day.label}
-                                            </Text>
-
-                                            <Text
-                                                style={{
-                                                    color: COLORS.textMuted,
-                                                    fontSize: 11,
-                                                    marginTop: 2,
-                                                }}
-                                            >
-                                                {day.records.length} registros
-                                            </Text>
-                                        </View>
-
-                                        <Ionicons
-                                            name={isOpen ? 'chevron-up' : 'chevron-down'}
-                                            size={20}
-                                            color={COLORS.primary}
-                                        />
-                                    </Pressable>
-
-                                    {isOpen && (
-                                        <View style={{ paddingHorizontal: 10, paddingBottom: 10 }}>
-                                            {day.records.map((record) => (
-                                                <View
-                                                    key={record.id}
-                                                    style={{
-                                                        backgroundColor: '#1b1b1b',
-                                                        borderRadius: 14,
-                                                        borderWidth: 1,
-                                                        borderColor: '#2c2c2c',
-                                                        padding: 11,
-                                                        marginTop: 8,
-                                                    }}
-                                                >
-                                                    <View className="flex-row items-start justify-between">
-                                                        <View className="flex-row flex-1" style={{ gap: 9 }}>
-                                                            <View
-                                                                style={{
-                                                                    width: 32,
-                                                                    height: 32,
-                                                                    borderRadius: 16,
-                                                                    backgroundColor: '#111111',
-                                                                    borderWidth: 1,
-                                                                    borderColor: '#333333',
-                                                                    alignItems: 'center',
-                                                                    justifyContent: 'center',
-                                                                }}
-                                                            >
-                                                                {getRecordIcon(record.type)}
-                                                            </View>
-
-                                                            <View style={{ flex: 1 }}>
-                                                                <Text
-                                                                    style={{
-                                                                        color: COLORS.textLight,
-                                                                        fontSize: 13,
-                                                                        fontWeight: '800',
-                                                                    }}
-                                                                >
-                                                                    {record.title}
-                                                                </Text>
-
-                                                                <Text
-                                                                    style={{
-                                                                        color: COLORS.textMuted,
-                                                                        fontSize: 11,
-                                                                        lineHeight: 16,
-                                                                        marginTop: 3,
-                                                                    }}
-                                                                >
-                                                                    {record.subtitle}
-                                                                </Text>
-
-                                                                {record.rating != null && (
-                                                                    <Text
-                                                                        style={{
-                                                                            color: COLORS.primary,
-                                                                            fontSize: 11,
-                                                                            fontWeight: '800',
-                                                                            marginTop: 4,
-                                                                        }}
-                                                                    >
-                                                                        Valoración: {record.rating}/10
-                                                                    </Text>
-                                                                )}
-                                                            </View>
-                                                        </View>
-
-                                                        <Pressable
-                                                            onPress={() => handleDeleteRecord(record)}
-                                                            hitSlop={8}
-                                                            style={{
-                                                                width: 30,
-                                                                height: 30,
-                                                                borderRadius: 15,
-                                                                backgroundColor: '#2a1212',
-                                                                borderWidth: 1,
-                                                                borderColor: '#7f1d1d',
-                                                                alignItems: 'center',
-                                                                justifyContent: 'center',
-                                                                marginLeft: 8,
-                                                            }}
-                                                        >
-                                                            <Ionicons name="trash-outline" size={16} color="#FF6B6B" />
-                                                        </Pressable>
-                                                    </View>
-                                                </View>
-                                            ))}
-                                        </View>
-                                    )}
-
-                                </View>
-
-                            );
-
-                        })}
-                        <View
-                            style={{
-                                marginTop: 14,
-                                backgroundColor: '#151515',
-                                borderRadius: 18,
-                                borderWidth: 1,
-                                borderColor: '#2f2f2f',
-                                padding: 14,
-                            }}
-                        >
-                            <View className="flex-row items-center mb-2">
-                                <Ionicons name="archive-outline" size={18} color={COLORS.primary} />
-                                <Text
-                                    style={{
-                                        color: COLORS.textLight,
-                                        fontSize: 14,
-                                        fontWeight: '800',
-                                        marginLeft: 8,
-                                    }}
-                                >
-                                    Historial antiguo
-                                </Text>
-                            </View>
-
-                            <Text
-                                style={{
-                                    color: COLORS.textMuted,
-                                    fontSize: 12,
-                                    lineHeight: 18,
-                                    marginBottom: 12,
-                                }}
-                            >
-                                Estos registros ya fueron resumidos para conservar solo la información mensual importante.
-                                No se editan registro por registro.
-                            </Text>
-
-                            {archivedItems.length === 0 ? (
-                                <Text
-                                    style={{
-                                        color: COLORS.textMuted,
-                                        fontSize: 12,
-                                        textAlign: 'center',
-                                        paddingVertical: 10,
-                                    }}
-                                >
-                                    Aún no hay historial antiguo archivado.
-                                </Text>
-                            ) : (
-                                archivedItems.map((item) => (
-                                    <View
-                                        key={item.id}
-                                        style={{
-                                            backgroundColor: '#1b1b1b',
-                                            borderRadius: 14,
-                                            borderWidth: 1,
-                                            borderColor: '#2c2c2c',
-                                            padding: 12,
-                                            marginBottom: 8,
-                                        }}
-                                    >
+                                    <View className="flex-row items-center mb-2">
+                                        <Ionicons name="archive-outline" size={18} color={COLORS.primary} />
                                         <Text
                                             style={{
                                                 color: COLORS.textLight,
-                                                fontSize: 13,
+                                                fontSize: 14,
                                                 fontWeight: '800',
+                                                marginLeft: 8,
                                             }}
                                         >
-                                            {item.label}
+                                            Historial antiguo
                                         </Text>
+                                    </View>
 
+                                    <Text
+                                        style={{
+                                            color: COLORS.textMuted,
+                                            fontSize: 12,
+                                            lineHeight: 18,
+                                            marginBottom: 12,
+                                        }}
+                                    >
+                                        Estos registros ya fueron resumidos para conservar solo la información mensual importante.
+                                        No se editan registro por registro.
+                                    </Text>
+
+                                    {archivedItems.length === 0 ? (
                                         <Text
                                             style={{
                                                 color: COLORS.textMuted,
-                                                fontSize: 11,
-                                                lineHeight: 17,
-                                                marginTop: 5,
+                                                fontSize: 12,
+                                                textAlign: 'center',
+                                                paddingVertical: 10,
                                             }}
                                         >
-                                            {item.subtitle}
+                                            Aún no hay historial antiguo archivado.
                                         </Text>
+                                    ) : (
+                                        archivedItems.map((item) => (
+                                            <View
+                                                key={item.id}
+                                                style={{
+                                                    backgroundColor: '#1b1b1b',
+                                                    borderRadius: 14,
+                                                    borderWidth: 1,
+                                                    borderColor: '#2c2c2c',
+                                                    padding: 12,
+                                                    marginBottom: 8,
+                                                }}
+                                            >
+                                                <Text
+                                                    style={{
+                                                        color: COLORS.textLight,
+                                                        fontSize: 13,
+                                                        fontWeight: '800',
+                                                    }}
+                                                >
+                                                    {item.label}
+                                                </Text>
 
-                                        <Text
-                                            style={{
-                                                color: COLORS.primary,
-                                                fontSize: 11,
-                                                fontWeight: '700',
-                                                marginTop: 6,
-                                            }}
-                                        >
-                                            Resumen mensual archivado
-                                        </Text>
-                                    </View>
-                                ))
-                            )}
-                        </View>
-                        <Pressable
-                            onPress={() => setClearHistoryModalVisible(true)}
-                            style={{
-                                marginTop: 14,
-                                backgroundColor: '#2a1212',
-                                borderWidth: 1,
-                                borderColor: '#7f1d1d',
-                                paddingVertical: 13,
-                                borderRadius: 14,
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                            }}
-                        >
-                            <View className="flex-row items-center">
-                                <Ionicons name="trash-outline" size={17} color="#FFB4B4" />
-                                <Text
+                                                <Text
+                                                    style={{
+                                                        color: COLORS.textMuted,
+                                                        fontSize: 11,
+                                                        lineHeight: 17,
+                                                        marginTop: 5,
+                                                    }}
+                                                >
+                                                    {item.subtitle}
+                                                </Text>
+
+                                                <Text
+                                                    style={{
+                                                        color: COLORS.primary,
+                                                        fontSize: 11,
+                                                        fontWeight: '700',
+                                                        marginTop: 6,
+                                                    }}
+                                                >
+                                                    Resumen mensual archivado
+                                                </Text>
+                                            </View>
+                                        ))
+                                    )}
+                                </View>
+                                <Pressable
+                                    onPress={() => setClearHistoryModalVisible(true)}
                                     style={{
-                                        color: '#FFB4B4',
-                                        fontWeight: '800',
-                                        fontSize: 13,
-                                        marginLeft: 8,
+                                        marginTop: 14,
+                                        backgroundColor: '#2a1212',
+                                        borderWidth: 1,
+                                        borderColor: '#7f1d1d',
+                                        paddingVertical: 13,
+                                        borderRadius: 14,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
                                     }}
                                 >
-                                    Limpiar todo el historial
-                                </Text>
-                            </View>
-                        </Pressable>
+                                    <View className="flex-row items-center">
+                                        <Ionicons name="trash-outline" size={17} color="#FFB4B4" />
+                                        <Text
+                                            style={{
+                                                color: '#FFB4B4',
+                                                fontWeight: '800',
+                                                fontSize: 13,
+                                                marginLeft: 8,
+                                            }}
+                                        >
+                                            Limpiar todo el historial
+                                        </Text>
+                                    </View>
+                                </Pressable>
+
+                            </>
+                        )}
+
                     </ScrollView>
                 </View>
 
-                <View className="m-2 flex-row justify-between " >
-                    <Pressable
-                        onPress={() => router.replace('/statistics')}
-                        className="flex-1 mr-2 px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
-                    >
-                        <Text className="text-[14px] font-normal"
-                            style={{ color: COLORS.textLight }}>
-                            Estadísticas
-                        </Text>
-                    </Pressable>
+                {/* ============================================== */}
+                {/* NAVEGACIÓN INFERIOR                            */}
+                {/* ============================================== */}
 
-                    <Pressable
-                        onPress={() => router.replace('/home')}
-                        className="flex-1  px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
-                    >
-                        <Text className="text-[14px] font-normal"
-                            style={{ color: COLORS.textLight }}>
-                            Ir al home
-                        </Text>
-                    </Pressable>
+                <View
+                    style={{
+                        flexDirection: 'row',
+
+                        alignItems: 'center',
+
+                        justifyContent:
+                            'space-between',
+
+                        gap: 8,
+
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        marginBottom: 10,
+                    }}
+                >
+                    {/* 1 — HOME */}
+
+                    <HistoryNavButton
+                        onPress={() =>
+                            router.replace('/home')
+                        }
+                        icon={
+                            <Ionicons
+                                name="home-outline"
+                                size={27}
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
+
+                    {/* 2 — PERFIL */}
+
+                    <HistoryNavButton
+                        onPress={() =>
+                            router.push('/profile')
+                        }
+                        icon={
+                            <Ionicons
+                                name="person-circle-outline"
+                                size={32}
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
+
+                    {/* 3 — PREGUNTAS FRECUENTES */}
+
+                    <HistoryNavButton
+                        onPress={() =>
+                            router.push('/support')
+                        }
+                        icon={
+                            <Ionicons
+                                name="help-circle-outline"
+                                size={30}
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
+
+
+                    {/* 4 — ESTADÍSTICAS */}
+
+                    <HistoryNavButton
+                        onPress={() =>
+                            router.push('/statistics')
+                        }
+                        icon={
+                            <Ionicons
+                                name="stats-chart-outline"
+                                size={27}
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
                 </View>
             </View>
             <Modal

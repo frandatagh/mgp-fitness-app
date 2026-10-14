@@ -5,7 +5,6 @@ import {
     Text,
     ScrollView,
     Pressable,
-    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -59,39 +58,92 @@ export default function TermsScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
             <View
-                className="flex-1 px-4 pb-2"
-                style={{ maxWidth: 800, alignSelf: 'center' }}
-            >
-                {/* LOGO SUPERIOR */}
-                <AppHeader showProfile={false} />
+                className="flex-1 w-full px-2"
 
+                style={{
+                    maxWidth: 800,
+
+                    alignSelf:
+                        'center',
+                }}
+            >
+                {/* HEADER */}
+
+                <View className="px-2">
+                    <AppHeader
+                        showProfile={
+                            isAuthenticated
+                        }
+                    />
+                </View>
+
+
+                {/* TÍTULO DE PANTALLA */}
+
+                <Text
+                    className="ml-5 pl-1 text-md text-gray-500"
+                >
+                    Términos y condiciones
+                </Text>
                 {/* PANEL PRINCIPAL */}
                 <View
-                    className="flex-1 rounded-3xl mt-3 px-3 py-4"
-                    style={{ borderWidth: 2, borderColor: COLORS.primary }}
+                    style={{
+                        borderWidth: 2,
+
+                        borderColor:
+                            COLORS.primary,
+
+                        borderRadius: 22,
+
+                        backgroundColor:
+                            '#101010',
+
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        flex: 1,
+
+                        overflow:
+                            'hidden',
+                    }}
                 >
                     <ScrollView
                         ref={scrollViewRef}
-                        showsVerticalScrollIndicator={false}
-                        className="px-2"
+
+                        showsVerticalScrollIndicator={
+                            false
+                        }
+
+                        style={{
+                            flex: 1,
+                        }}
+
+                        contentContainerStyle={{
+                            padding: 18,
+
+                            paddingBottom: 40,
+                        }}
                     >
                         {/* TÍTULO */}
-                        <View className="mb-2 px-1">
-                            <Text
-                                className="text-[20px] font-semibold py-2"
-                                style={{ color: COLORS.textLight }}
-                            >
-                                Términos y condiciones
-                            </Text>
-                            <Text
-                                className="text-[13px] mt-1"
-                                style={{ color: COLORS.textMuted }}
-                            >
-                                Al registrarte o utilizar MGP Rutina Fitness, aceptas las condiciones
-                                descritas en esta sección. Si no estás de acuerdo con estos términos,
-                                te recomendamos no utilizar la aplicación ni crear una cuenta.
-                            </Text>
-                        </View>
+                        <Text
+                            style={{
+                                color:
+                                    COLORS.textMuted,
+
+                                fontSize: 13,
+
+                                lineHeight: 19,
+
+                                marginBottom: 16,
+
+                                paddingHorizontal: 2,
+                            }}
+                        >
+                            Al registrarte o utilizar MGP Rutina Fitness, aceptas las condiciones
+                            descritas en esta sección. Si no estás de acuerdo con estos términos,
+                            te recomendamos no utilizar la aplicación ni crear una cuenta.
+                        </Text>
 
                         {/* ÍNDICE RÁPIDO */}
                         <View className="mb-3 px-1">
@@ -442,18 +494,67 @@ export default function TermsScreen() {
                     </ScrollView>
                 </View>
 
-                {/* BOTÓN INFERIOR */}
-                <View className="mt-2 px-2">
+                {/* ========================================= */}
+                {/* NAVEGACIÓN INFERIOR                      */}
+                {/* ========================================= */}
+
+                <View
+                    style={{
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        marginBottom: 10,
+                    }}
+                >
                     <Pressable
-                        onPress={handleBack}
-                        className="px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#111111', borderColor: '#2B2B2B', borderWidth: 1 }}
+                        onPress={
+                            handleBack
+                        }
+
+                        style={({
+                            pressed,
+                        }) => ({
+                            height: 58,
+
+                            borderRadius: 17,
+
+                            alignItems:
+                                'center',
+
+                            justifyContent:
+                                'center',
+
+                            backgroundColor:
+                                pressed
+                                    ? '#333333'
+                                    : '#242424',
+
+                            borderWidth: 3,
+
+                            borderColor:
+                                '#353535',
+
+                            opacity:
+                                pressed
+                                    ? 0.8
+                                    : 1,
+                        })}
                     >
                         <Text
-                            className="text-[14px] font-normal"
-                            style={{ color: COLORS.textLight }}
+                            style={{
+                                color:
+                                    '#FFFFFF',
+
+                                fontSize: 14,
+
+                                fontWeight:
+                                    '700',
+                            }}
                         >
-                            Volver
+                            {isAuthenticated
+                                ? 'Volver al home'
+                                : 'Volver al inicio'}
                         </Text>
                     </Pressable>
                 </View>

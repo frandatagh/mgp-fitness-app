@@ -1,13 +1,10 @@
 // app/support.tsx
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
     ScrollView,
     Pressable,
-    Image,
-    NativeSyntheticEvent,
-    NativeScrollEvent,
     LayoutAnimation,
     Platform,
     UIManager,
@@ -33,27 +30,16 @@ export default function SupportScreen() {
     const { isAuthenticated } = useAuth();
     const router = useRouter();
 
-    const scrollRef = useRef<ScrollView | null>(null);
+
     const [openItem, setOpenItem] = useState<string | null>(null);
-    const [showReportButton, setShowReportButton] = useState(false);
+
 
     const handleToggle = (id: string) => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setOpenItem(prev => (prev === id ? null : id));
     };
 
-    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-        const offsetY = event.nativeEvent.contentOffset.y;
 
-        // Aparece cuando el usuario scrollea hacia abajo
-        if (offsetY > 120 && !showReportButton) {
-            setShowReportButton(true);
-        }
-
-        if (offsetY <= 120 && showReportButton) {
-            setShowReportButton(false);
-        }
-    };
 
     const handleBackHome = () => {
         if (isAuthenticated) {
@@ -150,100 +136,301 @@ export default function SupportScreen() {
     return (
         <SafeAreaView
             className="flex-1"
-            style={{ backgroundColor: COLORS.background }}
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
         >
-            <View
-                className="flex-1 px-4 pt-1 pb-2"
-                style={{ maxWidth: 800, alignSelf: 'center' }}
-            >
-                <AppHeader showProfile={false} />
+            {/* ========================================= */}
+            {/* CONTENEDOR GENERAL                       */}
+            {/* ========================================= */}
 
-                {/* Título */}
-                <View className="self-start px-3 mb-1">
-                    <Text className="text-md text-gray-500">
-                        Soporte & Ayuda
-                    </Text>
+            <View
+                className="flex-1 w-full px-2"
+                style={{
+                    maxWidth: 800,
+                    alignSelf: 'center',
+                }}
+            >
+                {/* ===================================== */}
+                {/* HEADER                                */}
+                {/* ===================================== */}
+
+                <View className="px-2">
+                    <AppHeader
+                        showProfile={
+                            isAuthenticated
+                        }
+                    />
                 </View>
 
-                {/* Panel principal */}
+
+                {/* ===================================== */}
+                {/* TÍTULO                                */}
+                {/* ===================================== */}
+
+                <Text
+                    className="ml-5 pl-1 text-md text-gray-500"
+                >
+                    Soporte & Ayuda
+                </Text>
+
+
+                {/* ===================================== */}
+                {/* PANEL PRINCIPAL                       */}
+                {/* ===================================== */}
+
                 <View
-                    className="flex-1 mt-2 rounded-3xl px-3 py-4"
-                    style={{ borderWidth: 2, borderColor: COLORS.primary }}
+                    style={{
+                        borderWidth: 2,
+
+                        borderColor:
+                            COLORS.primary,
+
+                        borderRadius: 22,
+
+                        backgroundColor:
+                            '#101010',
+
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        flex: 1,
+
+                        overflow: 'hidden',
+                    }}
                 >
                     <ScrollView
-                        ref={scrollRef}
-                        showsVerticalScrollIndicator={false}
-                        onScroll={handleScroll}
-                        scrollEventThrottle={16}
-                    >
+                        showsVerticalScrollIndicator={
+                            false
+                        }
 
-                        {/* Introducción */}
+                        style={{
+                            flex: 1,
+                        }}
+
+                        contentContainerStyle={{
+                            padding: 18,
+
+                            paddingBottom: 28,
+                        }}
+                    >
+                        {/* ============================= */}
+                        {/* INTRODUCCIÓN                  */}
+                        {/* ============================= */}
+
                         <Text
-                            className="text-[13px] py-2 px-2"
-                            style={{ color: COLORS.textMuted }}
+                            style={{
+                                color:
+                                    COLORS.textMuted,
+
+                                fontSize: 13,
+
+                                lineHeight: 19,
+
+                                marginBottom: 16,
+
+                                paddingHorizontal: 2,
+                            }}
                         >
-                            Aquí encontrarás respuestas rápidas a dudas frecuentes y
-                            soluciones para problemas comunes dentro de la aplicación.
+                            Aquí encontrarás respuestas rápidas a dudas frecuentes y soluciones para problemas comunes dentro de la aplicación.
                         </Text>
 
-                        {/* Preguntas frecuentes */}
+
+                        {/* ============================= */}
+                        {/* PREGUNTAS FRECUENTES          */}
+                        {/* ============================= */}
+
                         <Text
-                            className="text-[15px] font-semibold py-2 px-2"
-                            style={{ color: COLORS.accent }}
+                            style={{
+                                color:
+                                    COLORS.accent,
+
+                                fontSize: 15,
+
+                                fontWeight: '700',
+
+                                marginBottom: 8,
+
+                                paddingHorizontal: 2,
+                            }}
                         >
                             Preguntas frecuentes
                         </Text>
 
-                        {faqItems.map(renderAccordion)}
 
-                        {/* Problemas comunes */}
+                        {faqItems.map(
+                            renderAccordion
+                        )}
+
+
+                        {/* ============================= */}
+                        {/* PROBLEMAS COMUNES             */}
+                        {/* ============================= */}
+
                         <Text
-                            className="text-[15px] font-semibold py-2 px-2"
-                            style={{ color: COLORS.accent }}
+                            style={{
+                                color:
+                                    COLORS.accent,
+
+                                fontSize: 15,
+
+                                fontWeight: '700',
+
+                                marginTop: 16,
+
+                                marginBottom: 8,
+
+                                paddingHorizontal: 2,
+                            }}
                         >
                             Problemas comunes
                         </Text>
 
-                        {problemItems.map(renderAccordion)}
 
-                        {/* Introducción */}
+                        {problemItems.map(
+                            renderAccordion
+                        )}
+
+
+                        {/* ============================= */}
+                        {/* MENSAJE FINAL                 */}
+                        {/* ============================= */}
+
                         <Text
-                            className="text-[13px] mt-2 mb-4 py-2 px-2"
-                            style={{ color: COLORS.textMuted }}
+                            style={{
+                                color:
+                                    COLORS.textMuted,
+
+                                fontSize: 13,
+
+                                lineHeight: 19,
+
+                                marginTop: 18,
+
+                                paddingHorizontal: 2,
+                            }}
                         >
                             Si no encuentras la solución a tu problema o tienes una sugerencia, no dudes en contactarnos.
+                            {'\n\n'}
                             Recuerda comunicarnos bien tu inconveniente para que podamos ayudarte de la mejor manera posible.
-                            Estamos aquí para brindarte la mejor experiencia posible.
                         </Text>
 
+
+                        {/* ============================= */}
+                        {/* CONTACTANOS                   */}
+                        {/* ============================= */}
+
+                        <Pressable
+                            onPress={() =>
+                                router.push(
+                                    '/contact'
+                                )
+                            }
+
+                            style={({ pressed }) => ({
+                                minHeight: 50,
+
+                                marginTop: 18,
+
+                                borderRadius: 15,
+
+                                flexDirection:
+                                    'row',
+
+                                alignItems:
+                                    'center',
+
+                                justifyContent:
+                                    'center',
+
+                                backgroundColor:
+                                    pressed
+                                        ? '#B4E800'
+                                        : COLORS.primary,
+
+                                opacity:
+                                    pressed
+                                        ? 0.9
+                                        : 1,
+                            })}
+                        >
+                            <Text
+                                style={{
+                                    color:
+                                        '#111111',
+
+                                    fontSize: 14,
+
+                                    fontWeight:
+                                        '900',
+                                }}
+                            >
+                                Contáctanos
+                            </Text>
+                        </Pressable>
                     </ScrollView>
                 </View>
 
-                {/* Botones inferiores */}
-                <View className="mt-2 flex-row justify-between px-2">
-                    <Pressable
-                        onPress={handleBackHome}
-                        className="flex-1 mr-2 px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
-                    >
-                        <Text
-                            className="text-[14px] font-normal"
-                            style={{ color: COLORS.textLight }}
-                        >
-                            Volver
-                        </Text>
-                    </Pressable>
 
+                {/* ===================================== */}
+                {/* NAVEGACIÓN INFERIOR                  */}
+                {/* ===================================== */}
+
+                <View
+                    style={{
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        marginBottom: 10,
+                    }}
+                >
                     <Pressable
-                        onPress={() => router.push('/contact')}
-                        className="flex-1  px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
+                        onPress={
+                            handleBackHome
+                        }
+
+                        style={({ pressed }) => ({
+                            height: 58,
+
+                            borderRadius: 17,
+
+                            alignItems:
+                                'center',
+
+                            justifyContent:
+                                'center',
+
+                            backgroundColor:
+                                pressed
+                                    ? '#333333'
+                                    : '#242424',
+
+                            borderWidth: 3,
+
+                            borderColor:
+                                '#353535',
+
+                            opacity:
+                                pressed
+                                    ? 0.8
+                                    : 1,
+                        })}
                     >
                         <Text
-                            className="text-[14px] font-semibold"
-                            style={{ color: COLORS.textLight }}
+                            style={{
+                                color:
+                                    '#FFFFFF',
+
+                                fontSize: 14,
+
+                                fontWeight:
+                                    '700',
+                            }}
                         >
-                            Contáctanos
+                            Volver al home
                         </Text>
                     </Pressable>
                 </View>

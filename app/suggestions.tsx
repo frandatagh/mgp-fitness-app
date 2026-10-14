@@ -1,158 +1,855 @@
 // app/suggestions.tsx
-import React, { useEffect, useState } from "react";
-import { View, Text, ScrollView, ActivityIndicator, Image, Pressable } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
-import { COLORS } from "../constants/colors";
-import { useAuth } from "../context/AuthContext";
-import { Routine, getSuggestedRoutines } from "../lib/routines";
-import { RoutineCard } from "../components/RoutineCard";
-import AppHeader from '../components/AppHeader';
+
+import React, {
+    useEffect,
+    useState,
+} from 'react';
+
+import {
+    View,
+    Text,
+    ScrollView,
+    ActivityIndicator,
+    Pressable,
+    Modal,
+} from 'react-native';
+
+import {
+    SafeAreaView,
+} from 'react-native-safe-area-context';
+
+import {
+    router,
+} from 'expo-router';
+
+import {
+    Ionicons,
+} from '@expo/vector-icons';
+
+import {
+    COLORS,
+} from '../constants/colors';
+
+import {
+    useAuth,
+} from '../context/AuthContext';
+
+import {
+    Routine,
+    getSuggestedRoutines,
+} from '../lib/routines';
+
+import {
+    RoutineCard,
+} from '../components/RoutineCard';
+
+import AppHeader
+    from '../components/AppHeader';
+
+
+/*
+ * =========================================
+ * BOTÓN DE NAVEGACIÓN INFERIOR
+ * =========================================
+ */
+
+function SuggestionsNavButton({
+    icon,
+    onPress,
+}: {
+    icon: React.ReactNode;
+    onPress: () => void;
+}) {
+    return (
+        <Pressable
+            onPress={onPress}
+
+            style={({
+                pressed,
+            }) => ({
+                flex: 1,
+
+                minWidth: 0,
+
+                height: 58,
+
+                borderRadius: 17,
+
+                alignItems:
+                    'center',
+
+                justifyContent:
+                    'center',
+
+                backgroundColor:
+                    pressed
+                        ? '#333333'
+                        : '#242424',
+
+                borderWidth: 3,
+
+                borderColor:
+                    '#353535',
+
+                opacity:
+                    pressed
+                        ? 0.8
+                        : 1,
+            })}
+        >
+            {icon}
+        </Pressable>
+    );
+}
+
 
 export default function SuggestionsScreen() {
-    const { isAuthenticated, user } = useAuth();
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [routines, setRoutines] = useState<Routine[]>([]);
+    const {
+        isAuthenticated,
+        user,
+    } = useAuth();
+
+
+    const [
+        loading,
+        setLoading,
+    ] = useState(true);
+
+
+    const [
+        error,
+        setError,
+    ] =
+        useState<string | null>(
+            null
+        );
+
+
+    const [
+        routines,
+        setRoutines,
+    ] =
+        useState<Routine[]>([]);
+
+
+    /*
+     * Modal:
+     * crear rutina desde cero.
+     */
+    const [
+        createRoutineConfirmVisible,
+        setCreateRoutineConfirmVisible,
+    ] =
+        useState(false);
+
+
+    /*
+     * =========================================
+     * CARGA DE SUGERENCIAS
+     * =========================================
+     */
 
     useEffect(() => {
-        const load = async () => {
-            try {
-                setError(null);
-                setLoading(true);
-                const data = await getSuggestedRoutines();
-                setRoutines(data);
-            } catch (err) {
-                console.error(err);
-                setError(
-                    err instanceof Error
-                        ? err.message
-                        : "No se pudieron cargar las sugerencias"
-                );
-            } finally {
-                setLoading(false);
-            }
-        };
-        load();
+        const load =
+            async () => {
+                try {
+                    setError(null);
+
+                    setLoading(true);
+
+                    const data =
+                        await getSuggestedRoutines();
+
+                    setRoutines(
+                        data
+                    );
+
+                } catch (err) {
+                    console.error(
+                        err
+                    );
+
+                    setError(
+                        err instanceof Error
+                            ? err.message
+                            : 'No se pudieron cargar las sugerencias'
+                    );
+
+                } finally {
+                    setLoading(
+                        false
+                    );
+                }
+            };
+
+
+        void load();
+
     }, []);
+
+
+    /*
+     * =========================================
+     * CREAR RUTINA DESDE CERO
+     * =========================================
+     */
+
+    const handleConfirmCreateRoutine =
+        () => {
+            setCreateRoutineConfirmVisible(
+                false
+            );
+
+            router.push(
+                '/routine/new'
+            );
+        };
+
 
     return (
         <SafeAreaView
             className="flex-1"
-            style={{ backgroundColor: COLORS.background }}
+
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
         >
+            {/* ================================= */}
+            {/* CONTENEDOR GENERAL                */}
+            {/* ================================= */}
+
             <View
-                className="flex-1 px-4  pb-2  w-full"
-                style={{ maxWidth: 800, alignSelf: "center" }}
+                className="flex-1 w-full px-2"
+
+                style={{
+                    maxWidth: 800,
+
+                    alignSelf:
+                        'center',
+                }}
             >
-                <AppHeader showProfile={false} />
+                {/* ============================= */}
+                {/* HEADER                        */}
+                {/* ============================= */}
 
-                {/* Título */}
-                <View className="self-start px-3 mb-1">
-                    <Text className="text-md text-gray-500">
-                        Sugerencias para {user?.name ?? "tu entrenamiento"}
-                    </Text>
-                </View>
-
-                {/* Cuadrante verde */}
                 <View
-                    className="flex-1 mt-2 rounded-3xl px-3 py-4"
-                    style={{ borderWidth: 2, borderColor: COLORS.primary }}
+                    className="px-2"
                 >
-                    <ScrollView showsVerticalScrollIndicator={false}>
-                        <Text
-                            className="text-[13px] mb-3 py-2 px-2"
-                            style={{ color: COLORS.textMuted }}
-                        >
-                            Aquí encontrarás rutinas recomendadas listas para usar. Explora
-                            las opciones, revisa los detalles y copia la rutina que más se
-                            adapte a tus objetivos.
-                            {'\n'}
-                            {'\n'}
-                            Puedes editarla luego según tus preferencias e ir añadiendo tus notas de ejercicios.
-                            {'\n'}
-                            {'\n'}
-                            Recuerda empezar con un buen calentamiento y ajustar la intensidad según tu nivel. Haz click aquí para saber cómo prevenir lesiones o accidentes durante tu entrenamiento.
-                            {'\n'}
-                            {'\n'}
-                            ¡Es hora de entrenar! 💪
-                        </Text>
-
-                        {loading && (
-                            <ActivityIndicator size="small" color={COLORS.primary} />
-                        )}
-
-                        {error && (
-                            <Text
-                                className="text-[13px] mt-2"
-                                style={{ color: "#FFBABA" }}
-                            >
-                                {error}
-                            </Text>
-                        )}
-
-                        {!loading &&
-                            !error &&
-                            routines.map((routine) => (
-                                <RoutineCard
-                                    key={routine.id}
-                                    title={routine.title}
-                                    description={routine.notes}
-                                    highlighted={false}
-                                    exercisesPreview={routine.exercises ?? []}
-                                    mode="suggestion"  // 👈 importante
-
-                                    onOpen={() =>
-                                        router.push({
-                                            pathname: "/suggestions/[id]",
-                                            params: { id: routine.id },
-                                        })
-                                    }
-
-                                    // Estos quedan por compatibilidad, pero no se usan en modo suggestion
-                                    onEdit={() => {
-                                        console.log("Editar rutina sugerida (no disponible)");
-                                    }}
-                                    onDelete={() => {
-                                        return;
-                                    }}
-                                    onShare={() => {
-                                        console.log("Compartir sugerencia", routine.id);
-                                    }}
-                                />
-                            ))}
-
-                    </ScrollView>
-
+                    <AppHeader
+                        showProfile={
+                            isAuthenticated
+                        }
+                    />
                 </View>
-                {/* Botónes inferiores*/}
-                <View className="mt-2 flex-row justify-between px-2">
-                    <Pressable
-                        className="flex-1 mr-2 px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
-                        onPress={() => router.replace('/home')}
+
+
+                {/* ============================= */}
+                {/* TÍTULO                        */}
+                {/* ============================= */}
+
+                <Text
+                    className="ml-5 pl-1 text-md text-gray-500"
+                >
+                    Sugerencias para{' '}
+                    {user?.name ??
+                        'tu entrenamiento'}
+                </Text>
+
+
+                {/* ============================= */}
+                {/* PANEL PRINCIPAL               */}
+                {/* ============================= */}
+
+                <View
+                    style={{
+                        borderWidth: 2,
+
+                        borderColor:
+                            COLORS.primary,
+
+                        borderRadius: 22,
+
+                        backgroundColor:
+                            '#101010',
+
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        flex: 1,
+
+                        overflow:
+                            'hidden',
+                    }}
+                >
+                    <ScrollView
+                        showsVerticalScrollIndicator={
+                            false
+                        }
+
+                        scrollEnabled={
+                            !loading
+                        }
+
+                        style={{
+                            flex: 1,
+                        }}
+
+                        contentContainerStyle={{
+                            padding: 18,
+
+                            paddingBottom:
+                                loading
+                                    ? 18
+                                    : 100,
+
+                            flexGrow: 1,
+                        }}
                     >
-                        <Text
-                            className="text-[14px] font-normal"
-                            style={{ color: COLORS.textLight }}
-                        >
-                            Volver al inicio
-                        </Text>
-                    </Pressable>
-                    <Pressable
-                        className="flex-1  px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
-                        onPress={() => router.push('/routine/new')}
-                    >
-                        <Text
-                            className="text-[14px] font-normal"
-                            style={{ color: COLORS.textLight }}
-                        >
-                            Crear nueva rutina
-                        </Text>
-                    </Pressable>
+                        {loading ? (
+
+                            /*
+                             * =====================
+                             * LOADING
+                             * =====================
+                             */
+
+                            <View
+                                style={{
+                                    flex: 1,
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+                                }}
+                            >
+                                <View
+                                    style={{
+                                        width: 62,
+
+                                        height: 62,
+
+                                        alignItems:
+                                            'center',
+
+                                        justifyContent:
+                                            'center',
+                                    }}
+                                >
+                                    <ActivityIndicator
+                                        size="large"
+
+                                        color={
+                                            COLORS.primary
+                                        }
+                                    />
+                                </View>
+
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textLight,
+
+                                        fontSize: 13,
+
+                                        fontWeight:
+                                            '900',
+
+                                        marginTop: 5,
+                                    }}
+                                >
+                                    Cargando sugerencias
+                                </Text>
+
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textMuted,
+
+                                        fontSize: 10,
+
+                                        marginTop: 5,
+
+                                        textAlign:
+                                            'center',
+                                    }}
+                                >
+                                    Preparando rutinas para tu entrenamiento...
+                                </Text>
+                            </View>
+
+                        ) : error ? (
+
+                            /*
+                             * =====================
+                             * ERROR
+                             * =====================
+                             */
+
+                            <View
+                                style={{
+                                    flex: 1,
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+
+                                    paddingHorizontal:
+                                        20,
+                                }}
+                            >
+                                <Ionicons
+                                    name="alert-circle-outline"
+
+                                    size={34}
+
+                                    color="#FF6B6B"
+                                />
+
+                                <Text
+                                    style={{
+                                        color:
+                                            '#FFBABA',
+
+                                        fontSize: 13,
+
+                                        textAlign:
+                                            'center',
+
+                                        marginTop: 10,
+                                    }}
+                                >
+                                    {error}
+                                </Text>
+                            </View>
+
+                        ) : (
+
+                            /*
+                             * =====================
+                             * CONTENIDO
+                             * =====================
+                             */
+
+                            <>
+                                {/* INTRODUCCIÓN */}
+
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textMuted,
+
+                                        fontSize: 13,
+
+                                        lineHeight: 19,
+
+                                        marginBottom:
+                                            16,
+
+                                        paddingHorizontal:
+                                            2,
+                                    }}
+                                >
+                                    Aquí encontrarás rutinas recomendadas listas para usar.
+                                    Explora las opciones, revisa los detalles y copia la rutina
+                                    que más se adapte a tus objetivos.
+                                    {'\n\n'}
+                                    Puedes editarla luego según tus preferencias e ir añadiendo
+                                    tus notas de ejercicios.
+                                    {'\n\n'}
+                                    Recuerda empezar con un buen calentamiento y ajustar la
+                                    intensidad según tu nivel.
+                                    {'\n\n'}
+                                    ¡Es hora de entrenar! 💪
+                                </Text>
+
+
+                                {/* RUTINAS SUGERIDAS */}
+
+                                {routines.map(
+                                    (
+                                        routine
+                                    ) => (
+                                        <RoutineCard
+                                            key={
+                                                routine.id
+                                            }
+
+                                            title={
+                                                routine.title
+                                            }
+
+                                            description={
+                                                routine.notes
+                                            }
+
+                                            highlighted={
+                                                false
+                                            }
+
+                                            exercisesPreview={
+                                                routine.exercises ??
+                                                []
+                                            }
+
+                                            mode="suggestion"
+
+                                            onOpen={() =>
+                                                router.push({
+                                                    pathname:
+                                                        '/suggestions/[id]',
+
+                                                    params: {
+                                                        id:
+                                                            routine.id,
+                                                    },
+                                                })
+                                            }
+
+                                            onEdit={() => {
+                                                console.log(
+                                                    'Editar rutina sugerida (no disponible)'
+                                                );
+                                            }}
+
+                                            onDelete={() => {
+                                                return;
+                                            }}
+
+                                            onShare={() => {
+                                                console.log(
+                                                    'Compartir sugerencia',
+                                                    routine.id
+                                                );
+                                            }}
+                                        />
+                                    )
+                                )}
+                            </>
+                        )}
+                    </ScrollView>
+                </View>
+
+
+                {/* ============================= */}
+                {/* NAVEGACIÓN INFERIOR          */}
+                {/* ============================= */}
+
+                <View
+                    style={{
+                        flexDirection:
+                            'row',
+
+                        alignItems:
+                            'center',
+
+                        justifyContent:
+                            'space-between',
+
+                        gap: 8,
+
+                        marginHorizontal:
+                            8,
+
+                        marginTop: 10,
+
+                        marginBottom: 10,
+                    }}
+                >
+                    {/* 1 — HOME */}
+
+                    <SuggestionsNavButton
+                        onPress={() =>
+                            router.replace(
+                                '/home'
+                            )
+                        }
+
+                        icon={
+                            <Ionicons
+                                name="home-outline"
+
+                                size={27}
+
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
+
+
+                    {/* 2 — PERFIL */}
+
+                    <SuggestionsNavButton
+                        onPress={() =>
+                            router.push(
+                                '/profile'
+                            )
+                        }
+
+                        icon={
+                            <Ionicons
+                                name="person-circle-outline"
+
+                                size={32}
+
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
+
+
+                    {/* 3 — ESTADÍSTICAS */}
+
+                    <SuggestionsNavButton
+                        onPress={() =>
+                            router.push(
+                                '/statistics'
+                            )
+                        }
+
+                        icon={
+                            <Ionicons
+                                name="stats-chart-outline"
+
+                                size={27}
+
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
+
+
+                    {/* 4 — CREAR RUTINA */}
+
+                    <SuggestionsNavButton
+                        onPress={() =>
+                            setCreateRoutineConfirmVisible(
+                                true
+                            )
+                        }
+
+                        icon={
+                            <Ionicons
+                                name="add"
+
+                                size={34}
+
+                                color="#FFFFFF"
+                            />
+                        }
+                    />
                 </View>
             </View>
+
+
+            {/* ================================= */}
+            {/* MODAL — CREAR DESDE CERO         */}
+            {/* ================================= */}
+
+            <Modal
+                visible={
+                    createRoutineConfirmVisible
+                }
+
+                transparent
+
+                animationType="fade"
+
+                onRequestClose={() =>
+                    setCreateRoutineConfirmVisible(
+                        false
+                    )
+                }
+            >
+                <View
+                    style={{
+                        flex: 1,
+
+                        backgroundColor:
+                            'rgba(0,0,0,0.75)',
+
+                        alignItems:
+                            'center',
+
+                        justifyContent:
+                            'center',
+
+                        padding: 24,
+                    }}
+                >
+                    <View
+                        style={{
+                            width:
+                                '100%',
+
+                            maxWidth: 350,
+
+                            backgroundColor:
+                                '#101010',
+
+                            borderRadius: 24,
+
+                            borderWidth: 1,
+
+                            borderColor:
+                                '#343434',
+
+                            padding: 18,
+                        }}
+                    >
+
+
+
+                        {/* TÍTULO */}
+
+                        <Text
+                            style={{
+                                color:
+                                    COLORS.textLight,
+
+                                fontSize: 18,
+
+                                fontWeight:
+                                    '900',
+
+                                textAlign:
+                                    'center',
+                            }}
+                        >
+                            ¿Crear una rutina desde cero?
+                        </Text>
+
+
+                        {/* TEXTO */}
+
+                        <Text
+                            style={{
+                                color:
+                                    COLORS.textMuted,
+
+                                fontSize: 13,
+
+                                lineHeight: 19,
+
+                                textAlign:
+                                    'center',
+
+                                marginTop: 10,
+                            }}
+                        >
+                            Vas a comenzar una nueva rutina vacía y podrás agregar tus ejercicios manualmente.
+                        </Text>
+
+
+                        {/* BOTONES */}
+
+                        <View
+                            style={{
+                                flexDirection:
+                                    'row',
+
+                                gap: 10,
+
+                                marginTop: 18,
+                            }}
+                        >
+                            {/* CANCELAR */}
+
+                            <Pressable
+                                onPress={() =>
+                                    setCreateRoutineConfirmVisible(
+                                        false
+                                    )
+                                }
+
+                                style={({ pressed }) => ({
+                                    flex: 1,
+
+                                    minHeight: 46,
+
+                                    borderRadius:
+                                        14,
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+
+                                    backgroundColor:
+                                        pressed
+                                            ? '#444444'
+                                            : '#303030',
+                                })}
+                            >
+                                <Text
+                                    style={{
+                                        color:
+                                            COLORS.textLight,
+
+                                        fontSize: 13,
+
+                                        fontWeight:
+                                            '800',
+                                    }}
+                                >
+                                    Cancelar
+                                </Text>
+                            </Pressable>
+
+
+                            {/* CREAR */}
+
+                            <Pressable
+                                onPress={
+                                    handleConfirmCreateRoutine
+                                }
+
+                                style={({ pressed }) => ({
+                                    flex: 1,
+
+                                    minHeight: 46,
+
+                                    borderRadius:
+                                        14,
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+
+                                    backgroundColor:
+                                        pressed
+                                            ? '#B4E800'
+                                            : COLORS.primary,
+                                })}
+                            >
+                                <Text
+                                    style={{
+                                        color:
+                                            '#111111',
+
+                                        fontSize: 13,
+
+                                        fontWeight:
+                                            '900',
+                                    }}
+                                >
+                                    Sí, crear
+                                </Text>
+                            </Pressable>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }

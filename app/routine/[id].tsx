@@ -1278,44 +1278,15 @@ export default function RoutineDetailScreen() {
         );
     };
 
-    if (loading) {
-        return (
-            <SafeAreaView
-                className="flex-1 items-center justify-center"
-                style={{ backgroundColor: COLORS.background }}
-            >
-                <ActivityIndicator size="large" color={COLORS.primary} />
-            </SafeAreaView>
-        );
-    }
-
-    if (error || !routine) {
-        return (
-            <SafeAreaView
-                className="flex-1 items-center justify-center px-4"
-                style={{ backgroundColor: COLORS.background }}
-            >
-                <Text style={{ color: COLORS.textLight, marginBottom: 12 }}>
-                    {error ?? 'Rutina no encontrada.'}
-                </Text>
-                <Pressable
-                    onPress={handleBack}
-                    className="px-4 py-3 rounded-xl"
-                    style={{ backgroundColor: COLORS.primary }}
-                >
-                    <Text style={{ color: '#111111', fontWeight: '600' }}>Volver</Text>
-                </Pressable>
-            </SafeAreaView>
-        );
-    }
-
     // 👉 Ordenamos por `order` y agrupamos por `day`
     const exercises: RoutineExercise[] =
-        (routine.exercises ?? []).slice().sort((a, b) => {
-            const ao = a.order ?? 0;
-            const bo = b.order ?? 0;
-            return ao - bo;
-        });
+        (routine?.exercises ?? [])
+            .slice()
+            .sort((a, b) => {
+                const ao = a.order ?? 0;
+                const bo = b.order ?? 0;
+                return ao - bo;
+            });
 
     const groupedByDay: Record<string, RoutineExercise[]> = {};
 
@@ -1349,324 +1320,364 @@ export default function RoutineDetailScreen() {
     return (
         <SafeAreaView
             className="flex-1"
-            style={{ backgroundColor: COLORS.background }}
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
         >
+            {/* ========================================= */}
+            {/* CONTENEDOR GENERAL                       */}
+            {/* ========================================= */}
 
-            <View className="flex-1 px-4"
+            <View
+                className="flex-1 w-full px-2"
                 style={{
                     maxWidth: 800,
                     alignSelf: 'center',
-                    width: '100%',
                     minHeight: 0,
-                }}>
-                {/* Encabezado superior */}
-                <AppHeader showProfile={false} />
+                }}
+            >
+                {/* ===================================== */}
+                {/* HEADER                                */}
+                {/* ===================================== */}
 
-                {/* Contenedor principal de la tarjeta */}
+                <View className="px-2">
+                    <AppHeader
+                        showProfile={true}
+                    />
+                </View>
+
+
+                {/* ===================================== */}
+                {/* TÍTULO DE PANTALLA                   */}
+                {/* ===================================== */}
+
+                <Text
+                    className="ml-5 pl-1 text-md text-gray-500"
+                >
+                    Detalle de rutina
+                </Text>
+
+
+                {/* ===================================== */}
+                {/* PANEL PRINCIPAL                       */}
+                {/* ===================================== */}
+
                 <View
-                    className="flex-1 rounded-3xl mt-3 py-3"
                     style={{
                         borderWidth: 2,
-                        borderColor: COLORS.primary,
-                        overflow: 'hidden',   // no necesitamos popups aquí
-                        marginBottom: 8,      // un poco de aire antes de los botones
-                        minHeight: 0,         // 👈 deja que el ScrollView se adapte
+
+                        borderColor:
+                            COLORS.primary,
+
+                        borderRadius: 22,
+
+                        backgroundColor:
+                            '#101010',
+
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        flex: 1,
+
+                        minHeight: 0,
+
+                        overflow:
+                            'hidden',
                     }}
                 >
-                    {/* TÍTULO + BOTÓN MENÚ (FIJOS) */}
-                    <View className="flex-row items-center mb-3 px-4">
-                        <View style={{ flex: 1, marginRight: 10 }}>
-                            <Text
-                                className="text-[16px] font-bold text-white"
-                                numberOfLines={2}
-                                ellipsizeMode="tail"
+
+                    {loading ? (
+
+                        /* ========================================= */
+                        /* CARGANDO                                  */
+                        /* ========================================= */
+
+                        <View
+                            style={{
+                                flex: 1,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: 18,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 62,
+                                    height: 62,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
                             >
-                                {routine.title}
+                                <ActivityIndicator
+                                    size="large"
+                                    color={COLORS.primary}
+                                />
+                            </View>
+
+                            <Text
+                                style={{
+                                    color: COLORS.textLight,
+                                    fontSize: 13,
+                                    fontWeight: '900',
+                                    marginTop: 5,
+                                }}
+                            >
+                                Cargando tu rutina
+                            </Text>
+
+                            <Text
+                                style={{
+                                    color: COLORS.textMuted,
+                                    fontSize: 10,
+                                    marginTop: 5,
+                                    textAlign: 'center',
+                                }}
+                            >
+                                Preparando ejercicios y datos...
                             </Text>
                         </View>
 
-                        <Pressable
-                            onPress={() => setMenuVisible(true)}
-                            hitSlop={8}
-                            style={({ pressed }) => ({
-                                width: 32,
-                                height: 32,
-                                borderRadius: 9999,
+                    ) : error || !routine ? (
+
+                        /* ========================================= */
+                        /* ERROR                                     */
+                        /* ========================================= */
+
+                        <View
+                            style={{
+                                flex: 1,
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                backgroundColor: pressed ? '#3f3f3f' : 'transparent',
-                                flexShrink: 0,
-                            })}
+                                paddingHorizontal: 24,
+                            }}
                         >
-                            <Text style={{ fontSize: 20, color: '#ffffff' }}>⋯</Text>
-                        </Pressable>
-                    </View>
+                            <Ionicons
+                                name="alert-circle-outline"
+                                size={36}
+                                color="#FF6B6B"
+                            />
 
-                    {/* ZONA SCROLLEABLE: DESCRIPCIÓN + TABLA */}
-                    <View style={{ flex: 1 }}>
-                        <ScrollView
-                            style={{ flex: 1 }}
-                            showsVerticalScrollIndicator={false}
-                            contentContainerStyle={{ paddingBottom: 16 }}
-                        >
-                            {/* Descripción */}
-                            {routine.notes && (
-                                <Text
-                                    className="text-[14px] leading-5 text-gray-200 mb-2 px-4"
-                                    style={{ color: COLORS.textMuted }}
-                                >
-                                    {routine.notes}
-                                </Text>
-                            )}
+                            <Text
+                                style={{
+                                    color: COLORS.textLight,
+                                    fontSize: 14,
+                                    fontWeight: '800',
+                                    textAlign: 'center',
+                                    marginTop: 12,
+                                }}
+                            >
+                                {error ?? 'Rutina no encontrada.'}
+                            </Text>
 
+                            <Text
+                                style={{
+                                    color: COLORS.textMuted,
+                                    fontSize: 10,
+                                    lineHeight: 16,
+                                    textAlign: 'center',
+                                    marginTop: 6,
+                                }}
+                            >
+                                Podés volver al inicio e intentar nuevamente.
+                            </Text>
+                        </View>
+
+                    ) : (
+
+                        <>
+
+                            {/* TÍTULO + BOTÓN MENÚ (FIJOS) */}
                             <View
                                 style={{
                                     flexDirection: 'row',
+
                                     alignItems: 'center',
+
+                                    marginBottom: 12,
+
                                     paddingHorizontal: 16,
-                                    marginTop: 3,
-                                    marginBottom: 6,
+
+                                    paddingTop: 14,
                                 }}
                             >
-                                <Ionicons
-                                    name="star-outline"
-                                    size={20}
-                                    color={
-                                        routine.lastRating != null
-                                            ? COLORS.primary
-                                            : '#666666'
-                                    }
-                                />
-
-                                <Text
-                                    style={{
-                                        color: '#929292',
-                                        fontSize: 13,
-                                        marginLeft: 6,
-                                    }}
-                                >
-                                    Última marca de rutina:{' '}
-
+                                <View style={{ flex: 1, marginRight: 10 }}>
                                     <Text
-                                        style={{
-                                            color:
-                                                routine.lastRating != null
-                                                    ? COLORS.primary
-                                                    : '#777777',
-
-                                            fontWeight: '900',
-                                        }}
+                                        className="text-[16px] font-bold text-white"
+                                        numberOfLines={2}
+                                        ellipsizeMode="tail"
                                     >
-                                        {formatLastRating(
-                                            routine.lastRating
-                                        )}
+                                        {routine.title}
                                     </Text>
-                                </Text>
+                                </View>
+
+                                <Pressable
+                                    onPress={() => setMenuVisible(true)}
+                                    hitSlop={8}
+                                    style={({ pressed }) => ({
+                                        width: 32,
+                                        height: 32,
+                                        borderRadius: 9999,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: pressed ? '#3f3f3f' : 'transparent',
+                                        flexShrink: 0,
+                                    })}
+                                >
+                                    <Text style={{ fontSize: 20, color: '#ffffff' }}>⋯</Text>
+                                </Pressable>
                             </View>
 
-                            {/* VISUALIZACIÓN DE LA RUTINA */}
+                            {/* ZONA SCROLLEABLE: DESCRIPCIÓN + TABLA */}
+                            <View style={{ flex: 1 }}>
+                                <ScrollView
+                                    style={{ flex: 1 }}
+                                    showsVerticalScrollIndicator={false}
+                                    contentContainerStyle={{ paddingBottom: 16 }}
+                                >
+                                    {/* Descripción */}
+                                    {routine.notes && (
+                                        <Text
+                                            className="text-[14px] leading-5 text-gray-200 mb-2 px-4"
+                                            style={{ color: COLORS.textMuted }}
+                                        >
+                                            {routine.notes}
+                                        </Text>
+                                    )}
 
-                            <View
-                                style={{
-                                    marginTop: 12,
-                                    paddingHorizontal: 16,
-                                }}
-                            >
-                                {routineViewMode ===
-                                    'table' ? (
-                                    /*
-                                     * =========================
-                                     * VISTA 1 — TABLA
-                                     * =========================
-                                     */
-                                    <>
-                                        {Object.entries(
-                                            groupedByDay
-                                        ).map(
-                                            ([day, exs]) => (
-                                                <View
-                                                    key={day}
-                                                    style={{
-                                                        marginBottom:
-                                                            12,
-                                                    }}
-                                                >
-                                                    {/* DÍA */}
+                                    <View
+                                        style={{
+                                            flexDirection: 'row',
+                                            alignItems: 'center',
+                                            paddingHorizontal: 16,
+                                            marginTop: 3,
+                                            marginBottom: 6,
+                                        }}
+                                    >
+                                        <Ionicons
+                                            name="star-outline"
+                                            size={20}
+                                            color={
+                                                routine.lastRating != null
+                                                    ? COLORS.primary
+                                                    : '#666666'
+                                            }
+                                        />
 
-                                                    <View
-                                                        style={{
-                                                            marginBottom:
-                                                                4,
-                                                        }}
-                                                    >
-                                                        <Text
+                                        <Text
+                                            style={{
+                                                color: '#929292',
+                                                fontSize: 13,
+                                                marginLeft: 6,
+                                            }}
+                                        >
+                                            Última marca de rutina:{' '}
+
+                                            <Text
+                                                style={{
+                                                    color:
+                                                        routine.lastRating != null
+                                                            ? COLORS.primary
+                                                            : '#777777',
+
+                                                    fontWeight: '900',
+                                                }}
+                                            >
+                                                {formatLastRating(
+                                                    routine.lastRating
+                                                )}
+                                            </Text>
+                                        </Text>
+                                    </View>
+
+                                    {/* VISUALIZACIÓN DE LA RUTINA */}
+
+                                    <View
+                                        style={{
+                                            marginTop: 12,
+                                            paddingHorizontal: 16,
+                                        }}
+                                    >
+                                        {routineViewMode ===
+                                            'table' ? (
+                                            /*
+                                             * =========================
+                                             * VISTA 1 — TABLA
+                                             * =========================
+                                             */
+                                            <>
+                                                {Object.entries(
+                                                    groupedByDay
+                                                ).map(
+                                                    ([day, exs]) => (
+                                                        <View
+                                                            key={day}
                                                             style={{
-                                                                color:
-                                                                    '#9CA3AF',
-
-                                                                fontSize:
-                                                                    13,
-
-                                                                fontWeight:
-                                                                    '800',
+                                                                marginBottom:
+                                                                    12,
                                                             }}
                                                         >
-                                                            {day}
-                                                        </Text>
-                                                    </View>
+                                                            {/* DÍA */}
 
-                                                    {/* ENCABEZADOS */}
+                                                            <View
+                                                                style={{
+                                                                    marginBottom:
+                                                                        4,
+                                                                }}
+                                                            >
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            '#9CA3AF',
 
-                                                    <View
-                                                        style={{
-                                                            flexDirection:
-                                                                'row',
+                                                                        fontSize:
+                                                                            13,
 
-                                                            borderBottomWidth:
-                                                                1,
+                                                                        fontWeight:
+                                                                            '800',
+                                                                    }}
+                                                                >
+                                                                    {day}
+                                                                </Text>
+                                                            </View>
 
-                                                            borderBottomColor:
-                                                                COLORS.primary,
+                                                            {/* ENCABEZADOS */}
 
-                                                            paddingBottom:
-                                                                4,
-
-                                                            marginBottom:
-                                                                4,
-                                                        }}
-                                                    >
-                                                        <Text
-                                                            style={[
-                                                                colName,
-                                                                {
-                                                                    color:
-                                                                        '#F3F4F6',
-
-                                                                    fontSize:
-                                                                        14,
-
-                                                                    fontWeight:
-                                                                        '700',
-                                                                },
-                                                            ]}
-                                                        >
-                                                            Ejercicios
-                                                        </Text>
-
-                                                        <Text
-                                                            style={[
-                                                                colSets,
-                                                                {
-                                                                    color:
-                                                                        '#F3F4F6',
-
-                                                                    fontSize:
-                                                                        14,
-
-                                                                    fontWeight:
-                                                                        '700',
-
-                                                                    textAlign:
-                                                                        'center',
-                                                                },
-                                                            ]}
-                                                        >
-                                                            Series
-                                                        </Text>
-
-                                                        <Text
-                                                            style={[
-                                                                colReps,
-                                                                {
-                                                                    color:
-                                                                        '#F3F4F6',
-
-                                                                    fontSize:
-                                                                        14,
-
-                                                                    fontWeight:
-                                                                        '700',
-
-                                                                    textAlign:
-                                                                        'center',
-                                                                },
-                                                            ]}
-                                                        >
-                                                            Reps.
-                                                        </Text>
-
-                                                        <Text
-                                                            style={[
-                                                                colRating,
-                                                                {
-                                                                    color: '#F3F4F6',
-                                                                    fontSize: 12,
-                                                                    fontWeight: '700',
-                                                                    textAlign: 'center',
-                                                                },
-                                                            ]}
-                                                        >
-                                                            Última
-                                                        </Text>
-                                                    </View>
-
-                                                    {/* FILAS */}
-
-                                                    {exs.map(
-                                                        (
-                                                            ex,
-                                                            index
-                                                        ) => (
-                                                            <Pressable
-                                                                key={
-                                                                    ex.id ??
-                                                                    `${day}-${index}`
-                                                                }
-                                                                onPress={() =>
-                                                                    openExerciseModal(
-                                                                        ex,
-                                                                        day
-                                                                    )
-                                                                }
-                                                                style={({
-                                                                    pressed,
-                                                                }) => ({
+                                                            <View
+                                                                style={{
                                                                     flexDirection:
                                                                         'row',
-
-                                                                    paddingVertical:
-                                                                        6,
 
                                                                     borderBottomWidth:
                                                                         1,
 
                                                                     borderBottomColor:
-                                                                        '#262626',
+                                                                        COLORS.primary,
 
-                                                                    backgroundColor:
-                                                                        pressed
-                                                                            ? '#202020'
-                                                                            : 'transparent',
-                                                                })}
+                                                                    paddingBottom:
+                                                                        4,
+
+                                                                    marginBottom:
+                                                                        4,
+                                                                }}
                                                             >
                                                                 <Text
                                                                     style={[
                                                                         colName,
                                                                         {
                                                                             color:
-                                                                                '#E5E7EB',
+                                                                                '#F3F4F6',
 
                                                                             fontSize:
                                                                                 14,
+
+                                                                            fontWeight:
+                                                                                '700',
                                                                         },
                                                                     ]}
-                                                                    numberOfLines={
-                                                                        1
-                                                                    }
                                                                 >
-                                                                    {
-                                                                        ex.name
-                                                                    }
+                                                                    Ejercicios
                                                                 </Text>
 
                                                                 <Text
@@ -1674,18 +1685,20 @@ export default function RoutineDetailScreen() {
                                                                         colSets,
                                                                         {
                                                                             color:
-                                                                                '#D1D5DB',
+                                                                                '#F3F4F6',
 
                                                                             fontSize:
                                                                                 14,
+
+                                                                            fontWeight:
+                                                                                '700',
 
                                                                             textAlign:
                                                                                 'center',
                                                                         },
                                                                     ]}
                                                                 >
-                                                                    {ex.sets ??
-                                                                        '-'}
+                                                                    Series
                                                                 </Text>
 
                                                                 <Text
@@ -1693,576 +1706,692 @@ export default function RoutineDetailScreen() {
                                                                         colReps,
                                                                         {
                                                                             color:
-                                                                                '#D1D5DB',
+                                                                                '#F3F4F6',
 
                                                                             fontSize:
                                                                                 14,
+
+                                                                            fontWeight:
+                                                                                '700',
 
                                                                             textAlign:
                                                                                 'center',
                                                                         },
                                                                     ]}
                                                                 >
-                                                                    {ex.reps ??
-                                                                        '-'}
+                                                                    Reps.
                                                                 </Text>
 
                                                                 <Text
                                                                     style={[
                                                                         colRating,
                                                                         {
-                                                                            color:
-                                                                                ex.lastRating != null
-                                                                                    ? COLORS.primary
-                                                                                    : '#777777',
-
+                                                                            color: '#F3F4F6',
                                                                             fontSize: 12,
-
-                                                                            fontWeight:
-                                                                                ex.lastRating != null
-                                                                                    ? '900'
-                                                                                    : '600',
-
+                                                                            fontWeight: '700',
                                                                             textAlign: 'center',
                                                                         },
                                                                     ]}
                                                                 >
-                                                                    {ex.lastRating != null
-                                                                        ? `${ex.lastRating}/10`
-                                                                        : '--'}
+                                                                    Última
                                                                 </Text>
-                                                            </Pressable>
-                                                        )
-                                                    )}
-                                                </View>
-                                            )
-                                        )}
-                                    </>
-                                ) : (
-                                    /*
-                                     * =========================
-                                     * VISTA 2 — TARJETAS
-                                     * =========================
-                                     */
-                                    <>
-                                        {Object.entries(
-                                            groupedByDay
-                                        ).map(
-                                            ([day, exs]) => (
-                                                <View
-                                                    key={day}
-                                                    style={{
-                                                        marginBottom:
-                                                            18,
-                                                    }}
-                                                >
-                                                    {/* CABECERA DEL DÍA */}
+                                                            </View>
 
-                                                    <View
-                                                        style={{
-                                                            flexDirection:
-                                                                'row',
+                                                            {/* FILAS */}
 
-                                                            alignItems:
-                                                                'center',
-
-                                                            marginBottom:
-                                                                9,
-                                                        }}
-                                                    >
-                                                        <View
-                                                            style={{
-                                                                width: 28,
-                                                                height: 28,
-
-                                                                borderRadius:
-                                                                    14,
-
-                                                                alignItems:
-                                                                    'center',
-
-                                                                justifyContent:
-                                                                    'center',
-
-                                                                backgroundColor:
-                                                                    'rgba(198,255,0,0.08)',
-
-                                                                borderWidth:
-                                                                    1,
-
-                                                                borderColor:
-                                                                    'rgba(198,255,0,0.30)',
-                                                            }}
-                                                        >
-                                                            <Ionicons
-                                                                name="calendar-outline"
-                                                                size={15}
-                                                                color={
-                                                                    COLORS.primary
-                                                                }
-                                                            />
-                                                        </View>
-
-                                                        <Text
-                                                            style={{
-                                                                color:
-                                                                    COLORS.textLight,
-
-                                                                fontSize:
-                                                                    14,
-
-                                                                fontWeight:
-                                                                    '900',
-
-                                                                marginLeft:
-                                                                    8,
-                                                            }}
-                                                        >
-                                                            {day}
-                                                        </Text>
-
-                                                        <Text
-                                                            style={{
-                                                                color:
-                                                                    COLORS.textMuted,
-
-                                                                fontSize:
-                                                                    10,
-
-                                                                marginLeft:
-                                                                    7,
-                                                            }}
-                                                        >
-                                                            {exs.length}{' '}
-                                                            {exs.length ===
-                                                                1
-                                                                ? 'ejercicio'
-                                                                : 'ejercicios'}
-                                                        </Text>
-                                                    </View>
-
-                                                    {/* TARJETAS */}
-
-                                                    {exs.map(
-                                                        (
-                                                            ex,
-                                                            index
-                                                        ) => {
-                                                            const hasNotes =
-                                                                Boolean(
-                                                                    ex.notes &&
-                                                                    ex.notes
-                                                                        .trim()
-                                                                        .length >
-                                                                    0
-                                                                );
-
-                                                            return (
-                                                                <Pressable
-                                                                    key={
-                                                                        ex.id ??
-                                                                        `${day}-${index}`
-                                                                    }
-                                                                    onPress={() =>
-                                                                        openExerciseModal(
-                                                                            ex,
-                                                                            day
-                                                                        )
-                                                                    }
-                                                                    style={({
-                                                                        pressed,
-                                                                    }) => ({
-                                                                        backgroundColor:
-                                                                            pressed
-                                                                                ? '#222222'
-                                                                                : '#181818',
-
-                                                                        borderWidth:
-                                                                            1,
-
-                                                                        borderColor:
-                                                                            pressed
-                                                                                ? 'rgba(198,255,0,0.55)'
-                                                                                : '#303030',
-
-                                                                        borderRadius:
-                                                                            18,
-
-                                                                        padding:
-                                                                            13,
-
-                                                                        marginBottom:
-                                                                            9,
-
-                                                                        transform: [
-                                                                            {
-                                                                                scale:
-                                                                                    pressed
-                                                                                        ? 0.99
-                                                                                        : 1,
-                                                                            },
-                                                                        ],
-                                                                    })}
-                                                                >
-                                                                    {/* CABECERA EJERCICIO */}
-
-                                                                    <View
-                                                                        style={{
+                                                            {exs.map(
+                                                                (
+                                                                    ex,
+                                                                    index
+                                                                ) => (
+                                                                    <Pressable
+                                                                        key={
+                                                                            ex.id ??
+                                                                            `${day}-${index}`
+                                                                        }
+                                                                        onPress={() =>
+                                                                            openExerciseModal(
+                                                                                ex,
+                                                                                day
+                                                                            )
+                                                                        }
+                                                                        style={({
+                                                                            pressed,
+                                                                        }) => ({
                                                                             flexDirection:
                                                                                 'row',
 
-                                                                            alignItems:
-                                                                                'center',
-                                                                        }}
+                                                                            paddingVertical:
+                                                                                6,
+
+                                                                            borderBottomWidth:
+                                                                                1,
+
+                                                                            borderBottomColor:
+                                                                                '#262626',
+
+                                                                            backgroundColor:
+                                                                                pressed
+                                                                                    ? '#202020'
+                                                                                    : 'transparent',
+                                                                        })}
                                                                     >
-                                                                        {/* NÚMERO */}
-
-                                                                        <View
-                                                                            style={{
-                                                                                width:
-                                                                                    31,
-
-                                                                                height:
-                                                                                    31,
-
-                                                                                borderRadius:
-                                                                                    16,
-
-                                                                                backgroundColor:
-                                                                                    '#222222',
-
-                                                                                borderWidth:
-                                                                                    1,
-
-                                                                                borderColor:
-                                                                                    '#383838',
-
-                                                                                alignItems:
-                                                                                    'center',
-
-                                                                                justifyContent:
-                                                                                    'center',
-
-                                                                                marginRight:
-                                                                                    10,
-                                                                            }}
-                                                                        >
-                                                                            <Text
-                                                                                style={{
+                                                                        <Text
+                                                                            style={[
+                                                                                colName,
+                                                                                {
                                                                                     color:
-                                                                                        COLORS.primary,
+                                                                                        '#E5E7EB',
 
                                                                                     fontSize:
-                                                                                        11,
-
-                                                                                    fontWeight:
-                                                                                        '900',
-                                                                                }}
-                                                                            >
-                                                                                {String(
-                                                                                    index +
-                                                                                    1
-                                                                                ).padStart(
-                                                                                    2,
-                                                                                    '0'
-                                                                                )}
-                                                                            </Text>
-                                                                        </View>
-
-                                                                        {/* NOMBRE */}
-
-                                                                        <Text
+                                                                                        14,
+                                                                                },
+                                                                            ]}
                                                                             numberOfLines={
-                                                                                2
+                                                                                1
                                                                             }
-                                                                            style={{
-                                                                                flex: 1,
-
-                                                                                color:
-                                                                                    COLORS.textLight,
-
-                                                                                fontSize:
-                                                                                    15,
-
-                                                                                fontWeight:
-                                                                                    '900',
-
-                                                                                lineHeight:
-                                                                                    19,
-                                                                            }}
                                                                         >
                                                                             {
                                                                                 ex.name
                                                                             }
                                                                         </Text>
 
-                                                                        <Ionicons
-                                                                            name="chevron-forward"
-                                                                            size={18}
-                                                                            color="#666666"
-                                                                            style={{
-                                                                                marginLeft:
-                                                                                    6,
-                                                                            }}
-                                                                        />
-                                                                    </View>
-
-                                                                    {/* SERIES Y REPS */}
-
-                                                                    <View
-                                                                        style={{
-                                                                            flexDirection:
-                                                                                'row',
-
-                                                                            marginTop:
-                                                                                12,
-
-                                                                            gap: 8,
-                                                                        }}
-                                                                    >
-                                                                        <View
-                                                                            style={{
-                                                                                flex: 1,
-
-                                                                                backgroundColor:
-                                                                                    '#111111',
-
-                                                                                borderRadius:
-                                                                                    12,
-
-                                                                                paddingVertical:
-                                                                                    8,
-
-                                                                                paddingHorizontal:
-                                                                                    10,
-
-                                                                                borderWidth:
-                                                                                    1,
-
-                                                                                borderColor:
-                                                                                    '#292929',
-                                                                            }}
-                                                                        >
-                                                                            <Text
-                                                                                style={{
-                                                                                    color:
-                                                                                        '#747474',
-
-                                                                                    fontSize:
-                                                                                        8,
-
-                                                                                    fontWeight:
-                                                                                        '900',
-
-                                                                                    letterSpacing:
-                                                                                        0.7,
-                                                                                }}
-                                                                            >
-                                                                                SERIES
-                                                                            </Text>
-
-                                                                            <Text
-                                                                                style={{
-                                                                                    color:
-                                                                                        '#E5E5E5',
-
-                                                                                    fontSize:
-                                                                                        15,
-
-                                                                                    fontWeight:
-                                                                                        '900',
-
-                                                                                    marginTop:
-                                                                                        2,
-                                                                                }}
-                                                                            >
-                                                                                {ex.sets ??
-                                                                                    '-'}
-                                                                            </Text>
-                                                                        </View>
-
-                                                                        <View
-                                                                            style={{
-                                                                                flex: 1,
-
-                                                                                backgroundColor:
-                                                                                    '#111111',
-
-                                                                                borderRadius:
-                                                                                    12,
-
-                                                                                paddingVertical:
-                                                                                    8,
-
-                                                                                paddingHorizontal:
-                                                                                    10,
-
-                                                                                borderWidth:
-                                                                                    1,
-
-                                                                                borderColor:
-                                                                                    '#292929',
-                                                                            }}
-                                                                        >
-                                                                            <Text
-                                                                                style={{
-                                                                                    color:
-                                                                                        '#747474',
-
-                                                                                    fontSize:
-                                                                                        8,
-
-                                                                                    fontWeight:
-                                                                                        '900',
-
-                                                                                    letterSpacing:
-                                                                                        0.7,
-                                                                                }}
-                                                                            >
-                                                                                REPETICIONES
-                                                                            </Text>
-
-                                                                            <Text
-                                                                                style={{
-                                                                                    color:
-                                                                                        '#E5E5E5',
-
-                                                                                    fontSize:
-                                                                                        15,
-
-                                                                                    fontWeight:
-                                                                                        '900',
-
-                                                                                    marginTop:
-                                                                                        2,
-                                                                                }}
-                                                                            >
-                                                                                {ex.reps ??
-                                                                                    '-'}
-                                                                            </Text>
-                                                                        </View>
-                                                                    </View>
-
-                                                                    {/* NOTAS */}
-
-                                                                    {hasNotes && (
-                                                                        <View
-                                                                            style={{
-                                                                                flexDirection:
-                                                                                    'row',
-
-                                                                                alignItems:
-                                                                                    'flex-start',
-
-                                                                                marginTop:
-                                                                                    10,
-
-                                                                                paddingTop:
-                                                                                    9,
-
-                                                                                borderTopWidth:
-                                                                                    1,
-
-                                                                                borderTopColor:
-                                                                                    '#292929',
-                                                                            }}
-                                                                        >
-                                                                            <Ionicons
-                                                                                name="document-text-outline"
-                                                                                size={14}
-                                                                                color="#777777"
-                                                                                style={{
-                                                                                    marginRight:
-                                                                                        6,
-
-                                                                                    marginTop:
-                                                                                        1,
-                                                                                }}
-                                                                            />
-
-                                                                            <Text
-                                                                                numberOfLines={
-                                                                                    1
-                                                                                }
-                                                                                ellipsizeMode="tail"
-                                                                                style={{
-                                                                                    flex: 1,
-
-                                                                                    color:
-                                                                                        '#999999',
-
-                                                                                    fontSize:
-                                                                                        10,
-
-                                                                                    lineHeight:
-                                                                                        15,
-                                                                                }}
-                                                                            >
+                                                                        <Text
+                                                                            style={[
+                                                                                colSets,
                                                                                 {
-                                                                                    ex.notes
-                                                                                }
-                                                                            </Text>
-                                                                        </View>
-                                                                    )}
-                                                                    <View
-                                                                        style={{
-                                                                            flexDirection: 'row',
-                                                                            alignItems: 'center',
+                                                                                    color:
+                                                                                        '#D1D5DB',
 
-                                                                            marginTop: 9,
-                                                                            paddingTop: 8,
+                                                                                    fontSize:
+                                                                                        14,
 
-                                                                            borderTopWidth: 1,
-                                                                            borderTopColor: '#292929',
-                                                                        }}
-                                                                    >
-                                                                        <Ionicons
-                                                                            name="star-outline"
-                                                                            size={15}
-                                                                            color={
-                                                                                ex.lastRating != null
-                                                                                    ? COLORS.primary
-                                                                                    : '#666666'
-                                                                            }
-                                                                        />
+                                                                                    textAlign:
+                                                                                        'center',
+                                                                                },
+                                                                            ]}
+                                                                        >
+                                                                            {ex.sets ??
+                                                                                '-'}
+                                                                        </Text>
 
                                                                         <Text
-                                                                            style={{
-                                                                                color: '#888888',
-                                                                                fontSize: 10,
-                                                                                marginLeft: 6,
-                                                                            }}
-                                                                        >
-                                                                            Última valoración:{' '}
+                                                                            style={[
+                                                                                colReps,
+                                                                                {
+                                                                                    color:
+                                                                                        '#D1D5DB',
 
-                                                                            <Text
-                                                                                style={{
+                                                                                    fontSize:
+                                                                                        14,
+
+                                                                                    textAlign:
+                                                                                        'center',
+                                                                                },
+                                                                            ]}
+                                                                        >
+                                                                            {ex.reps ??
+                                                                                '-'}
+                                                                        </Text>
+
+                                                                        <Text
+                                                                            style={[
+                                                                                colRating,
+                                                                                {
                                                                                     color:
                                                                                         ex.lastRating != null
                                                                                             ? COLORS.primary
                                                                                             : '#777777',
 
-                                                                                    fontWeight: '900',
+                                                                                    fontSize: 12,
+
+                                                                                    fontWeight:
+                                                                                        ex.lastRating != null
+                                                                                            ? '900'
+                                                                                            : '600',
+
+                                                                                    textAlign: 'center',
+                                                                                },
+                                                                            ]}
+                                                                        >
+                                                                            {ex.lastRating != null
+                                                                                ? `${ex.lastRating}/10`
+                                                                                : '--'}
+                                                                        </Text>
+                                                                    </Pressable>
+                                                                )
+                                                            )}
+                                                        </View>
+                                                    )
+                                                )}
+                                            </>
+                                        ) : (
+                                            /*
+                                             * =========================
+                                             * VISTA 2 — TARJETAS
+                                             * =========================
+                                             */
+                                            <>
+                                                {Object.entries(
+                                                    groupedByDay
+                                                ).map(
+                                                    ([day, exs]) => (
+                                                        <View
+                                                            key={day}
+                                                            style={{
+                                                                marginBottom:
+                                                                    18,
+                                                            }}
+                                                        >
+                                                            {/* CABECERA DEL DÍA */}
+
+                                                            <View
+                                                                style={{
+                                                                    flexDirection:
+                                                                        'row',
+
+                                                                    alignItems:
+                                                                        'center',
+
+                                                                    marginBottom:
+                                                                        9,
+                                                                }}
+                                                            >
+                                                                <View
+                                                                    style={{
+                                                                        width: 28,
+                                                                        height: 28,
+
+                                                                        borderRadius:
+                                                                            14,
+
+                                                                        alignItems:
+                                                                            'center',
+
+                                                                        justifyContent:
+                                                                            'center',
+
+                                                                        backgroundColor:
+                                                                            'rgba(198,255,0,0.08)',
+
+                                                                        borderWidth:
+                                                                            1,
+
+                                                                        borderColor:
+                                                                            'rgba(198,255,0,0.30)',
+                                                                    }}
+                                                                >
+                                                                    <Ionicons
+                                                                        name="calendar-outline"
+                                                                        size={15}
+                                                                        color={
+                                                                            COLORS.primary
+                                                                        }
+                                                                    />
+                                                                </View>
+
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            COLORS.textLight,
+
+                                                                        fontSize:
+                                                                            14,
+
+                                                                        fontWeight:
+                                                                            '900',
+
+                                                                        marginLeft:
+                                                                            8,
+                                                                    }}
+                                                                >
+                                                                    {day}
+                                                                </Text>
+
+                                                                <Text
+                                                                    style={{
+                                                                        color:
+                                                                            COLORS.textMuted,
+
+                                                                        fontSize:
+                                                                            10,
+
+                                                                        marginLeft:
+                                                                            7,
+                                                                    }}
+                                                                >
+                                                                    {exs.length}{' '}
+                                                                    {exs.length ===
+                                                                        1
+                                                                        ? 'ejercicio'
+                                                                        : 'ejercicios'}
+                                                                </Text>
+                                                            </View>
+
+                                                            {/* TARJETAS */}
+
+                                                            {exs.map(
+                                                                (
+                                                                    ex,
+                                                                    index
+                                                                ) => {
+                                                                    const hasNotes =
+                                                                        Boolean(
+                                                                            ex.notes &&
+                                                                            ex.notes
+                                                                                .trim()
+                                                                                .length >
+                                                                            0
+                                                                        );
+
+                                                                    return (
+                                                                        <Pressable
+                                                                            key={
+                                                                                ex.id ??
+                                                                                `${day}-${index}`
+                                                                            }
+                                                                            onPress={() =>
+                                                                                openExerciseModal(
+                                                                                    ex,
+                                                                                    day
+                                                                                )
+                                                                            }
+                                                                            style={({
+                                                                                pressed,
+                                                                            }) => ({
+                                                                                backgroundColor:
+                                                                                    pressed
+                                                                                        ? '#222222'
+                                                                                        : '#181818',
+
+                                                                                borderWidth:
+                                                                                    1,
+
+                                                                                borderColor:
+                                                                                    pressed
+                                                                                        ? 'rgba(198,255,0,0.55)'
+                                                                                        : '#303030',
+
+                                                                                borderRadius:
+                                                                                    18,
+
+                                                                                padding:
+                                                                                    13,
+
+                                                                                marginBottom:
+                                                                                    9,
+
+                                                                                transform: [
+                                                                                    {
+                                                                                        scale:
+                                                                                            pressed
+                                                                                                ? 0.99
+                                                                                                : 1,
+                                                                                    },
+                                                                                ],
+                                                                            })}
+                                                                        >
+                                                                            {/* CABECERA EJERCICIO */}
+
+                                                                            <View
+                                                                                style={{
+                                                                                    flexDirection:
+                                                                                        'row',
+
+                                                                                    alignItems:
+                                                                                        'center',
                                                                                 }}
                                                                             >
-                                                                                {formatLastRating(
-                                                                                    ex.lastRating
-                                                                                )}
-                                                                            </Text>
-                                                                        </Text>
-                                                                    </View>
-                                                                </Pressable>
-                                                            );
-                                                        }
-                                                    )}
-                                                </View>
-                                            )
+                                                                                {/* NÚMERO */}
+
+                                                                                <View
+                                                                                    style={{
+                                                                                        width:
+                                                                                            31,
+
+                                                                                        height:
+                                                                                            31,
+
+                                                                                        borderRadius:
+                                                                                            16,
+
+                                                                                        backgroundColor:
+                                                                                            '#222222',
+
+                                                                                        borderWidth:
+                                                                                            1,
+
+                                                                                        borderColor:
+                                                                                            '#383838',
+
+                                                                                        alignItems:
+                                                                                            'center',
+
+                                                                                        justifyContent:
+                                                                                            'center',
+
+                                                                                        marginRight:
+                                                                                            10,
+                                                                                    }}
+                                                                                >
+                                                                                    <Text
+                                                                                        style={{
+                                                                                            color:
+                                                                                                COLORS.primary,
+
+                                                                                            fontSize:
+                                                                                                11,
+
+                                                                                            fontWeight:
+                                                                                                '900',
+                                                                                        }}
+                                                                                    >
+                                                                                        {String(
+                                                                                            index +
+                                                                                            1
+                                                                                        ).padStart(
+                                                                                            2,
+                                                                                            '0'
+                                                                                        )}
+                                                                                    </Text>
+                                                                                </View>
+
+                                                                                {/* NOMBRE */}
+
+                                                                                <Text
+                                                                                    numberOfLines={
+                                                                                        2
+                                                                                    }
+                                                                                    style={{
+                                                                                        flex: 1,
+
+                                                                                        color:
+                                                                                            COLORS.textLight,
+
+                                                                                        fontSize:
+                                                                                            15,
+
+                                                                                        fontWeight:
+                                                                                            '900',
+
+                                                                                        lineHeight:
+                                                                                            19,
+                                                                                    }}
+                                                                                >
+                                                                                    {
+                                                                                        ex.name
+                                                                                    }
+                                                                                </Text>
+
+                                                                                <Ionicons
+                                                                                    name="chevron-forward"
+                                                                                    size={18}
+                                                                                    color="#666666"
+                                                                                    style={{
+                                                                                        marginLeft:
+                                                                                            6,
+                                                                                    }}
+                                                                                />
+                                                                            </View>
+
+                                                                            {/* SERIES Y REPS */}
+
+                                                                            <View
+                                                                                style={{
+                                                                                    flexDirection:
+                                                                                        'row',
+
+                                                                                    marginTop:
+                                                                                        12,
+
+                                                                                    gap: 8,
+                                                                                }}
+                                                                            >
+                                                                                <View
+                                                                                    style={{
+                                                                                        flex: 1,
+
+                                                                                        backgroundColor:
+                                                                                            '#111111',
+
+                                                                                        borderRadius:
+                                                                                            12,
+
+                                                                                        paddingVertical:
+                                                                                            8,
+
+                                                                                        paddingHorizontal:
+                                                                                            10,
+
+                                                                                        borderWidth:
+                                                                                            1,
+
+                                                                                        borderColor:
+                                                                                            '#292929',
+                                                                                    }}
+                                                                                >
+                                                                                    <Text
+                                                                                        style={{
+                                                                                            color:
+                                                                                                '#747474',
+
+                                                                                            fontSize:
+                                                                                                8,
+
+                                                                                            fontWeight:
+                                                                                                '900',
+
+                                                                                            letterSpacing:
+                                                                                                0.7,
+                                                                                        }}
+                                                                                    >
+                                                                                        SERIES
+                                                                                    </Text>
+
+                                                                                    <Text
+                                                                                        style={{
+                                                                                            color:
+                                                                                                '#E5E5E5',
+
+                                                                                            fontSize:
+                                                                                                15,
+
+                                                                                            fontWeight:
+                                                                                                '900',
+
+                                                                                            marginTop:
+                                                                                                2,
+                                                                                        }}
+                                                                                    >
+                                                                                        {ex.sets ??
+                                                                                            '-'}
+                                                                                    </Text>
+                                                                                </View>
+
+                                                                                <View
+                                                                                    style={{
+                                                                                        flex: 1,
+
+                                                                                        backgroundColor:
+                                                                                            '#111111',
+
+                                                                                        borderRadius:
+                                                                                            12,
+
+                                                                                        paddingVertical:
+                                                                                            8,
+
+                                                                                        paddingHorizontal:
+                                                                                            10,
+
+                                                                                        borderWidth:
+                                                                                            1,
+
+                                                                                        borderColor:
+                                                                                            '#292929',
+                                                                                    }}
+                                                                                >
+                                                                                    <Text
+                                                                                        style={{
+                                                                                            color:
+                                                                                                '#747474',
+
+                                                                                            fontSize:
+                                                                                                8,
+
+                                                                                            fontWeight:
+                                                                                                '900',
+
+                                                                                            letterSpacing:
+                                                                                                0.7,
+                                                                                        }}
+                                                                                    >
+                                                                                        REPETICIONES
+                                                                                    </Text>
+
+                                                                                    <Text
+                                                                                        style={{
+                                                                                            color:
+                                                                                                '#E5E5E5',
+
+                                                                                            fontSize:
+                                                                                                15,
+
+                                                                                            fontWeight:
+                                                                                                '900',
+
+                                                                                            marginTop:
+                                                                                                2,
+                                                                                        }}
+                                                                                    >
+                                                                                        {ex.reps ??
+                                                                                            '-'}
+                                                                                    </Text>
+                                                                                </View>
+                                                                            </View>
+
+                                                                            {/* NOTAS */}
+
+                                                                            {hasNotes && (
+                                                                                <View
+                                                                                    style={{
+                                                                                        flexDirection:
+                                                                                            'row',
+
+                                                                                        alignItems:
+                                                                                            'flex-start',
+
+                                                                                        marginTop:
+                                                                                            10,
+
+                                                                                        paddingTop:
+                                                                                            9,
+
+                                                                                        borderTopWidth:
+                                                                                            1,
+
+                                                                                        borderTopColor:
+                                                                                            '#292929',
+                                                                                    }}
+                                                                                >
+                                                                                    <Ionicons
+                                                                                        name="document-text-outline"
+                                                                                        size={14}
+                                                                                        color="#777777"
+                                                                                        style={{
+                                                                                            marginRight:
+                                                                                                6,
+
+                                                                                            marginTop:
+                                                                                                1,
+                                                                                        }}
+                                                                                    />
+
+                                                                                    <Text
+                                                                                        numberOfLines={
+                                                                                            1
+                                                                                        }
+                                                                                        ellipsizeMode="tail"
+                                                                                        style={{
+                                                                                            flex: 1,
+
+                                                                                            color:
+                                                                                                '#999999',
+
+                                                                                            fontSize:
+                                                                                                10,
+
+                                                                                            lineHeight:
+                                                                                                15,
+                                                                                        }}
+                                                                                    >
+                                                                                        {
+                                                                                            ex.notes
+                                                                                        }
+                                                                                    </Text>
+                                                                                </View>
+                                                                            )}
+                                                                            <View
+                                                                                style={{
+                                                                                    flexDirection: 'row',
+                                                                                    alignItems: 'center',
+
+                                                                                    marginTop: 9,
+                                                                                    paddingTop: 8,
+
+                                                                                    borderTopWidth: 1,
+                                                                                    borderTopColor: '#292929',
+                                                                                }}
+                                                                            >
+                                                                                <Ionicons
+                                                                                    name="star-outline"
+                                                                                    size={15}
+                                                                                    color={
+                                                                                        ex.lastRating != null
+                                                                                            ? COLORS.primary
+                                                                                            : '#666666'
+                                                                                    }
+                                                                                />
+
+                                                                                <Text
+                                                                                    style={{
+                                                                                        color: '#888888',
+                                                                                        fontSize: 10,
+                                                                                        marginLeft: 6,
+                                                                                    }}
+                                                                                >
+                                                                                    Última valoración:{' '}
+
+                                                                                    <Text
+                                                                                        style={{
+                                                                                            color:
+                                                                                                ex.lastRating != null
+                                                                                                    ? COLORS.primary
+                                                                                                    : '#777777',
+
+                                                                                            fontWeight: '900',
+                                                                                        }}
+                                                                                    >
+                                                                                        {formatLastRating(
+                                                                                            ex.lastRating
+                                                                                        )}
+                                                                                    </Text>
+                                                                                </Text>
+                                                                            </View>
+                                                                        </Pressable>
+                                                                    );
+                                                                }
+                                                            )}
+                                                        </View>
+                                                    )
+                                                )}
+                                            </>
                                         )}
-                                    </>
-                                )}
+                                    </View>
+                                </ScrollView>
                             </View>
-                        </ScrollView>
-                    </View>
+                        </>
+                    )}
                 </View>
 
 
@@ -3229,13 +3358,19 @@ export default function RoutineDetailScreen() {
                 <View
                     style={{
                         flexDirection: 'row',
+
                         alignItems: 'center',
-                        justifyContent: 'space-between',
+
+                        justifyContent:
+                            'space-between',
 
                         gap: 8,
 
-                        marginTop: 4,
-                        marginBottom: 8,
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        marginBottom: 10,
                     }}
                 >
                     {/* 1 — HOME */}
@@ -3276,9 +3411,17 @@ export default function RoutineDetailScreen() {
                         onPress={
                             handleDonePress
                         }
+
                         active={
                             doneMarked
                         }
+
+                        disabled={
+                            loading ||
+                            !!error ||
+                            !routine
+                        }
+
                         icon={
                             <Ionicons
                                 name={
@@ -3286,7 +3429,9 @@ export default function RoutineDetailScreen() {
                                         ? 'checkbox'
                                         : 'checkbox-outline'
                                 }
+
                                 size={29}
+
                                 color={
                                     doneMarked
                                         ? COLORS.primary
@@ -3299,7 +3444,17 @@ export default function RoutineDetailScreen() {
                     {/* 4 — CAMBIAR VISTA */}
 
                     <RoutineNavButton
-                        onPress={handleToggleRoutineView}
+                        onPress={
+                            handleToggleRoutineView
+                        }
+
+                        disabled={
+                            loading ||
+                            !!error ||
+                            !routine ||
+                            !viewPreferenceLoaded
+                        }
+
                         icon={
                             <Ionicons
                                 name={
@@ -3316,7 +3471,16 @@ export default function RoutineDetailScreen() {
                     {/* 5 — EDITAR */}
 
                     <RoutineNavButton
-                        onPress={handleEditPress}
+                        onPress={
+                            handleEditPress
+                        }
+
+                        disabled={
+                            loading ||
+                            !!error ||
+                            !routine
+                        }
+
                         icon={
                             <Ionicons
                                 name="create-outline"
@@ -3518,7 +3682,7 @@ export default function RoutineDetailScreen() {
                                                         3,
                                                 }}
                                             >
-                                                {routine.title}
+                                                {routine?.title ?? 'Rutina'}
                                             </Text>
                                         </View>
                                     </View>
@@ -4787,7 +4951,7 @@ export default function RoutineDetailScreen() {
                                             marginTop: 3,
                                         }}
                                     >
-                                        {routine.title}
+                                        {routine?.title ?? 'Rutina'}
                                     </Text>
                                 </View>
                             </View>

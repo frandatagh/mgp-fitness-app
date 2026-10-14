@@ -53,31 +53,72 @@ export default function InfoScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
             <View
-                className="flex-1 px-4 pb-2"
-                style={{ maxWidth: 800, alignSelf: 'center' }}
+                className="flex-1 w-full px-2"
+                style={{
+                    maxWidth: 800,
+                    alignSelf: 'center',
+                }}
             >
-                <AppHeader showProfile={false} />
+                {/* HEADER */}
+
+                <View className="px-2">
+                    <AppHeader
+                        showProfile={true}
+                    />
+                </View>
+
+
+                {/* TÍTULO DE PANTALLA */}
+
+                <Text
+                    className="ml-5 pl-1 text-md text-gray-500"
+                >
+                    Información de la aplicación
+                </Text>
 
 
 
                 {/* PANEL PRINCIPAL */}
                 <View
-                    className="flex-1 rounded-3xl mt-3 px-3 py-4"
-                    style={{ borderWidth: 2, borderColor: COLORS.primary }}
+                    style={{
+                        borderWidth: 2,
+
+                        borderColor:
+                            COLORS.primary,
+
+                        borderRadius: 22,
+
+                        backgroundColor:
+                            '#101010',
+
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        flex: 1,
+
+                        overflow: 'hidden',
+                    }}
                 >
                     <ScrollView
                         ref={scrollViewRef}
-                        showsVerticalScrollIndicator={false}
-                        className='px-2'
+
+                        showsVerticalScrollIndicator={
+                            false
+                        }
+
+                        style={{
+                            flex: 1,
+                        }}
+
+                        contentContainerStyle={{
+                            padding: 18,
+                            paddingBottom: 40,
+                        }}
                     >
                         {/* TÍTULO */}
-                        <View className="mb-2 px-1">
-                            <Text
-                                className="text-[20px] font-semibold py-2"
-                                style={{ color: COLORS.textLight }}
-                            >
-                                Información de la aplicación
-                            </Text>
+                        <View className="mb-4 px-1">
+
                             <Text
                                 className="text-[13px] mt-1"
                                 style={{ color: COLORS.textMuted }}
@@ -319,32 +360,63 @@ export default function InfoScreen() {
                 </View>
 
                 {/* BOTONES INFERIORES */}
-                <View className="mt-2 flex-row justify-between px-2">
-                    {/* Volver al home */}
+                {/* ========================================= */}
+                {/* NAVEGACIÓN INFERIOR                      */}
+                {/* ========================================= */}
+
+                <View
+                    style={{
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        marginBottom: 10,
+                    }}
+                >
                     <Pressable
-                        onPress={() => router.replace('/home')}
-                        className="flex-1 mr-2 px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
+                        onPress={() =>
+                            router.replace('/home')
+                        }
+
+                        style={({ pressed }) => ({
+                            height: 58,
+
+                            borderRadius: 17,
+
+                            alignItems:
+                                'center',
+
+                            justifyContent:
+                                'center',
+
+                            backgroundColor:
+                                pressed
+                                    ? '#333333'
+                                    : '#242424',
+
+                            borderWidth: 3,
+
+                            borderColor:
+                                '#353535',
+
+                            opacity:
+                                pressed
+                                    ? 0.8
+                                    : 1,
+                        })}
                     >
                         <Text
-                            className="text-[14px] font-normal"
-                            style={{ color: COLORS.textLight }}
+                            style={{
+                                color:
+                                    '#FFFFFF',
+
+                                fontSize: 14,
+
+                                fontWeight:
+                                    '700',
+                            }}
                         >
                             Volver al home
-                        </Text>
-                    </Pressable>
-
-                    {/* Contactanos (futura pantalla) */}
-                    <Pressable
-                        onPress={() => router.push('/contact')}
-                        className="flex-1 px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#444444' }}
-                    >
-                        <Text
-                            className="text-[14px] font-semibold"
-                            style={{ color: COLORS.textLight }}
-                        >
-                            Contactanos
                         </Text>
                     </Pressable>
                 </View>

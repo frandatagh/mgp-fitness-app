@@ -5,7 +5,6 @@ import {
     Text,
     ScrollView,
     Pressable,
-    Image,
     Linking,
     Alert,
 } from 'react-native';
@@ -44,29 +43,63 @@ export default function AboutScreen() {
             style={{ backgroundColor: COLORS.background }}
         >
             <View
-                className="flex-1 px-4  pb-2"
-                style={{ maxWidth: 800, alignSelf: 'center' }}
+                className="flex-1 w-full px-2"
+                style={{
+                    maxWidth: 800,
+                    alignSelf: 'center',
+                }}
             >
-                <AppHeader showProfile={false} />
+                {/* HEADER */}
+
+                <View className="px-2">
+                    <AppHeader
+                        showProfile={isAuthenticated}
+                    />
+                </View>
+
+
+                {/* TÍTULO DE PANTALLA */}
+
+                <Text
+                    className="ml-5 pl-1 text-md text-gray-500"
+                >
+                    Acerca de nosotros
+                </Text>
 
                 {/* PANEL PRINCIPAL */}
                 <View
-                    className="flex-1 rounded-3xl mt-3 px-3 py-4"
-                    style={{ borderWidth: 2, borderColor: COLORS.primary }}
+                    style={{
+                        borderWidth: 2,
+
+                        borderColor:
+                            COLORS.primary,
+
+                        borderRadius: 22,
+
+                        backgroundColor:
+                            '#101010',
+
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        flex: 1,
+
+                        overflow: 'hidden',
+                    }}
                 >
                     <ScrollView
                         showsVerticalScrollIndicator={false}
-                        className="px-2"
+
+                        style={{
+                            flex: 1,
+                        }}
+
+                        contentContainerStyle={{
+                            padding: 18,
+                            paddingBottom: 40,
+                        }}
                     >
-                        {/* TÍTULO */}
-                        <View className="mb-2 px-1">
-                            <Text
-                                className="text-[20px] font-semibold py-2"
-                                style={{ color: COLORS.textLight }}
-                            >
-                                Acerca de nosotros
-                            </Text>
-                        </View>
 
                         {/* BLOQUE 1 */}
                         <Text
@@ -251,18 +284,63 @@ export default function AboutScreen() {
                     </ScrollView>
                 </View>
 
-                {/* BOTÓN INFERIOR */}
-                <View className="mt-2 px-2">
+                {/* ========================================= */}
+                {/* NAVEGACIÓN INFERIOR                      */}
+                {/* ========================================= */}
+
+                <View
+                    style={{
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        marginBottom: 10,
+                    }}
+                >
                     <Pressable
                         onPress={handleBack}
-                        className="px-4 py-4 rounded-xl items-center justify-center"
-                        style={{ backgroundColor: '#111111', borderColor: '#2B2B2B', borderWidth: 1 }}
+
+                        style={({ pressed }) => ({
+                            height: 58,
+
+                            borderRadius: 17,
+
+                            alignItems:
+                                'center',
+
+                            justifyContent:
+                                'center',
+
+                            backgroundColor:
+                                pressed
+                                    ? '#333333'
+                                    : '#242424',
+
+                            borderWidth: 3,
+
+                            borderColor:
+                                '#353535',
+
+                            opacity:
+                                pressed
+                                    ? 0.8
+                                    : 1,
+                        })}
                     >
                         <Text
-                            className="text-[14px] font-normal"
-                            style={{ color: COLORS.textLight }}
+                            style={{
+                                color:
+                                    '#FFFFFF',
+
+                                fontSize: 14,
+
+                                fontWeight:
+                                    '700',
+                            }}
                         >
-                            Volver
+                            {isAuthenticated
+                                ? 'Volver al home'
+                                : 'Volver al inicio'}
                         </Text>
                     </Pressable>
                 </View>

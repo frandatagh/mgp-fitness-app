@@ -18,6 +18,7 @@ export type ContactPayload = {
     platform: string;
     accountName: string | null;
     accountEmail: string | null;
+    turnstileToken: string;
 };
 
 export async function submitContactMessage(payload: ContactPayload) {

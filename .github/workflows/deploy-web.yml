@@ -3,7 +3,7 @@ name: Deploy Expo Web to GitHub Pages
 on:
   push:
     branches:
-      - develop
+      - main
   workflow_dispatch:
 
 permissions:
@@ -20,7 +20,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      EXPO_PUBLIC_API_URL: https://mgp-fitness-backend.onrender.com/api
+     EXPO_PUBLIC_API_URL: https://mgp-fitness-backend.onrender.com/api
+     EXPO_PUBLIC_TURNSTILE_SITE_KEY: "${{ vars.EXPO_PUBLIC_TURNSTILE_SITE_KEY }}"
 
     steps:
       - name: Checkout

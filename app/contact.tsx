@@ -17,7 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AppHeader from '../components/AppHeader';
 import { COLORS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
-
+import HumanVerification
+    from '../components/security/HumanVerification';
 import { submitContactMessage, type InquiryType, type ContactPayload } from '../lib/contact';
 
 type InquiryTypeForm = '' | 'technical' | 'general' | 'suggestion' | 'bug' | 'other';
@@ -55,6 +56,33 @@ export default function ContactScreen() {
 
     const didPrefillRef = useRef(false);
 
+    const [
+        verificationVisible,
+        setVerificationVisible,
+    ] = useState(false);
+
+    const [
+        pendingFormData,
+        setPendingFormData,
+    ] = useState<ContactFormData | null>(
+        null
+    );
+
+    const [
+        verificationError,
+        setVerificationError,
+    ] = useState<string | null>(
+        null
+    );
+
+    const [
+        verificationKey,
+        setVerificationKey,
+    ] = useState(0);
+
+    const verificationHandledRef =
+        useRef(false);
+
     const {
         control,
         handleSubmit,
@@ -91,24 +119,120 @@ export default function ContactScreen() {
         router.replace(isAuthenticated ? '/home' : '/');
     };
 
-    const onSubmit = async (data: ContactFormData) => {
+    const onSubmit = (
+        data: ContactFormData
+    ) => {
+        /*
+         * El formulario ya pasó las
+         * validaciones de react-hook-form.
+         *
+         * Todavía NO enviamos nada.
+         */
+
+        setPendingFormData(
+            data
+        );
+
+        setVerificationError(
+            null
+        );
+
+        verificationHandledRef.current =
+            false;
+
+        /*
+         * Incrementamos esta key para
+         * obtener un Turnstile nuevo cada
+         * vez que abrimos el modal.
+         */
+        setVerificationKey(
+            (prev) => prev + 1
+        );
+
+        setVerificationVisible(
+            true
+        );
+    };
+
+
+    const handleHumanVerified = async (
+        turnstileToken: string
+    ) => {
+        /*
+         * Evitamos que un callback duplicado
+         * provoque dos envíos.
+         */
+        if (
+            verificationHandledRef.current
+        ) {
+            return;
+        }
+
+        if (!pendingFormData) {
+            setVerificationVisible(false);
+
+            setSubmitError(
+                'No se encontraron los datos del formulario.'
+            );
+
+            setErrorVisible(true);
+
+            return;
+        }
+
+        verificationHandledRef.current =
+            true;
+
         try {
             setSending(true);
+
             setSubmitError(null);
 
+            setVerificationVisible(
+                false
+            );
+
+            const data =
+                pendingFormData;
+
             const payload: ContactPayload = {
-                name: data.name,
-                email: data.email,
-                inquiryType: data.inquiryType as InquiryType,
-                subject: data.subject,
-                message: data.message,
-                sentFrom: isAuthenticated ? 'authenticated' : 'guest',
-                platform: Platform.OS,
-                accountName: user?.name ?? null,
-                accountEmail: user?.email ?? null,
+                name:
+                    data.name,
+
+                email:
+                    data.email,
+
+                inquiryType:
+                    data.inquiryType as InquiryType,
+
+                subject:
+                    data.subject,
+
+                message:
+                    data.message,
+
+                sentFrom:
+                    isAuthenticated
+                        ? 'authenticated'
+                        : 'guest',
+
+                platform:
+                    Platform.OS,
+
+                accountName:
+                    user?.name ?? null,
+
+                accountEmail:
+                    user?.email ?? null,
+
+                turnstileToken,
             };
 
-            await submitContactMessage(payload);
+
+            await submitContactMessage(
+                payload
+            );
+
 
             reset({
                 name: '',
@@ -118,17 +242,35 @@ export default function ContactScreen() {
                 message: '',
             });
 
-            setSuccessVisible(true);
+
+            setPendingFormData(
+                null
+            );
+
+            setSuccessVisible(
+                true
+            );
+
         } catch (error) {
+
             const message =
                 error instanceof Error
                     ? error.message
                     : 'No se pudo enviar el mensaje. Intenta nuevamente.';
 
-            setSubmitError(message);
-            setErrorVisible(true);
+            setSubmitError(
+                message
+            );
+
+            setErrorVisible(
+                true
+            );
+
         } finally {
-            setSending(false);
+
+            setSending(
+                false
+            );
         }
     };
 
@@ -549,6 +691,237 @@ export default function ContactScreen() {
                     </View>
                 </View>
             </KeyboardAvoidingView>
+
+            {/* ========================================= */}
+            {/* MODAL VERIFICACIÓN DE SEGURIDAD          */}
+            {/* ========================================= */}
+
+            <Modal
+                visible={
+                    verificationVisible
+                }
+
+                transparent
+
+                animationType="fade"
+
+                onRequestClose={() => {
+                    if (!sending) {
+                        setVerificationVisible(
+                            false
+                        );
+
+                        setPendingFormData(
+                            null
+                        );
+                    }
+                }}
+            >
+                <View
+                    className="flex-1 items-center justify-center px-4"
+
+                    style={{
+                        backgroundColor:
+                            'rgba(0,0,0,0.70)',
+                    }}
+                >
+                    <View
+                        style={{
+                            width: '100%',
+
+                            maxWidth: 380,
+
+                            backgroundColor:
+                                '#111111',
+
+                            borderWidth: 1,
+
+                            borderColor:
+                                COLORS.primary,
+
+                            borderRadius: 22,
+
+                            paddingHorizontal: 20,
+
+                            paddingVertical: 22,
+                        }}
+                    >
+                        {/* ICONO */}
+
+                        <View
+                            style={{
+                                alignItems:
+                                    'center',
+
+                                marginBottom: 14,
+                            }}
+                        >
+                            <View
+                                style={{
+                                    width: 48,
+
+                                    height: 48,
+
+                                    borderRadius: 24,
+
+                                    alignItems:
+                                        'center',
+
+                                    justifyContent:
+                                        'center',
+
+                                    backgroundColor:
+                                        'rgba(198,255,0,0.08)',
+
+                                    borderWidth: 1,
+
+                                    borderColor:
+                                        'rgba(198,255,0,0.30)',
+                                }}
+                            >
+                                <Ionicons
+                                    name="shield-checkmark-outline"
+                                    size={25}
+                                    color={
+                                        COLORS.primary
+                                    }
+                                />
+                            </View>
+                        </View>
+
+
+                        {/* TURNSTILE */}
+
+                        <HumanVerification
+                            key={
+                                verificationKey
+                            }
+
+                            onVerified={
+                                handleHumanVerified
+                            }
+
+                            onExpired={() => {
+                                verificationHandledRef.current =
+                                    false;
+
+                                setVerificationError(
+                                    'La verificación venció. Intenta nuevamente.'
+                                );
+
+                                /*
+                                 * Creamos un desafío nuevo.
+                                 */
+                                setVerificationKey(
+                                    (prev) =>
+                                        prev + 1
+                                );
+                            }}
+
+                            onError={() => {
+                                verificationHandledRef.current =
+                                    false;
+
+                                setVerificationError(
+                                    'No se pudo completar la verificación. Intenta nuevamente.'
+                                );
+                            }}
+                        />
+
+
+                        {/* ERROR LOCAL */}
+
+                        {verificationError && (
+                            <Text
+                                style={{
+                                    color:
+                                        '#FF8A8A',
+
+                                    fontSize: 11,
+
+                                    textAlign:
+                                        'center',
+
+                                    lineHeight: 17,
+
+                                    marginTop: 10,
+                                }}
+                            >
+                                {
+                                    verificationError
+                                }
+                            </Text>
+                        )}
+
+
+                        {/* CANCELAR */}
+
+                        <Pressable
+                            disabled={
+                                sending
+                            }
+
+                            onPress={() => {
+                                setVerificationVisible(
+                                    false
+                                );
+
+                                setPendingFormData(
+                                    null
+                                );
+
+                                setVerificationError(
+                                    null
+                                );
+
+                                verificationHandledRef.current =
+                                    false;
+                            }}
+
+                            style={({
+                                pressed,
+                            }) => ({
+                                marginTop: 18,
+
+                                height: 44,
+
+                                borderRadius: 999,
+
+                                alignItems:
+                                    'center',
+
+                                justifyContent:
+                                    'center',
+
+                                backgroundColor:
+                                    pressed
+                                        ? '#444444'
+                                        : '#333333',
+
+                                opacity:
+                                    sending
+                                        ? 0.5
+                                        : 1,
+                            })}
+                        >
+                            <Text
+                                style={{
+                                    color:
+                                        COLORS.textLight,
+
+                                    fontWeight:
+                                        '600',
+
+                                    fontSize: 13,
+                                }}
+                            >
+                                Cancelar
+                            </Text>
+                        </Pressable>
+
+                    </View>
+                </View>
+            </Modal>
 
             {/* MODAL DE ÉXITO */}
             <Modal

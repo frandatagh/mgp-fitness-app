@@ -1,11 +1,13 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Image, Modal, Pressable, ScrollView, Text, View, Animated, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
-import { getMyProfile } from '../lib/profile';
+import {
+    useAppHeader,
+} from '../context/AppHeaderContext';
 
 type AppHeaderProps = {
     showProfile?: boolean;
@@ -95,44 +97,21 @@ export default function AppHeader({
     const insets = useSafeAreaInsets();
     const { user, logout, isAuthenticated } = useAuth();
 
+    const {
+        profileImageUrl,
+        displayName,
+
+        headerMessage,
+        headerMessageLoading,
+        headerMessageShowStar,
+    } = useAppHeader();
+
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [drawerVisible, setDrawerVisible] = useState(false);
     const drawerTranslateX = useRef(new Animated.Value(-320)).current;
     const backdropOpacity = useRef(new Animated.Value(0)).current;
 
-    const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
-    const [profileDisplayName, setProfileDisplayName] = useState<string | null>(null);
-
-    const displayName =
-        profileDisplayName ??
-        user?.name ??
-        user?.email ??
-        'usuario';
-
     const userInitials = getInitials(displayName);
-
-
-
-    useEffect(() => {
-        const loadProfileImage = async () => {
-            try {
-                if (!isAuthenticated) {
-                    setProfileImageUrl(null);
-                    setProfileDisplayName(null);
-                    return;
-                }
-
-                const data = await getMyProfile();
-
-                setProfileImageUrl(data.profile.profileImageUrl);
-                setProfileDisplayName(data.user.name ?? data.user.email);
-            } catch (error) {
-                console.log('Error cargando imagen de perfil en AppHeader:', error);
-            }
-        };
-
-        loadProfileImage();
-    }, [isAuthenticated]);
 
     const handleLogout = async () => {
         await logout();
@@ -184,12 +163,22 @@ export default function AppHeader({
         <>
             <View
                 style={{
-                    height: 88,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    position: 'relative',
-                    marginHorizontal: 8,
+                    height: 108,
+
+                    flexDirection:
+                        'row',
+
+                    alignItems:
+                        'center',
+
+                    justifyContent:
+                        'space-between',
+
+                    position:
+                        'relative',
+
+                    marginHorizontal:
+                        8,
                 }}
             >
                 {/* Menú hamburguesa */}
@@ -278,57 +267,71 @@ export default function AppHeader({
                                 )}
                             </View>
 
-                            {profileBadge ? (
+                            {/* MENSAJE DEBAJO DE LA FOTO */}
+
+                            <View
+                                style={{
+                                    marginTop: -8,
+                                    right: -10,
+
+                                    width: 104,
+                                    height: 18,
+
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
                                 <View
                                     style={{
-                                        marginTop: -5,
-                                        right: -10,
+                                        minWidth: 54,
+                                        maxWidth: 104,
+                                        height: 18,
 
-                                        backgroundColor:
-                                            COLORS.primary,
+                                        backgroundColor: COLORS.primary,
 
                                         borderRadius: 999,
-
                                         borderWidth: 2,
                                         borderColor: '#444444',
 
-                                        paddingHorizontal: 4,
-                                        paddingVertical: 2,
+                                        paddingHorizontal: 8,
+                                        paddingBottom: 3,
 
-                                        minWidth: 52,
-                                        minHeight: 20,
-
-                                        flexDirection: 'row',
                                         alignItems: 'center',
                                         justifyContent: 'center',
 
-                                        maxWidth: 120,
+                                        overflow: 'hidden',
                                     }}
                                 >
-                                    {profileBadge.loading ? (
+                                    {headerMessageLoading ? (
                                         <ActivityIndicator
-                                            size={10}
+                                            size="small"
                                             color="#111111"
                                         />
-                                    ) : (
-                                        <>
+                                    ) : headerMessage ? (
+                                        <View
+                                            style={{
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                maxWidth: '100%',
+                                            }}
+                                        >
                                             <Text
                                                 numberOfLines={1}
+                                                adjustsFontSizeToFit
+                                                minimumFontScale={0.75}
                                                 style={{
                                                     color: '#111111',
-
-                                                    fontSize:
-                                                        profileBadge.showStar
-                                                            ? 12
-                                                            : 10,
-
-                                                    fontWeight: '900',
+                                                    fontSize: headerMessageShowStar ? 12 : 10,
+                                                    fontWeight: '700',
+                                                    textAlign: 'center',
+                                                    flexShrink: 1,
                                                 }}
                                             >
-                                                {profileBadge.text}
+                                                {headerMessage}
                                             </Text>
 
-                                            {profileBadge.showStar && (
+                                            {headerMessageShowStar && (
                                                 <Ionicons
                                                     name="star"
                                                     size={12}
@@ -338,41 +341,10 @@ export default function AppHeader({
                                                     }}
                                                 />
                                             )}
-                                        </>
-                                    )}
+                                        </View>
+                                    ) : null}
                                 </View>
-                            ) : profileGreeting ? (
-                                <View
-                                    style={{
-                                        marginTop: -5,
-                                        right: -10,
-
-                                        backgroundColor:
-                                            COLORS.primary,
-
-                                        borderRadius: 999,
-
-                                        borderWidth: 2,
-                                        borderColor: '#444444',
-
-                                        paddingHorizontal: 7,
-                                        paddingVertical: 1,
-
-                                        maxWidth: 95,
-                                    }}
-                                >
-                                    <Text
-                                        numberOfLines={1}
-                                        style={{
-                                            color: '#111111',
-                                            fontSize: 12,
-                                            fontWeight: '600',
-                                        }}
-                                    >
-                                        {profileGreeting}
-                                    </Text>
-                                </View>
-                            ) : null}
+                            </View>
                         </Pressable>
                     ) : (
                         <View style={{ width: 50, height: 50 }} />

@@ -1612,21 +1612,23 @@ export default function LiveRunScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
+            className="flex-1"
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
+        >
             <View
                 className="flex-1 w-full px-4 pt-1"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
-                <View className="mb-1">
-                    <View className="items-center">
-                        <Image
-                            source={require('../assets/img/icontwist.png')}
-                            style={{ width: 180, height: 100 }}
-                            resizeMode="contain"
-                        />
-                    </View>
 
-                </View>
 
                 <View
                     className="flex-1 mt-2 rounded-3xl overflow-hidden"

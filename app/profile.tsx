@@ -26,7 +26,6 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { uploadProfileImageToCloudinary } from '../lib/cloudinary';
 import { getMyStatistics, type MyStatisticsResponse } from '../lib/statistics';
-import AppHeader from '../components/AppHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 
@@ -2324,7 +2323,14 @@ export default function ProfileScreen() {
 
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
+
             className="flex-1"
+
             style={{
                 backgroundColor:
                     COLORS.background,
@@ -2342,17 +2348,6 @@ export default function ProfileScreen() {
                     alignSelf: 'center',
                 }}
             >
-                {/* ===================================== */}
-                {/* HEADER                                */}
-                {/* ===================================== */}
-
-                <View className="px-2">
-                    <AppHeader
-                        showProfile={true}
-                        profileGreeting="Sigue así"
-                    />
-                </View>
-
 
                 {/* ===================================== */}
                 {/* TÍTULO                                */}

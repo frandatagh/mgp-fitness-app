@@ -12,7 +12,6 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/colors';
-import AppHeader from '../../components/AppHeader';
 import { createRoutine } from '../../lib/routines';
 
 type ImportedExercise = {
@@ -244,7 +243,6 @@ export default function ReviewImportRoutineScreen() {
                     paddingBottom: 28,
                 }}
             >
-                <AppHeader showProfile={false} />
 
                 <View
                     style={{

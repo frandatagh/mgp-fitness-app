@@ -29,7 +29,6 @@ import {
     type StatisticsHistoryDay,
 } from '../lib/statisticsHistory';
 import { useRouter } from 'expo-router';
-import AppHeader from '../components/AppHeader';
 import {
     getRoutines,
     type Routine,
@@ -2224,19 +2223,22 @@ export default function StatisticsScreen() {
 
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
+
             className="flex-1"
-            style={{ backgroundColor: COLORS.background }}
+
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
         >
             <View className="flex-1 w-full px-2"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
-                <View className="px-2">
-                    <AppHeader
-                        showProfile={true}
-                        profileGreeting="A mejorar"
-                    />
-                </View>
-
 
                 <Text
                     className="ml-5 pl-1  text-md text-gray-500"

@@ -32,7 +32,9 @@ import { getWalkingRoute } from '../lib/routing';
 import { COLORS } from '../constants/colors';
 import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import LiveRunMap from '../components/LiveRunMap.web';
-import AppHeader from '@/components/AppHeader';
+import {
+    useAppHeader,
+} from '../context/AppHeaderContext';
 
 type RunPoint = {
     latitude: number;
@@ -620,6 +622,10 @@ export default function LiveRunWeb() {
 
     const hasReliablePositionRef = useRef(false);
 
+    const {
+        setHeaderVisible,
+    } = useAppHeader();
+
 
 
     const [isRunning, setIsRunning] =
@@ -1011,11 +1017,13 @@ export default function LiveRunWeb() {
             return;
         }
 
+        setHeaderVisible(false);
         screenLockModeRef.current = true;
         setScreenLockMode(true);
     };
 
     const exitScreenLockMode = async () => {
+        setHeaderVisible(true);
         screenLockModeRef.current = false;
         setScreenLockMode(false);
 
@@ -2850,9 +2858,15 @@ export default function LiveRunWeb() {
 
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
             style={{
                 flex: 1,
-                backgroundColor: COLORS.background,
+                backgroundColor:
+                    COLORS.background,
             }}
         >
             <View
@@ -2864,10 +2878,6 @@ export default function LiveRunWeb() {
                     paddingHorizontal: 14,
                 }}
             >
-                {/* Logo */}
-
-                <AppHeader profileGreeting={`Mar del Plata`} />
-
                 {/* Mapa */}
 
 

@@ -12,7 +12,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
-import AppHeader from '../components/AppHeader';
 
 export default function AboutScreen() {
     const { isAuthenticated } = useAuth();
@@ -39,8 +38,16 @@ export default function AboutScreen() {
 
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
             className="flex-1"
-            style={{ backgroundColor: COLORS.background }}
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
         >
             <View
                 className="flex-1 w-full px-2"
@@ -49,13 +56,6 @@ export default function AboutScreen() {
                     alignSelf: 'center',
                 }}
             >
-                {/* HEADER */}
-
-                <View className="px-2">
-                    <AppHeader
-                        showProfile={isAuthenticated}
-                    />
-                </View>
 
 
                 {/* TÍTULO DE PANTALLA */}

@@ -20,7 +20,7 @@ import {
     type TrainingActivityDay,
     type TrainingActivityWeek,
 } from '../lib/statistics';
-import AppHeader from '../components/AppHeader';
+
 import { LineChart } from 'react-native-chart-kit';
 import AppLoading from '../components/AppLoading';
 import { SlideInLeft } from 'react-native-reanimated';
@@ -1974,8 +1974,18 @@ export default function HomeScreen() {
 
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
+
             className="flex-1"
-            style={{ backgroundColor: COLORS.background }}
+
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
         >
             <View className="flex-1 w-full px-4"
                 style={{
@@ -1985,13 +1995,6 @@ export default function HomeScreen() {
                     minHeight: 0,
                 }}
             >
-                <AppHeader
-                    profileBadge={
-                        homeProfileBadge
-                    }
-                />
-
-
 
                 {/* TABS SUPERIORES */}
                 <View

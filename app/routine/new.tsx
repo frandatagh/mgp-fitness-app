@@ -14,7 +14,6 @@ import {
     Modal,
     KeyboardAvoidingView,
 } from 'react-native';
-import AppHeader from '../../components/AppHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, Redirect } from 'expo-router';
 import { COLORS } from '../../constants/colors';
@@ -394,8 +393,16 @@ export default function NewRoutineScreen() {
 
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
             className="flex-1"
-            style={{ backgroundColor: COLORS.background }}
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
         >
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
@@ -415,12 +422,6 @@ export default function NewRoutineScreen() {
                         minHeight: 0,
                     }}
                 >
-                    {/* HEADER FIJO: LOGO + TÍTULO */}
-                    <View className="px-2">
-                        <AppHeader
-                            showProfile={true}
-                        />
-                    </View>
 
                     <Text
                         className="ml-5 pl-1 text-md text-gray-500"
@@ -506,7 +507,7 @@ export default function NewRoutineScreen() {
                                 textAlignVertical="top"
                                 placeholder="Notas generales de la rutina, frecuencia semanal, recomendaciones..."
                                 placeholderTextColor={COLORS.textMuted}
-                                className="px-3 py-2 rounded-xl text-base"
+                                className="px-3 py-2 rounded-xl text-sm"
                                 style={{
                                     backgroundColor: '#111111',
                                     color: COLORS.textLight,

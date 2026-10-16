@@ -16,7 +16,6 @@ import {
     getAppDateKey,
     formatAppHistoryDayLabel,
 } from '../lib/date';
-import AppHeader from '../components/AppHeader';
 
 type HistoryRecord = {
     id: string;
@@ -238,6 +237,11 @@ export default function StatisticsHistoryScreen() {
 
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
             className="flex-1"
             style={{
                 backgroundColor:
@@ -251,17 +255,6 @@ export default function StatisticsHistoryScreen() {
                     alignSelf: 'center',
                 }}
             >
-                {/* ===================================== */}
-                {/* HEADER                                */}
-                {/* ===================================== */}
-
-                <View className="px-2">
-                    <AppHeader
-                        showProfile={true}
-                        profileGreeting="¡Constancia!"
-                    />
-                </View>
-
 
                 {/* ===================================== */}
                 {/* TÍTULO                                */}

@@ -21,7 +21,6 @@ import {
     Feather,
     Ionicons,
 } from "@expo/vector-icons";
-import AppHeader from '../../../components/AppHeader';
 import { COLORS } from "../../../constants/colors";
 import { useAuth } from "../../../context/AuthContext";
 import {
@@ -479,8 +478,16 @@ export default function EditRoutineScreen() {
     // ---------- Render principal ----------
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
             className="flex-1"
-            style={{ backgroundColor: COLORS.background }}
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
         >
             <KeyboardAvoidingView
                 className="flex-1"
@@ -496,12 +503,6 @@ export default function EditRoutineScreen() {
                         minHeight: 0,
                     }}
                 >
-                    {/* HEADER FIJO: LOGO + TÍTULO */}
-                    <View className="px-2">
-                        <AppHeader
-                            showProfile={true}
-                        />
-                    </View>
 
                     <Text
                         className="ml-5 pl-1 text-md text-gray-500"

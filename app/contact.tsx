@@ -14,7 +14,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Controller, useForm } from 'react-hook-form';
 import { Ionicons } from '@expo/vector-icons';
-import AppHeader from '../components/AppHeader';
 import { COLORS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
 import HumanVerification
@@ -275,7 +274,18 @@ export default function ContactScreen() {
     };
 
     return (
-        <SafeAreaView className="flex-1" style={{ backgroundColor: COLORS.background }}>
+        <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
+            className="flex-1"
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
+        >
             <KeyboardAvoidingView
                 className="flex-1"
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -287,15 +297,6 @@ export default function ContactScreen() {
                         alignSelf: 'center',
                     }}
                 >
-                    {/* HEADER */}
-
-                    <View className="px-2">
-                        <AppHeader
-                            showProfile={
-                                isAuthenticated
-                            }
-                        />
-                    </View>
 
 
                     {/* TÍTULO DE PANTALLA */}

@@ -22,7 +22,6 @@ import {
     saveExerciseCheckinWithOfflineSupport,
     saveRoutineCheckinWithOfflineSupport,
 } from '../../lib/offlineActions';
-import AppHeader from '../../components/AppHeader';
 import {
     getRoutineViewMode,
     saveRoutineViewMode,
@@ -1319,6 +1318,11 @@ export default function RoutineDetailScreen() {
 
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
             className="flex-1"
             style={{
                 backgroundColor:
@@ -1337,16 +1341,6 @@ export default function RoutineDetailScreen() {
                     minHeight: 0,
                 }}
             >
-                {/* ===================================== */}
-                {/* HEADER                                */}
-                {/* ===================================== */}
-
-                <View className="px-2">
-                    <AppHeader
-                        showProfile={true}
-                    />
-                </View>
-
 
                 {/* ===================================== */}
                 {/* TÍTULO DE PANTALLA                   */}

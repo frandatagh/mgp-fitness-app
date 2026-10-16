@@ -95,21 +95,21 @@ export default function AccountScreen() {
 
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
             className="flex-1"
-            style={{ backgroundColor: COLORS.background }}
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
         >
             <View
                 className="flex-1 w-full px-4"
                 style={{ maxWidth: 800, alignSelf: 'center' }}
             >
-                {/* LOGO */}
-                <View className="items-center">
-                    <Image
-                        source={require('../assets/img/iconhome.png')}
-                        style={{ width: 110, height: 110 }}
-                        resizeMode="contain"
-                    />
-                </View>
 
                 {/* TÍTULO */}
                 <View className="self-start px-3 mb-3">

@@ -5,13 +5,11 @@ import {
     Text,
     ScrollView,
     Pressable,
-    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useRouter } from 'expo-router';
 import { COLORS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
-import AppHeader from '../components/AppHeader';
 
 type SectionKey = 'mgp' | 'primerospasos' | 'rutinas' | 'sugerencias' | 'puntos' | 'consejos';
 
@@ -49,8 +47,16 @@ export default function InfoScreen() {
 
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
             className="flex-1"
-            style={{ backgroundColor: COLORS.background }}
+            style={{
+                backgroundColor:
+                    COLORS.background,
+            }}
         >
             <View
                 className="flex-1 w-full px-2"
@@ -59,13 +65,6 @@ export default function InfoScreen() {
                     alignSelf: 'center',
                 }}
             >
-                {/* HEADER */}
-
-                <View className="px-2">
-                    <AppHeader
-                        showProfile={true}
-                    />
-                </View>
 
 
                 {/* TÍTULO DE PANTALLA */}

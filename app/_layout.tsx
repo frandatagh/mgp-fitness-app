@@ -9,6 +9,17 @@ import '../lib/backgroundLocationTask';
 
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { COLORS } from '../constants/colors';
+import {
+  useAppHeader,
+} from '../context/AppHeaderContext';
+import {
+  AppHeaderProvider,
+} from '../context/AppHeaderContext';
+import {
+  SafeAreaView,
+} from 'react-native-safe-area-context';
+import AppHeader
+  from '../components/AppHeader';
 
 function AppLoadingScreen() {
   return (
@@ -53,6 +64,53 @@ function RootNavigator() {
   const segments = useSegments();
 
   const firstSegment = segments[0] as string | undefined;
+
+  const {
+    headerVisible,
+  } = useAppHeader();
+
+  /*
+ * ==========================================
+ * HEADER PERSISTENTE — ETAPA DE PRUEBA
+ * ==========================================
+ *
+ * Primero migramos solamente:
+ * Home
+ * Perfil
+ * Estadísticas
+ *
+ * Después ampliaremos este grupo.
+ */
+
+  const isAuthenticatedHeaderRoute =
+    (
+      firstSegment === 'home' ||
+      firstSegment === 'profile' ||
+      firstSegment === 'statistics' ||
+      firstSegment === 'suggestions' ||
+      firstSegment === 'statistics-history' ||
+      firstSegment === 'routine' ||
+      firstSegment === 'account' ||
+      firstSegment === 'liverun' ||
+      firstSegment === 'info'
+    );
+
+
+  const isPublicHeaderRoute =
+    (
+      firstSegment === 'contact' ||
+      firstSegment === 'support' ||
+      firstSegment === 'about' ||
+      firstSegment === 'terms'
+    );
+
+
+  const usesPersistentHeader =
+    isPublicHeaderRoute ||
+    (
+      isAuthenticated &&
+      isAuthenticatedHeaderRoute
+    );
 
   const isPublicRoute = (segment?: string) => {
     return (
@@ -106,14 +164,98 @@ function RootNavigator() {
     return <AppLoadingScreen />;
   }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor:
+          COLORS.background,
+      }}
+    >
+
+      {/* ===================================== */}
+      {/* HEADER PERSISTENTE                    */}
+      {/* ===================================== */}
+
+      {usesPersistentHeader &&
+        headerVisible && (
+
+          <SafeAreaView
+            edges={[
+              'top',
+              'left',
+              'right',
+            ]}
+
+            style={{
+              backgroundColor:
+                COLORS.background,
+            }}
+          >
+            <View
+              style={{
+                width: '100%',
+
+                maxWidth: 800,
+
+                alignSelf:
+                  'center',
+
+                paddingHorizontal: 8,
+              }}
+            >
+              <AppHeader
+                showProfile={
+                  true
+                }
+              />
+            </View>
+          </SafeAreaView>
+
+        )}
+
+
+      {/* ===================================== */}
+      {/* PANTALLAS                             */}
+      {/* ===================================== */}
+
+      <View
+        style={{
+          flex: 1,
+        }}
+      >
+        <Stack
+          screenOptions={{
+            headerShown:
+              false,
+
+            contentStyle: {
+              backgroundColor:
+                COLORS.background,
+            },
+          }}
+        />
+      </View>
+
+    </View>
+  );
 }
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView
+      style={{
+        flex: 1,
+      }}
+    >
       <AuthProvider>
-        <RootNavigator />
+
+        <AppHeaderProvider>
+
+          <RootNavigator />
+
+        </AppHeaderProvider>
+
       </AuthProvider>
     </GestureHandlerRootView>
   );

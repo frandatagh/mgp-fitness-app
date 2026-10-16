@@ -43,8 +43,6 @@ import {
     RoutineCard,
 } from '../components/RoutineCard';
 
-import AppHeader
-    from '../components/AppHeader';
 
 
 /*
@@ -208,8 +206,12 @@ export default function SuggestionsScreen() {
 
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
             className="flex-1"
-
             style={{
                 backgroundColor:
                     COLORS.background,
@@ -229,20 +231,6 @@ export default function SuggestionsScreen() {
                         'center',
                 }}
             >
-                {/* ============================= */}
-                {/* HEADER                        */}
-                {/* ============================= */}
-
-                <View
-                    className="px-2"
-                >
-                    <AppHeader
-                        showProfile={
-                            isAuthenticated
-                        }
-                    />
-                </View>
-
 
                 {/* ============================= */}
                 {/* TÍTULO                        */}

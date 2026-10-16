@@ -14,7 +14,6 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../../constants/colors';
-import AppHeader from '../../components/AppHeader';
 import { parseRoutineText } from '../../utils/parseRoutineText';
 import { extractRoutineTextOnDevice } from '../../lib/mobileOcr';
 
@@ -185,7 +184,6 @@ export default function ScanPhotoScreen() {
                     paddingBottom: 28,
                 }}
             >
-                <AppHeader showProfile={false} />
 
                 <View
                     style={{

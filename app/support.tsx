@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../constants/colors';
 import { useAuth } from '../context/AuthContext';
-import AppHeader from '../components/AppHeader';
 
 // Habilita animaciones en Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -135,6 +134,11 @@ export default function SupportScreen() {
 
     return (
         <SafeAreaView
+            edges={[
+                'left',
+                'right',
+                'bottom',
+            ]}
             className="flex-1"
             style={{
                 backgroundColor:
@@ -152,17 +156,6 @@ export default function SupportScreen() {
                     alignSelf: 'center',
                 }}
             >
-                {/* ===================================== */}
-                {/* HEADER                                */}
-                {/* ===================================== */}
-
-                <View className="px-2">
-                    <AppHeader
-                        showProfile={
-                            isAuthenticated
-                        }
-                    />
-                </View>
 
 
                 {/* ===================================== */}

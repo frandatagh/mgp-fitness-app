@@ -294,7 +294,7 @@ export default function AppHeader({
                                         borderColor: '#444444',
 
                                         paddingHorizontal: 8,
-                                        paddingBottom: 3,
+                                        paddingVertical: 2,
 
                                         alignItems: 'center',
                                         justifyContent: 'center',
@@ -303,10 +303,20 @@ export default function AppHeader({
                                     }}
                                 >
                                     {headerMessageLoading ? (
-                                        <ActivityIndicator
-                                            size="small"
-                                            color="#111111"
-                                        />
+                                        <View
+                                            style={{
+                                                transform: [
+                                                    {
+                                                        scale: 0.65,
+                                                    },
+                                                ],
+                                            }}
+                                        >
+                                            <ActivityIndicator
+                                                size="small"
+                                                color="#111111"
+                                            />
+                                        </View>
                                     ) : headerMessage ? (
                                         <View
                                             style={{
@@ -318,13 +328,24 @@ export default function AppHeader({
                                         >
                                             <Text
                                                 numberOfLines={1}
-                                                adjustsFontSizeToFit
-                                                minimumFontScale={0.75}
+
                                                 style={{
                                                     color: '#111111',
-                                                    fontSize: headerMessageShowStar ? 12 : 10,
+
+                                                    fontSize:
+                                                        headerMessageShowStar
+                                                            ? 12
+                                                            : 10,
+
+                                                    lineHeight:
+                                                        headerMessageShowStar
+                                                            ? 14
+                                                            : 12,
+
                                                     fontWeight: '700',
+
                                                     textAlign: 'center',
+
                                                     flexShrink: 1,
                                                 }}
                                             >
@@ -332,14 +353,35 @@ export default function AppHeader({
                                             </Text>
 
                                             {headerMessageShowStar && (
-                                                <Ionicons
-                                                    name="star"
-                                                    size={12}
-                                                    color="#111111"
+
+                                                <View
                                                     style={{
                                                         marginLeft: 3,
+
+                                                        width: 12,
+                                                        height: 14,
+
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
                                                     }}
-                                                />
+                                                >
+                                                    <Ionicons
+                                                        name="star"
+
+                                                        size={11}
+
+                                                        color="#111111"
+
+                                                        style={{
+                                                            transform: [
+                                                                {
+                                                                    translateY: 0.5,
+                                                                },
+                                                            ],
+                                                        }}
+                                                    />
+                                                </View>
+
                                             )}
                                         </View>
                                     ) : null}

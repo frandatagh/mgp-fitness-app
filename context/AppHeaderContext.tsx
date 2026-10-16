@@ -21,6 +21,14 @@ import {
     getMyProfile,
 } from '../lib/profile';
 
+import {
+    useFitnessInsights,
+} from './FitnessInsightsContext';
+
+import {
+    getHeaderCoachMessage,
+} from '../lib/headerCoach';
+
 
 /*
  * ==========================================
@@ -269,6 +277,13 @@ export function AppHeaderProvider({
         isAuthenticated,
         user,
     } = useAuth();
+
+    const {
+        stats,
+        adviceItems,
+        loading: fitnessLoading,
+        statsError,
+    } = useFitnessInsights();
 
 
     const pathname =
@@ -524,9 +539,53 @@ export function AppHeaderProvider({
 
 
     /*
+ * ======================================
+ * MENSAJE AUTOMÁTICO DEL COACH
+ * ======================================
+ */
+
+    const coachMessage =
+        useMemo(
+            () => {
+
+                return getHeaderCoachMessage({
+                    pathname,
+
+                    stats,
+
+                    adviceItems,
+
+                    loading:
+                        fitnessLoading,
+
+                    statsError,
+                });
+
+            },
+            [
+                pathname,
+
+                stats,
+
+                adviceItems,
+
+                fitnessLoading,
+
+                statsError,
+            ]
+        );
+
+
+    /*
      * ======================================
-     * MENSAJE FINAL
+     * MENSAJE BÁSICO DE RESPALDO
      * ======================================
+     *
+     * Lo conservamos.
+     *
+     * Si en el futuro aparece una ruta
+     * todavía no contemplada por el coach,
+     * seguirá mostrando su nombre normal.
      */
 
     const defaultMessage =
@@ -535,19 +594,55 @@ export function AppHeaderProvider({
         );
 
 
+    /*
+     * ======================================
+     * MENSAJE AUTOMÁTICO FINAL
+     * ======================================
+     */
+
+    const automaticMessage:
+        AppHeaderMessage =
+        coachMessage ??
+        (
+            defaultMessage
+                ? {
+                    text:
+                        defaultMessage,
+                }
+                : null
+        );
+
+
+    /*
+     * ======================================
+     * MENSAJE FINAL DEL HEADER
+     * ======================================
+     *
+     * Prioridad:
+     *
+     * 1. Mensaje manual de una pantalla.
+     * 2. Header Coach.
+     * 3. Nombre básico de la ruta.
+     */
+
+    const finalMessage =
+        customMessage ??
+        automaticMessage;
+
+
     const headerMessage =
-        customMessage?.text ??
-        defaultMessage;
+        finalMessage?.text ??
+        null;
 
 
     const headerMessageLoading =
         routeChanging ||
-        customMessage?.loading ===
+        finalMessage?.loading ===
         true;
 
 
     const headerMessageShowStar =
-        customMessage?.showStar ??
+        finalMessage?.showStar ??
         false;
 
 

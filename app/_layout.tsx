@@ -6,7 +6,9 @@ import { View, Text, ActivityIndicator, Image } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'expo-dev-client';
 import '../lib/backgroundLocationTask';
-
+import {
+  FitnessInsightsProvider,
+} from '../context/FitnessInsightsContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { COLORS } from '../constants/colors';
 import {
@@ -250,11 +252,15 @@ export default function RootLayout() {
     >
       <AuthProvider>
 
-        <AppHeaderProvider>
+        <FitnessInsightsProvider>
 
-          <RootNavigator />
+          <AppHeaderProvider>
 
-        </AppHeaderProvider>
+            <RootNavigator />
+
+          </AppHeaderProvider>
+
+        </FitnessInsightsProvider>
 
       </AuthProvider>
     </GestureHandlerRootView>

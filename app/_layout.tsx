@@ -197,20 +197,15 @@ function RootNavigator() {
             <View
               style={{
                 width: '100%',
-
                 maxWidth: 800,
-
-                alignSelf:
-                  'center',
-
+                alignSelf: 'center',
                 paddingHorizontal: 8,
+
+                overflow: 'visible',
+                zIndex: 50,
               }}
             >
-              <AppHeader
-                showProfile={
-                  true
-                }
-              />
+              <AppHeader showProfile={true} />
             </View>
           </SafeAreaView>
 

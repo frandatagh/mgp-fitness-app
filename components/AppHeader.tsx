@@ -163,7 +163,7 @@ export default function AppHeader({
         <>
             <View
                 style={{
-                    height: 108,
+                    height: 90,
 
                     flexDirection:
                         'row',
@@ -179,6 +179,10 @@ export default function AppHeader({
 
                     marginHorizontal:
                         8,
+
+                    overflow: 'visible',
+
+                    zIndex: 50,
                 }}
             >
                 {/* Menú hamburguesa */}
@@ -227,6 +231,8 @@ export default function AppHeader({
                             style={{
                                 alignItems: 'center',
                                 justifyContent: 'center',
+
+                                zIndex: 60,
                             }}
                         >
                             <View

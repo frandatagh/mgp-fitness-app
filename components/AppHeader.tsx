@@ -95,6 +95,10 @@ export default function AppHeader({
     profileBadge = null,
 }: AppHeaderProps) {
     const insets = useSafeAreaInsets();
+    const headerHeight =
+        insets.top > 0
+            ? 78
+            : 108;
     const { user, logout, isAuthenticated } = useAuth();
 
     const {
@@ -163,7 +167,7 @@ export default function AppHeader({
         <>
             <View
                 style={{
-                    height: 90,
+                    height: headerHeight,
 
                     flexDirection:
                         'row',

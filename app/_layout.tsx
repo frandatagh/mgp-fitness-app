@@ -192,6 +192,12 @@ function RootNavigator() {
             style={{
               backgroundColor:
                 COLORS.background,
+
+              overflow:
+                'visible',
+
+              zIndex:
+                100,
             }}
           >
             <View
@@ -219,6 +225,8 @@ function RootNavigator() {
       <View
         style={{
           flex: 1,
+
+          zIndex: 0,
         }}
       >
         <Stack

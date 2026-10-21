@@ -175,13 +175,13 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                             className="w-11/12 max-w-xs rounded-2xl p-4"
                             style={{
                                 backgroundColor: '#111111',
-                                borderWidth: 1,
+                                borderWidth: 3,
                                 borderColor: COLORS.primary,
                             }}
                         >
                             <Text
                                 className="text-center text-base font-semibold mb-3"
-                                style={{ color: COLORS.textLight }}
+                                style={{ color: COLORS.textLight, fontSize: 18 }}
                             >
                                 Opciones de rutina
                             </Text>
@@ -193,7 +193,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                                     onOpen();
                                 }}
                             >
-                                <Text style={{ color: COLORS.textLight }}>
+                                <Text style={{ color: COLORS.textLight, fontSize: 16 }}>
                                     Ver rutina
                                 </Text>
                             </Pressable>
@@ -205,7 +205,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                                     onEdit();
                                 }}
                             >
-                                <Text style={{ color: COLORS.textLight }}>
+                                <Text style={{ color: COLORS.textLight, fontSize: 16 }}>
                                     Editar rutina
                                 </Text>
                             </Pressable>
@@ -217,7 +217,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                                     onShare();
                                 }}
                             >
-                                <Text style={{ color: COLORS.textLight }}>
+                                <Text style={{ color: COLORS.textLight, fontSize: 16 }}>
                                     Compartir / exportar
                                 </Text>
                             </Pressable>
@@ -235,6 +235,7 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                                     style={{
                                         color: '#FFBABA',
                                         fontWeight: '600',
+                                        fontSize: 16,
                                     }}
                                 >
                                     Eliminar rutina
@@ -244,6 +245,12 @@ export const RoutineCard: React.FC<RoutineCardProps> = ({
                             <Pressable
                                 className="mt-3 py-2 items-center"
                                 onPress={handleCloseOptions}
+                                style={{
+                                    borderRadius: 12,
+                                    borderWidth: 3,
+                                    borderColor: 'rgba(198,255,0,0.22)',
+                                    paddingVertical: 12,
+                                }}
                             >
                                 <Text style={{ color: COLORS.textMuted }}>
                                     Cancelar

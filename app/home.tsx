@@ -370,8 +370,8 @@ function CreateRoutineOption({
         >
             <View
                 style={{
-                    width: 44,
-                    height: 44,
+                    width: 50,
+                    height: 50,
                     borderRadius: 14,
                     backgroundColor: '#111111',
                     alignItems: 'center',
@@ -383,7 +383,7 @@ function CreateRoutineOption({
             >
                 <Ionicons
                     name={icon}
-                    size={24}
+                    size={28}
                     color={disabled ? COLORS.textMuted : COLORS.primary}
                 />
             </View>
@@ -392,7 +392,7 @@ function CreateRoutineOption({
                 <Text
                     style={{
                         color: COLORS.textLight,
-                        fontSize: 14,
+                        fontSize: 15,
                         fontWeight: '900',
                         marginBottom: 3,
                     }}
@@ -413,7 +413,7 @@ function CreateRoutineOption({
 
             <Ionicons
                 name="chevron-forward"
-                size={18}
+                size={20}
                 color={COLORS.textMuted}
             />
         </Pressable>
@@ -1999,7 +1999,6 @@ export default function HomeScreen() {
                 {/* TABS SUPERIORES */}
                 <View
                     style={{
-                        marginTop: 2,
                         marginBottom: 7,
 
                         position: 'relative',
@@ -2061,12 +2060,12 @@ export default function HomeScreen() {
                                                         : '#777777',
 
                                                 fontSize:
-                                                    13,
+                                                    14,
 
                                                 fontWeight:
                                                     active
-                                                        ? '600'
-                                                        : '500',
+                                                        ? '400'
+                                                        : '400',
                                             }}
                                         >
                                             {label}
@@ -2723,7 +2722,7 @@ export default function HomeScreen() {
 
                                                         fontSize: 13,
 
-                                                        marginLeft: 5,
+                                                        marginLeft: 8,
                                                         fontWeight:
                                                             '700',
                                                     }}
@@ -4441,10 +4440,10 @@ export default function HomeScreen() {
                     <Pressable
                         onPress={() => setCreateRoutineModalVisible(true)}
                         style={({ pressed }) => ({
-                            width: 78,
-                            height: 60,
+                            width: 86,
+                            height: 58,
                             borderRadius: 16,
-                            backgroundColor: 'rgb(26, 26, 26)',
+                            backgroundColor: '#242424',
                             alignItems: 'center',
                             justifyContent: 'center',
                             overflow: 'hidden',
@@ -4488,12 +4487,12 @@ export default function HomeScreen() {
                     <Pressable
                         onPress={() => router.push('/statistics')}
                         style={({ pressed }) => ({
-                            width: 78,
-                            height: 60,
+                            width: 86,
+                            height: 58,
                             borderRadius: 16,
                             borderWidth: 3,
                             borderColor: '#444444',
-                            backgroundColor: 'rgb(26, 26, 26)',
+                            backgroundColor: '#242424',
                             alignItems: 'center',
                             justifyContent: 'center',
                             overflow: 'hidden',
@@ -4528,24 +4527,53 @@ export default function HomeScreen() {
                     <View
                         style={{
                             width: '100%',
-                            maxWidth: 360,
+                            maxWidth: 340,
                             backgroundColor: '#111111',
                             borderRadius: 24,
-                            borderWidth: 1,
+                            borderWidth: 3,
                             borderColor: COLORS.primary,
                             padding: 18,
                         }}
                     >
-                        <Text
+                        <View
                             style={{
-                                color: COLORS.textLight,
-                                fontSize: 19,
-                                fontWeight: '900',
-                                marginBottom: 8,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: 14,
                             }}
                         >
-                            Progreso de tu objetivo
-                        </Text>
+                            <View>
+                                <Text
+                                    style={{
+                                        color: COLORS.textLight,
+                                        fontSize: 20,
+                                        fontWeight: '700',
+                                        marginLeft: 8,
+                                    }}
+                                >
+                                    Tu progreso
+                                </Text>
+                            </View>
+
+                            <Pressable
+                                onPress={() => setProgressModalVisible(false)}
+                                style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: 18,
+                                    backgroundColor: '#1A1A1A',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                <Ionicons
+                                    name="close"
+                                    size={23}
+                                    color={COLORS.textLight}
+                                />
+                            </Pressable>
+                        </View>
 
                         <Text
                             style={{
@@ -4553,28 +4581,183 @@ export default function HomeScreen() {
                                 fontSize: 13,
                                 lineHeight: 19,
                                 marginBottom: 14,
+                                marginLeft: 4,
                             }}
                         >
                             Este progreso se calcula según el objetivo principal que definiste en tu perfil y tus registros actuales.
                         </Text>
 
                         {goalProgress ? (
-                            <View style={{ gap: 10 }}>
-                                <Text style={{ color: '#FFFFFF' }}>
-                                    {goalProgress.targetLabel}
+                            <View>
+                                <View
+                                    style={{
+                                        flexDirection: 'row',
+                                        gap: 8,
+                                    }}
+                                >
+                                    <View
+                                        style={{
+                                            flex: 1,
+                                            aspectRatio: 1,
+
+                                            backgroundColor: '#191919',
+
+                                            borderRadius: 14,
+
+                                            borderWidth: 1,
+                                            borderColor: '#303030',
+
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+
+                                            padding: 8,
+                                        }}
+                                    >
+                                        <Text
+                                            style={{
+                                                color: COLORS.textMuted,
+                                                fontSize: 14,
+                                                fontWeight: '600',
+                                                textAlign: 'center',
+
+                                                marginBottom: 7,
+                                            }}
+                                        >
+                                            Objetivo
+                                        </Text>
+
+                                        <Text
+                                            numberOfLines={1}
+                                            adjustsFontSizeToFit
+                                            minimumFontScale={0.75}
+                                            style={{
+                                                color: '#FFFFFF',
+                                                fontSize: 18,
+                                                fontWeight: '600',
+                                                textAlign: 'center',
+                                            }}
+                                        >
+                                            {goalProgress.targetLabel.replace(
+                                                /^Objetivo:\s*/,
+                                                ''
+                                            )}
+                                        </Text>
+                                    </View>
+                                    <View
+                                        style={{
+                                            flex: 1,
+                                            aspectRatio: 1,
+
+                                            backgroundColor: '#191919',
+
+                                            borderRadius: 14,
+
+                                            borderWidth: 1,
+                                            borderColor: 'rgba(198,255,0,0.25)',
+
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+
+                                            padding: 8,
+                                        }}
+                                    >
+                                        <Text
+                                            style={{
+                                                color: COLORS.textMuted,
+                                                fontSize: 14,
+                                                fontWeight: '600',
+                                                textAlign: 'center',
+
+                                                marginBottom: 7,
+                                            }}
+                                        >
+                                            Recorrido
+                                        </Text>
+
+                                        <Text
+                                            numberOfLines={1}
+                                            adjustsFontSizeToFit
+                                            minimumFontScale={0.75}
+                                            style={{
+                                                color: COLORS.primary,
+                                                fontSize: 18,
+                                                fontWeight: '600',
+                                                textAlign: 'center',
+                                            }}
+                                        >
+                                            {goalProgress.currentValueLabel.replace(
+                                                /^(Recorrido|Acumulado):\s*/,
+                                                ''
+                                            )}
+                                        </Text>
+                                    </View>
+                                    <View
+                                        style={{
+                                            flex: 1,
+                                            aspectRatio: 1,
+
+                                            backgroundColor: '#191919',
+
+                                            borderRadius: 14,
+
+                                            borderWidth: 1,
+                                            borderColor: '#303030',
+
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+
+                                            padding: 8,
+                                        }}
+                                    >
+                                        <Text
+                                            style={{
+                                                color: COLORS.textMuted,
+                                                fontSize: 14,
+                                                fontWeight: '600',
+                                                textAlign: 'center',
+
+                                                marginBottom: 7,
+                                            }}
+                                        >
+                                            Restante
+                                        </Text>
+
+                                        <Text
+                                            numberOfLines={1}
+                                            adjustsFontSizeToFit
+                                            minimumFontScale={0.75}
+                                            style={{
+                                                color: '#FFFFFF',
+                                                fontSize: 18,
+                                                fontWeight: '600',
+                                                textAlign: 'center',
+                                            }}
+                                        >
+                                            {goalProgress.remainingLabel.replace(
+                                                /^Restante:\s*/,
+                                                ''
+                                            )}
+                                        </Text>
+                                    </View>
+
+                                </View>
+
+
+                                {/* PORCENTAJE */}
+
+                                <Text
+                                    style={{
+                                        color: COLORS.primary,
+                                        fontWeight: '600',
+                                        fontSize: 16,
+
+                                        marginTop: 8,
+                                        textAlign: 'center',
+                                    }}
+                                >
+                                    Objetivo completado: {goalProgress.progressPercent}%
                                 </Text>
 
-                                <Text style={{ color: '#FFFFFF' }}>
-                                    {goalProgress.currentValueLabel}
-                                </Text>
-
-                                <Text style={{ color: '#FFFFFF' }}>
-                                    {goalProgress.remainingLabel}
-                                </Text>
-
-                                <Text style={{ color: COLORS.primary, fontWeight: '900' }}>
-                                    Cumplido: {goalProgress.progressPercent}%
-                                </Text>
                             </View>
                         ) : (
                             <Text style={{ color: COLORS.textMuted }}>
@@ -4584,11 +4767,13 @@ export default function HomeScreen() {
 
                         <View
                             style={{
-                                height: 16,
+                                height: 20,
                                 borderRadius: 999,
                                 backgroundColor: '#252525',
                                 overflow: 'hidden',
-                                marginTop: 16,
+                                marginTop: 11,
+                                paddingVertical: 4,
+                                paddingHorizontal: 5,
                             }}
                         >
                             <View
@@ -4609,7 +4794,9 @@ export default function HomeScreen() {
                                 }}
                                 style={{
                                     flex: 1,
-                                    backgroundColor: COLORS.primary,
+                                    borderWidth: 3,
+                                    backgroundColor: '#1A1A1A',
+                                    borderColor: 'rgba(198,255,0,0.22)',
                                     borderRadius: 14,
                                     paddingVertical: 12,
                                     alignItems: 'center',
@@ -4617,31 +4804,11 @@ export default function HomeScreen() {
                             >
                                 <Text
                                     style={{
-                                        color: '#111111',
-                                        fontWeight: '900',
+                                        color: '#FFFFFF',
+                                        fontWeight: '700',
                                     }}
                                 >
                                     Ver perfil
-                                </Text>
-                            </Pressable>
-
-                            <Pressable
-                                onPress={() => setProgressModalVisible(false)}
-                                style={{
-                                    flex: 1,
-                                    backgroundColor: '#2a2a2a',
-                                    borderRadius: 14,
-                                    paddingVertical: 12,
-                                    alignItems: 'center',
-                                }}
-                            >
-                                <Text
-                                    style={{
-                                        color: COLORS.textLight,
-                                        fontWeight: '800',
-                                    }}
-                                >
-                                    Cerrar
                                 </Text>
                             </Pressable>
                         </View>
@@ -4669,8 +4836,8 @@ export default function HomeScreen() {
                             maxWidth: 390,
                             backgroundColor: '#111111',
                             borderRadius: 26,
-                            borderWidth: 1,
-                            borderColor: 'rgba(198,255,0,0.35)',
+                            borderWidth: 3,
+                            borderColor: COLORS.primary,
                             padding: 18,
                         }}
                     >
@@ -4687,7 +4854,8 @@ export default function HomeScreen() {
                                     style={{
                                         color: COLORS.textLight,
                                         fontSize: 20,
-                                        fontWeight: '900',
+                                        fontWeight: '700',
+                                        marginLeft: 8,
                                     }}
                                 >
                                     Crea tu rutina
@@ -4707,7 +4875,7 @@ export default function HomeScreen() {
                             >
                                 <Ionicons
                                     name="close"
-                                    size={20}
+                                    size={25}
                                     color={COLORS.textLight}
                                 />
                             </Pressable>
@@ -4722,6 +4890,16 @@ export default function HomeScreen() {
                             onPress={() => {
                                 setCreateRoutineModalVisible(false);
                                 router.push('/routine/new');
+                            }}
+                        />
+
+                        <CreateRoutineOption
+                            icon="bulb-outline"
+                            title="Elegir sugerencias"
+                            description="Guardá una rutina recomendada desde nuestras sugerencias."
+                            onPress={() => {
+                                setCreateRoutineModalVisible(false);
+                                router.push('/suggestions');
                             }}
                         />
 
@@ -4745,47 +4923,7 @@ export default function HomeScreen() {
                             }}
                         />
 
-                        <CreateRoutineOption
-                            icon="bulb-outline"
-                            title="Elegir sugerencias"
-                            description="Guardá una rutina recomendada desde nuestras sugerencias."
-                            onPress={() => {
-                                setCreateRoutineModalVisible(false);
-                                router.push('/suggestions');
-                            }}
-                        />
 
-                        <View
-                            style={{
-                                backgroundColor: 'rgba(255,193,7,0.08)',
-                                borderWidth: 1,
-                                borderColor: 'rgba(255,193,7,0.25)',
-                                borderRadius: 16,
-                                padding: 12,
-                                marginTop: 4,
-                            }}
-                        >
-                            <Text
-                                style={{
-                                    color: '#FFD36A',
-                                    fontSize: 12,
-                                    fontWeight: '900',
-                                    marginBottom: 3,
-                                }}
-                            >
-                                Importante
-                            </Text>
-
-                            <Text
-                                style={{
-                                    color: COLORS.textMuted,
-                                    fontSize: 11,
-                                    lineHeight: 16,
-                                }}
-                            >
-                                El escaneo funcionará mejor con texto impreso, buena iluminación y papel claro. En la primera versión no se garantizará lectura correcta de manuscritos.
-                            </Text>
-                        </View>
                     </View>
                 </View>
             </Modal>
@@ -5272,8 +5410,8 @@ export default function HomeScreen() {
 
                             borderRadius: 24,
 
-                            borderWidth: 1,
-                            borderColor: '#343434',
+                            borderWidth: 3,
+                            borderColor: COLORS.primary,
 
                             padding: 18,
                         }}
@@ -5284,7 +5422,7 @@ export default function HomeScreen() {
                             style={{
                                 flexDirection: 'row',
                                 alignItems: 'center',
-                                marginBottom: 15,
+                                marginBottom: 16,
                             }}
                         >
                             <View
@@ -5321,7 +5459,7 @@ export default function HomeScreen() {
                                 <Text
                                     style={{
                                         color: COLORS.textLight,
-                                        fontSize: 19,
+                                        fontSize: 20,
                                         fontWeight: '900',
                                     }}
                                 >
@@ -5331,7 +5469,7 @@ export default function HomeScreen() {
                                 <Text
                                     style={{
                                         color: COLORS.textMuted,
-                                        fontSize: 10,
+                                        fontSize: 12,
                                         lineHeight: 14,
                                         marginTop: 3,
                                     }}
@@ -5370,14 +5508,14 @@ export default function HomeScreen() {
                                 >
                                     <Ionicons
                                         name="barbell-outline"
-                                        size={19}
+                                        size={22}
                                         color={COLORS.primary}
                                     />
 
                                     <Text
                                         style={{
                                             color: COLORS.textLight,
-                                            fontSize: 13,
+                                            fontSize: 14,
                                             fontWeight: '900',
                                             marginLeft: 8,
                                         }}
@@ -5389,7 +5527,7 @@ export default function HomeScreen() {
                                 <Text
                                     style={{
                                         color: '#AAAAAA',
-                                        fontSize: 10,
+                                        fontSize: 12,
                                         lineHeight: 16,
                                     }}
                                 >
@@ -5424,14 +5562,14 @@ export default function HomeScreen() {
                                 >
                                     <Ionicons
                                         name="walk-outline"
-                                        size={19}
+                                        size={22}
                                         color={COLORS.primary}
                                     />
 
                                     <Text
                                         style={{
                                             color: COLORS.textLight,
-                                            fontSize: 13,
+                                            fontSize: 14,
                                             fontWeight: '900',
                                             marginLeft: 8,
                                         }}
@@ -5443,7 +5581,7 @@ export default function HomeScreen() {
                                 <Text
                                     style={{
                                         color: '#AAAAAA',
-                                        fontSize: 10,
+                                        fontSize: 12,
                                         lineHeight: 16,
                                     }}
                                 >
@@ -5478,14 +5616,14 @@ export default function HomeScreen() {
                                 >
                                     <Ionicons
                                         name="home-outline"
-                                        size={19}
+                                        size={22}
                                         color={COLORS.primary}
                                     />
 
                                     <Text
                                         style={{
                                             color: COLORS.textLight,
-                                            fontSize: 13,
+                                            fontSize: 14,
                                             fontWeight: '900',
                                             marginLeft: 8,
                                         }}
@@ -5497,7 +5635,7 @@ export default function HomeScreen() {
                                 <Text
                                     style={{
                                         color: '#AAAAAA',
-                                        fontSize: 10,
+                                        fontSize: 12,
                                         lineHeight: 16,
                                     }}
                                 >
@@ -5537,14 +5675,14 @@ export default function HomeScreen() {
                                 >
                                     <Ionicons
                                         name="warning-outline"
-                                        size={19}
+                                        size={22}
                                         color="#FFD36A"
                                     />
 
                                     <Text
                                         style={{
                                             color: '#FFD36A',
-                                            fontSize: 12,
+                                            fontSize: 14,
                                             fontWeight: '900',
                                             marginLeft: 7,
                                         }}
@@ -5556,7 +5694,7 @@ export default function HomeScreen() {
                                 <Text
                                     style={{
                                         color: '#B8B8B8',
-                                        fontSize: 10,
+                                        fontSize: 12,
                                         lineHeight: 16,
                                     }}
                                 >
@@ -5567,7 +5705,7 @@ export default function HomeScreen() {
                             <Text
                                 style={{
                                     color: '#666666',
-                                    fontSize: 9,
+                                    fontSize: 12,
                                     lineHeight: 14,
                                     textAlign: 'center',
                                     marginTop: 12,
@@ -5600,7 +5738,7 @@ export default function HomeScreen() {
                             <Text
                                 style={{
                                     color: '#111111',
-                                    fontSize: 12,
+                                    fontSize: 14,
                                     fontWeight: '900',
                                 }}
                             >
@@ -5643,17 +5781,17 @@ export default function HomeScreen() {
                             width: '100%',
                             maxWidth: 410,
 
-                            maxHeight: '88%',
+                            maxHeight: '75%',
 
                             backgroundColor:
                                 '#101010',
 
                             borderRadius: 24,
 
-                            borderWidth: 1,
+                            borderWidth: 3,
 
                             borderColor:
-                                '#343434',
+                                COLORS.primary,
 
                             padding: 18,
                         }}
@@ -5727,7 +5865,7 @@ export default function HomeScreen() {
                                         color:
                                             COLORS.textMuted,
 
-                                        fontSize: 10,
+                                        fontSize: 14,
 
                                         marginTop: 3,
                                     }}
@@ -5767,7 +5905,7 @@ export default function HomeScreen() {
                             >
                                 <Ionicons
                                     name="close"
-                                    size={19}
+                                    size={23}
                                     color="#AAAAAA"
                                 />
                             </Pressable>
@@ -5779,7 +5917,7 @@ export default function HomeScreen() {
                             style={{
                                 color: '#888888',
 
-                                fontSize: 10,
+                                fontSize: 12,
 
                                 lineHeight: 15,
 
@@ -6478,10 +6616,10 @@ export default function HomeScreen() {
 
                             borderRadius: 24,
 
-                            borderWidth: 1,
+                            borderWidth: 3,
 
                             borderColor:
-                                '#343434',
+                                COLORS.primary,
 
                             padding: 16,
                         }}

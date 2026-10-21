@@ -1,5 +1,14 @@
 import { useState, useRef } from 'react';
-import { Image, Modal, Pressable, ScrollView, Text, View, Animated, ActivityIndicator } from 'react-native';
+import {
+    Image,
+    Modal,
+    Pressable,
+    ScrollView,
+    Text,
+    View,
+    Animated,
+    ActivityIndicator,
+} from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -94,10 +103,28 @@ export default function AppHeader({
     profileGreeting = null,
     profileBadge = null,
 }: AppHeaderProps) {
-    const insets = useSafeAreaInsets();
+    const insets =
+        useSafeAreaInsets();
+
+    const isIphonePwa =
+        typeof window !== 'undefined' &&
+        typeof navigator !== 'undefined' &&
+        /iPhone|iPod/i.test(
+            navigator.userAgent
+        ) &&
+        (
+            window.matchMedia(
+                '(display-mode: standalone)'
+            ).matches ||
+            Boolean(
+                (navigator as any).standalone
+            )
+        );
+
+
     const headerHeight =
-        insets.top > 0
-            ? 78
+        isIphonePwa
+            ? 60
             : 108;
     const { user, logout, isAuthenticated } = useAuth();
 
@@ -216,7 +243,15 @@ export default function AppHeader({
                 >
                     <Image
                         source={require('../assets/img/icontwist.png')}
-                        style={{ width: 184, height: 130, top: 5 }}
+                        style={{
+                            width: 184,
+                            height: 130,
+
+                            top:
+                                isIphonePwa
+                                    ? 0
+                                    : 5,
+                        }}
                         resizeMode="contain"
                     />
                 </View>
@@ -241,8 +276,13 @@ export default function AppHeader({
                         >
                             <View
                                 style={{
-                                    marginTop: 23,
+                                    marginTop:
+                                        isIphonePwa
+                                            ? 8
+                                            : 23,
+
                                     right: -10,
+
                                     width: 70,
                                     height: 70,
                                     borderRadius: 100,

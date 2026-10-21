@@ -106,17 +106,8 @@ export default function AppHeader({
     const insets =
         useSafeAreaInsets();
 
-    const isIphoneWeb =
-        typeof navigator !== 'undefined' &&
-        /iPhone|iPod/i.test(
-            navigator.userAgent
-        );
-
-
     const headerHeight =
-        isIphoneWeb
-            ? 68
-            : 108;
+        108;
     const { user, logout, isAuthenticated } = useAuth();
 
     const {
@@ -214,10 +205,7 @@ export default function AppHeader({
                         style={{
                             width: 44,
                             height: 44,
-                            top:
-                                isIphoneWeb
-                                    ? 0
-                                    : 5,
+                            top: 5,
                             alignItems: 'center',
                             justifyContent: 'center',
                         }}
@@ -240,11 +228,7 @@ export default function AppHeader({
                         style={{
                             width: 184,
                             height: 130,
-
-                            top:
-                                isIphoneWeb
-                                    ? 0
-                                    : 5,
+                            top: 5,
                         }}
                         resizeMode="contain"
                     />
@@ -270,13 +254,8 @@ export default function AppHeader({
                         >
                             <View
                                 style={{
-                                    marginTop:
-                                        isIphoneWeb
-                                            ? 8
-                                            : 23,
-
+                                    marginTop: 23,
                                     right: -10,
-
                                     width: 70,
                                     height: 70,
                                     borderRadius: 100,

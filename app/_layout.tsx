@@ -2,7 +2,13 @@ import '../global.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
-import { View, Text, ActivityIndicator, Image } from 'react-native';
+import {
+  View,
+  Text,
+  ActivityIndicator,
+  Image,
+  Platform,
+} from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'expo-dev-client';
 import '../lib/backgroundLocationTask';
@@ -66,6 +72,13 @@ function RootNavigator() {
   const segments = useSegments();
 
   const firstSegment = segments[0] as string | undefined;
+
+  const isIphoneWeb =
+    Platform.OS === 'web' &&
+    typeof navigator !== 'undefined' &&
+    /iPhone|iPod/i.test(
+      navigator.userAgent
+    );
 
   const {
     headerVisible,
@@ -198,6 +211,11 @@ function RootNavigator() {
 
               zIndex:
                 100,
+
+              marginBottom:
+                isIphoneWeb
+                  ? -32
+                  : 0,
             }}
           >
             <View

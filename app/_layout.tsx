@@ -214,7 +214,7 @@ function RootNavigator() {
 
               marginBottom:
                 isIphoneWeb
-                  ? -32
+                  ? -12
                   : 0,
             }}
           >

@@ -201,7 +201,6 @@ function RootNavigator() {
               'left',
               'right',
             ]}
-
             style={{
               backgroundColor:
                 COLORS.background,
@@ -211,11 +210,6 @@ function RootNavigator() {
 
               zIndex:
                 100,
-
-              marginBottom:
-                isIphoneWeb
-                  ? -12
-                  : 0,
             }}
           >
             <View

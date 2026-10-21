@@ -8,6 +8,7 @@ import {
     View,
     Animated,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -106,8 +107,47 @@ export default function AppHeader({
     const insets =
         useSafeAreaInsets();
 
+    const isIphoneWeb =
+        Platform.OS === 'web' &&
+        typeof navigator !== 'undefined' &&
+        /iPhone|iPod/i.test(
+            navigator.userAgent
+        );
+
     const headerHeight =
-        108;
+        isIphoneWeb
+            ? 82
+            : 108;
+
+
+    const logoWidth =
+        isIphoneWeb
+            ? 158
+            : 184;
+
+
+    const logoHeight =
+        isIphoneWeb
+            ? 104
+            : 130;
+
+
+    const avatarSize =
+        isIphoneWeb
+            ? 60
+            : 70;
+
+
+    const avatarImageSize =
+        isIphoneWeb
+            ? 52
+            : 60;
+
+
+    const avatarMarginTop =
+        isIphoneWeb
+            ? 6
+            : 23;
     const { user, logout, isAuthenticated } = useAuth();
 
     const {
@@ -226,9 +266,13 @@ export default function AppHeader({
                     <Image
                         source={require('../assets/img/icontwist.png')}
                         style={{
-                            width: 184,
-                            height: 130,
-                            top: 5,
+                            width: logoWidth,
+                            height: logoHeight,
+
+                            top:
+                                isIphoneWeb
+                                    ? 0
+                                    : 5,
                         }}
                         resizeMode="contain"
                     />
@@ -254,10 +298,19 @@ export default function AppHeader({
                         >
                             <View
                                 style={{
-                                    marginTop: 23,
-                                    right: -10,
-                                    width: 70,
-                                    height: 70,
+                                    marginTop:
+                                        avatarMarginTop,
+
+                                    right:
+                                        isIphoneWeb
+                                            ? -8
+                                            : -10,
+
+                                    width:
+                                        avatarSize,
+
+                                    height:
+                                        avatarSize,
                                     borderRadius: 100,
                                     backgroundColor: '#1b1b1b',
                                     borderWidth: 3,
@@ -269,10 +322,16 @@ export default function AppHeader({
                             >
                                 {profileImageUrl ? (
                                     <Image
-                                        source={{ uri: profileImageUrl }}
+                                        source={{
+                                            uri: profileImageUrl,
+                                        }}
                                         style={{
-                                            width: 60,
-                                            height: 60,
+                                            width:
+                                                avatarImageSize,
+
+                                            height:
+                                                avatarImageSize,
+
                                             borderRadius: 100,
                                         }}
                                         resizeMode="cover"
@@ -294,8 +353,14 @@ export default function AppHeader({
 
                             <View
                                 style={{
-                                    marginTop: -8,
-                                    right: -10,
+                                    marginTop:
+                                        isIphoneWeb
+                                            ? -7
+                                            : -8,
+                                    right:
+                                        isIphoneWeb
+                                            ? -8
+                                            : -10,
 
                                     width: 104,
                                     height: 18,

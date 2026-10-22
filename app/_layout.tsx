@@ -207,9 +207,6 @@ function RootNavigator() {
 
               overflow:
                 'visible',
-
-              zIndex:
-                100,
             }}
           >
             <View
@@ -220,7 +217,6 @@ function RootNavigator() {
                 paddingHorizontal: 8,
 
                 overflow: 'visible',
-                zIndex: 50,
               }}
             >
               <AppHeader showProfile={true} />
@@ -237,8 +233,6 @@ function RootNavigator() {
       <View
         style={{
           flex: 1,
-
-          zIndex: 0,
         }}
       >
         <Stack

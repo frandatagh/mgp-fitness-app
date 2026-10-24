@@ -45,7 +45,6 @@ function AppLoadingScreen() {
         style={{
           width: 180,
           height: 105,
-          marginBottom: 22,
         }}
         resizeMode="contain"
       />
@@ -79,6 +78,18 @@ function RootNavigator() {
     /iPhone|iPod/i.test(
       navigator.userAgent
     );
+
+  const headerSafeAreaEdges =
+    Platform.OS === 'web'
+      ? ([
+        'left',
+        'right',
+      ] as const)
+      : ([
+        'top',
+        'left',
+        'right',
+      ] as const);
 
   const {
     headerVisible,
@@ -196,11 +207,7 @@ function RootNavigator() {
         headerVisible && (
 
           <SafeAreaView
-            edges={[
-              'top',
-              'left',
-              'right',
-            ]}
+            edges={headerSafeAreaEdges}
             style={{
               backgroundColor:
                 COLORS.background,

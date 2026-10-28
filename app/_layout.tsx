@@ -95,19 +95,6 @@ function RootNavigator() {
     headerVisible,
   } = useAppHeader();
 
-  /*
- * ==========================================
- * HEADER PERSISTENTE — ETAPA DE PRUEBA
- * ==========================================
- *
- * Primero migramos solamente:
- * Home
- * Perfil
- * Estadísticas
- *
- * Después ampliaremos este grupo.
- */
-
   const isAuthenticatedHeaderRoute =
     (
       firstSegment === 'home' ||
@@ -199,23 +186,22 @@ function RootNavigator() {
       }}
     >
 
-      {/* ===================================== */}
-      {/* HEADER PERSISTENTE                    */}
-      {/* ===================================== */}
-
       {usesPersistentHeader &&
         headerVisible && (
+
 
           <SafeAreaView
             edges={headerSafeAreaEdges}
             style={{
-              backgroundColor:
-                COLORS.background,
+              backgroundColor: COLORS.background,
+              overflow: 'visible',
 
-              overflow:
-                'visible',
+              // DIAGNÓSTICO TEMPORAL
+              borderBottomWidth: 2,
+              borderBottomColor: '#FF3030',
             }}
           >
+
             <View
               style={{
                 width: '100%',
@@ -240,6 +226,10 @@ function RootNavigator() {
       <View
         style={{
           flex: 1,
+
+          // DIAGNÓSTICO TEMPORAL
+          borderTopWidth: 2,
+          borderTopColor: '#00D9FF',
         }}
       >
         <Stack

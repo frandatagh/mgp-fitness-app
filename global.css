@@ -35,3 +35,17 @@
         pointer-events: none;
     }
 }
+
+
+/* =========================================
+   PWA — CONTROL DEL DESPLAZAMIENTO RAÍZ
+   Prueba para iPhone en modo standalone
+   ========================================= */
+
+@media (display-mode: standalone) and (pointer: coarse) {
+
+    html,
+    body {
+        overscroll-behavior-y: none;
+    }
+}

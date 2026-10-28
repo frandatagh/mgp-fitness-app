@@ -6,15 +6,15 @@ import { COLORS } from '../constants/colors';
 import { RoutineCard } from '../components/RoutineCard';
 import { router } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
+import { useFitnessInsights } from '../context/FitnessInsightsContext';
 import { getRoutines, getRoutine, Routine, deleteRoutine } from '../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
 import { getMyProfile, type MyProfileResponse, type UserProfile } from '../lib/profile';
+
 import {
     getMyStatistics,
-    getMyAdvice,
     getTrainingActivity,
 
-    type AdviceItem,
     type MyStatisticsResponse,
     type TrainingActivityResponse,
     type TrainingActivityDay,
@@ -827,6 +827,16 @@ export default function HomeScreen() {
     const { user, isAuthenticated, logout } = useAuth();
 
 
+    const {
+        adviceItems,
+        loading: insightsLoading,
+    } = useFitnessInsights();
+
+    const adviceLoading =
+        insightsLoading &&
+        adviceItems.length === 0;
+
+
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [routines, setRoutines] = useState<Routine[]>([]);
     const [loadingRoutines, setLoadingRoutines] = useState(true);
@@ -1051,21 +1061,6 @@ export default function HomeScreen() {
         precautionsVisible,
         setPrecautionsVisible,
     ] = useState(false);
-
-
-    // CONSEJOS
-
-    const [
-        adviceItems,
-        setAdviceItems,
-    ] = useState<AdviceItem[]>([]);
-
-    const [
-        adviceLoading,
-        setAdviceLoading,
-    ] = useState(false);
-
-
 
     // ===================================
     // ACTIVIDAD / CONSTANCIA
@@ -1527,51 +1522,7 @@ export default function HomeScreen() {
         load();
     }, [isAuthenticated]);
 
-    useEffect(() => {
-        if (!isAuthenticated) {
-            setAdviceItems([]);
-            return;
-        }
 
-        let active = true;
-
-        const loadAdvice =
-            async () => {
-                try {
-                    setAdviceLoading(true);
-
-                    const result =
-                        await getMyAdvice();
-
-                    if (!active) {
-                        return;
-                    }
-
-                    setAdviceItems(
-                        result.items ?? []
-                    );
-                } catch (error) {
-                    console.log(
-                        'No se pudieron cargar consejos en Home:',
-                        error
-                    );
-
-                    if (active) {
-                        setAdviceItems([]);
-                    }
-                } finally {
-                    if (active) {
-                        setAdviceLoading(false);
-                    }
-                }
-            };
-
-        void loadAdvice();
-
-        return () => {
-            active = false;
-        };
-    }, [isAuthenticated]);
 
     useEffect(() => {
         if (isAuthenticated) {

@@ -86,17 +86,14 @@ function RootNavigator() {
       navigator.userAgent
     );
 
-  const headerSafeAreaEdges =
-    Platform.OS === 'web'
-      ? ([
-        'left',
-        'right',
-      ] as const)
-      : ([
-        'top',
-        'left',
-        'right',
-      ] as const);
+
+  const headerSafeAreaEdges = {
+    top: Platform.OS === 'web' ? 'off' : 'additive',
+    bottom: 'off',
+    left: 'additive',
+    right: 'additive',
+  } as const;
+
 
   const {
     headerVisible,

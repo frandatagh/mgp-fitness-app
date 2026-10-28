@@ -1,3 +1,37 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+/* =========================================
+   DIAGNÓSTICO PWA STANDALONE — iPhone
+   Temporal: no modifica el layout
+   ========================================= */
+
+@media (display-mode: standalone) {
+    body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 7px;
+        height: env(safe-area-inset-top, 0px);
+        background-color: #FFD600;
+        z-index: 2147483647;
+        pointer-events: none;
+    }
+
+    body::after {
+        content: "PWA STANDALONE";
+        position: fixed;
+        right: 10px;
+        bottom: 105px;
+        padding: 6px 10px;
+        background-color: #FFD600;
+        color: #111111;
+        font: 700 11px system-ui, sans-serif;
+        border-radius: 8px;
+        z-index: 2147483647;
+        pointer-events: none;
+    }
+}

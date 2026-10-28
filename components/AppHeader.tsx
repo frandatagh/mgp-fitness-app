@@ -312,8 +312,8 @@ export default function AppHeader({
 
                                     right:
                                         isIphoneWeb
-                                            ? -8
-                                            : -10,
+                                            ? -12
+                                            : -16,
 
                                     width:
                                         avatarSize,
@@ -368,8 +368,8 @@ export default function AppHeader({
                                             : -8,
                                     right:
                                         isIphoneWeb
-                                            ? -8
-                                            : -10,
+                                            ? -12
+                                            : -14,
 
                                     width: 104,
                                     height: 18,

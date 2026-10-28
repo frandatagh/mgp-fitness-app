@@ -1,7 +1,7 @@
 import '../global.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import {
   View,
   Text,
@@ -71,20 +71,6 @@ function RootNavigator() {
   const segments = useSegments();
 
   const firstSegment = segments[0] as string | undefined;
-
-
-  const [headerMeasurements, setHeaderMeasurements] = useState({
-    safeArea: 0,
-    inner: 0,
-  });
-
-
-  const isIphoneWeb =
-    Platform.OS === 'web' &&
-    typeof navigator !== 'undefined' &&
-    /iPhone|iPod/i.test(
-      navigator.userAgent
-    );
 
 
   const headerSafeAreaEdges = {
@@ -190,81 +176,34 @@ function RootNavigator() {
       }}
     >
 
+
+      {/* ===================================== */}
+      {/* HEADER PERSISTENTE                    */}
+      {/* ===================================== */}
+
       {usesPersistentHeader &&
         headerVisible && (
-
-
           <SafeAreaView
             edges={headerSafeAreaEdges}
-
-            onLayout={(event) => {
-              const height = event.nativeEvent.layout.height;
-
-              setHeaderMeasurements((current) =>
-                current.safeArea === height
-                  ? current
-                  : { ...current, safeArea: height }
-              );
-            }}
-
             style={{
               backgroundColor: COLORS.background,
               overflow: 'visible',
-
-              // DIAGNÓSTICO TEMPORAL
-              borderBottomWidth: 2,
-              borderBottomColor: '#FF3030',
             }}
           >
-
             <View
               style={{
                 width: '100%',
                 maxWidth: 800,
                 alignSelf: 'center',
                 paddingHorizontal: 8,
-
                 overflow: 'visible',
               }}
-
-              onLayout={(event) => {
-                const height = event.nativeEvent.layout.height;
-
-                setHeaderMeasurements((current) =>
-                  current.inner === height
-                    ? current
-                    : { ...current, inner: height }
-                );
-              }}
-
             >
               <AppHeader showProfile={true} />
-
-              {Platform.OS === 'web' && (
-                <Text
-                  style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 12,
-                    color: '#FFD600',
-                    backgroundColor: '#222222',
-                    fontSize: 10,
-                    fontWeight: 'bold',
-                    zIndex: 999,
-                  }}
-                >
-                  SAFE: {headerMeasurements.safeArea.toFixed(0)}
-                  {' | '}
-                  INNER: {headerMeasurements.inner.toFixed(0)}
-                  {' | '}
-                  ESPERADO: {isIphoneWeb ? 82 : 108}
-                </Text>
-              )}
-
             </View>
           </SafeAreaView>
-
         )}
+
 
 
       {/* ===================================== */}
@@ -274,10 +213,6 @@ function RootNavigator() {
       <View
         style={{
           flex: 1,
-
-          // DIAGNÓSTICO TEMPORAL
-          borderTopWidth: 2,
-          borderTopColor: '#00D9FF',
         }}
       >
         <Stack

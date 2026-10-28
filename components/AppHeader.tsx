@@ -218,6 +218,10 @@ export default function AppHeader({
                 style={{
                     height: headerHeight,
 
+                    // DIAGNÓSTICO TEMPORAL
+                    borderTopWidth: 2,
+                    borderTopColor: '#FF00FF',
+
                     flexDirection:
                         'row',
 

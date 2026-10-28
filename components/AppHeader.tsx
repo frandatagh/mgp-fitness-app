@@ -218,6 +218,15 @@ export default function AppHeader({
                 style={{
                     height: headerHeight,
 
+                    // Control de tamaño para iPhone web
+                    ...(isIphoneWeb
+                        ? {
+                            minHeight: 0,
+                            maxHeight: headerHeight,
+                            flexShrink: 0,
+                        }
+                        : {}),
+
                     // DIAGNÓSTICO TEMPORAL
                     borderTopWidth: 2,
                     borderTopColor: '#FF00FF',

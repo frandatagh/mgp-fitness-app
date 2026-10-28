@@ -37,10 +37,7 @@ export default function Root({ children }: { children: React.ReactNode }) {
                 <meta name="mobile-web-app-capable" content="yes" />
                 <meta name="apple-mobile-web-app-capable" content="yes" />
                 <meta name="apple-mobile-web-app-title" content="Mardel Fitness" />
-                <meta
-                    name="apple-mobile-web-app-status-bar-style"
-                    content="black"
-                />
+
 
                 <ScrollViewStyleReset />
             </head>

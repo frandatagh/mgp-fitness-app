@@ -227,10 +227,6 @@ export default function AppHeader({
                         }
                         : {}),
 
-                    // DIAGNÓSTICO TEMPORAL
-                    borderTopWidth: 2,
-                    borderTopColor: '#FF00FF',
-
                     flexDirection:
                         'row',
 

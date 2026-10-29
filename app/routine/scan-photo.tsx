@@ -181,7 +181,6 @@ export default function ScanPhotoScreen() {
                 contentContainerStyle={{
                     paddingHorizontal: 16,
                     paddingTop: 12,
-                    paddingBottom: 28,
                 }}
             >
 
@@ -364,15 +363,16 @@ export default function ScanPhotoScreen() {
                         borderWidth: 1,
                         borderColor: '#2F2F2F',
                         padding: 16,
-                        marginTop: 14,
+                        marginTop: 10,
                     }}
                 >
                     <Text
                         style={{
                             color: COLORS.textLight,
-                            fontSize: 16,
-                            fontWeight: '900',
+                            fontSize: 12,
+                            fontWeight: '600',
                             marginBottom: 10,
+                            marginLeft: 8,
                         }}
                     >
                         Imagen seleccionada
@@ -384,10 +384,10 @@ export default function ScanPhotoScreen() {
                                 source={{ uri: selectedImageUri }}
                                 style={{
                                     width: '100%',
-                                    height: 260,
+                                    height: 120,
                                     borderRadius: 20,
                                     backgroundColor: '#111111',
-                                    borderWidth: 1,
+                                    borderWidth: 3,
                                     borderColor: '#333333',
                                 }}
                                 resizeMode="cover"
@@ -443,7 +443,7 @@ export default function ScanPhotoScreen() {
                     ) : (
                         <View
                             style={{
-                                minHeight: 190,
+                                minHeight: 120,
                                 borderRadius: 20,
                                 backgroundColor: '#111111',
                                 borderWidth: 1,
@@ -464,7 +464,7 @@ export default function ScanPhotoScreen() {
                             <Text
                                 style={{
                                     color: COLORS.textMuted,
-                                    fontSize: 13,
+                                    fontSize: 10,
                                     textAlign: 'center',
                                     lineHeight: 19,
                                 }}
@@ -475,26 +475,66 @@ export default function ScanPhotoScreen() {
                     )}
                 </View>
 
-                <Pressable
-                    onPress={() => router.back()}
+                {/* ========================================= */}
+                {/* NAVEGACIÓN INFERIOR                      */}
+                {/* ========================================= */}
+
+                <View
                     style={{
-                        marginTop: 14,
-                        backgroundColor: '#2A2A2A',
-                        borderRadius: 16,
-                        paddingVertical: 13,
-                        alignItems: 'center',
+                        marginHorizontal: 8,
+
+                        marginTop: 10,
+
+                        marginBottom: 10,
                     }}
                 >
-                    <Text
-                        style={{
-                            color: COLORS.textLight,
-                            fontSize: 14,
-                            fontWeight: '900',
-                        }}
+                    <Pressable
+                        onPress={() =>
+                            router.replace('/home')
+                        }
+
+                        style={({ pressed }) => ({
+                            height: 58,
+
+                            borderRadius: 17,
+
+                            alignItems:
+                                'center',
+
+                            justifyContent:
+                                'center',
+
+                            backgroundColor:
+                                pressed
+                                    ? '#333333'
+                                    : '#242424',
+
+                            borderWidth: 3,
+
+                            borderColor:
+                                '#353535',
+
+                            opacity:
+                                pressed
+                                    ? 0.8
+                                    : 1,
+                        })}
                     >
-                        Volver
-                    </Text>
-                </Pressable>
+                        <Text
+                            style={{
+                                color:
+                                    '#FFFFFF',
+
+                                fontSize: 14,
+
+                                fontWeight:
+                                    '700',
+                            }}
+                        >
+                            Volver al home
+                        </Text>
+                    </Pressable>
+                </View>
             </ScrollView>
 
             <Modal visible={processing} transparent animationType="fade">

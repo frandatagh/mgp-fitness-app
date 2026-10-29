@@ -10,17 +10,13 @@ import { useFitnessInsights } from '../context/FitnessInsightsContext';
 import { getRoutines, getRoutine, Routine, deleteRoutine } from '../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
 import { getMyProfile, type MyProfileResponse, type UserProfile } from '../lib/profile';
-
 import {
-    getMyStatistics,
     getTrainingActivity,
-
     type MyStatisticsResponse,
     type TrainingActivityResponse,
     type TrainingActivityDay,
     type TrainingActivityWeek,
 } from '../lib/statistics';
-
 import { LineChart } from 'react-native-chart-kit';
 import AppLoading from '../components/AppLoading';
 import { SlideInLeft } from 'react-native-reanimated';
@@ -827,14 +823,30 @@ export default function HomeScreen() {
     const { user, isAuthenticated, logout } = useAuth();
 
 
+
     const {
+        stats: statsData,
+        statsError: insightsStatsError,
         adviceItems,
         loading: insightsLoading,
     } = useFitnessInsights();
 
+    // Mientras todavía no recibimos estadísticas,
+    // mantenemos el estado de carga inicial.
+    const homeStatsLoading =
+        statsData === null &&
+        insightsStatsError === null;
+
+    // Si falla la primera consulta, mostramos error.
+    // Si existen datos anteriores, los conservamos.
+    const homeStatsError =
+        statsData === null &&
+        insightsStatsError !== null;
+
     const adviceLoading =
         insightsLoading &&
         adviceItems.length === 0;
+
 
 
     const [settingsOpen, setSettingsOpen] = useState(false);
@@ -845,18 +857,10 @@ export default function HomeScreen() {
     const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
     const [profileDisplayName, setProfileDisplayName] = useState<string | null>(null);
 
-    const [profileData, setProfileData] = useState<MyProfileResponse | null>(null);
-    const [statsData, setStatsData] = useState<MyStatisticsResponse | null>(null);
 
-    const [
-        homeStatsLoading,
-        setHomeStatsLoading,
-    ] = useState(true);
+    const [profileData, setProfileData] =
+        useState<MyProfileResponse | null>(null);
 
-    const [
-        homeStatsError,
-        setHomeStatsError,
-    ] = useState(false);
 
     const [createRoutineModalVisible, setCreateRoutineModalVisible] = useState(false);
 
@@ -1413,73 +1417,49 @@ export default function HomeScreen() {
         setExpandedExerciseId,
     ] = useState<string | null>(null);
 
+
     useEffect(() => {
-        const loadHomeProfileAndStats =
-            async () => {
-                try {
-                    if (!isAuthenticated) {
-                        setProfileData(null);
-                        setStatsData(null);
-                        setProfileImageUrl(null);
-                        setProfileDisplayName(null);
+        if (!isAuthenticated) {
+            setProfileData(null);
+            setProfileImageUrl(null);
+            setProfileDisplayName(null);
+            return;
+        }
 
-                        setHomeStatsLoading(false);
-                        setHomeStatsError(false);
+        let active = true;
 
-                        return;
-                    }
+        const loadHomeProfile = async () => {
+            try {
+                const profile = await getMyProfile();
 
-                    /*
-                     * IMPORTANTE:
-                     * todavía NO sabemos si
-                     * el usuario tiene estadísticas.
-                     */
-                    setHomeStatsLoading(true);
-                    setHomeStatsError(false);
+                if (!active) return;
 
-                    const [profile, stats] =
-                        await Promise.all([
-                            getMyProfile(),
-                            getMyStatistics(),
-                        ]);
+                setProfileData(profile);
 
-                    setProfileData(profile);
-                    setStatsData(stats);
+                setProfileImageUrl(
+                    profile.profile.profileImageUrl
+                );
 
-                    setProfileImageUrl(
-                        profile.profile
-                            .profileImageUrl
-                    );
+                setProfileDisplayName(
+                    profile.user.name ??
+                    profile.user.email
+                );
 
-                    setProfileDisplayName(
-                        profile.user.name ??
-                        profile.user.email
-                    );
+            } catch (error) {
+                console.log(
+                    'Error cargando perfil en Home:',
+                    error
+                );
+            }
+        };
 
-                } catch (error) {
-                    console.log(
-                        'Error cargando perfil/estadísticas en Home:',
-                        error
-                    );
+        void loadHomeProfile();
 
-                    /*
-                     * Un error de conexión NO significa
-                     * que el usuario no tenga registros.
-                     */
-                    setHomeStatsError(true);
-
-                } finally {
-                    /*
-                     * Recién acá sabemos que
-                     * terminó el intento de carga.
-                     */
-                    setHomeStatsLoading(false);
-                }
-            };
-
-        void loadHomeProfileAndStats();
-
+        return () => {
+            active = false;
+        };
     }, [isAuthenticated]);
+
 
 
     // 👉 Redirigir a login si NO está autenticado (pero desde un efecto)

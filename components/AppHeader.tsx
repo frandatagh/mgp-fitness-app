@@ -134,13 +134,13 @@ export default function AppHeader({
 
     const avatarSize =
         isIphoneWeb
-            ? 60
+            ? 65
             : 70;
 
 
     const avatarImageSize =
         isIphoneWeb
-            ? 52
+            ? 56
             : 60;
 
 

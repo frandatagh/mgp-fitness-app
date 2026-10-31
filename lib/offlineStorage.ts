@@ -93,29 +93,44 @@ export async function removeCachedRoutineDetail(id: string): Promise<void> {
     }
 }
 
+
 export async function getPendingActions(): Promise<PendingAction[]> {
     try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEYS.pendingActions);
+        const raw = await AsyncStorage.getItem(
+            STORAGE_KEYS.pendingActions
+        );
+
         if (!raw) return [];
 
+
         const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
+
+        if (!Array.isArray(parsed)) {
+            throw new Error(
+                'El formato de las acciones pendientes no es válido.'
+            );
+        }
+
+        return parsed as PendingAction[];
+
+
+
     } catch (error) {
         console.error('Error leyendo acciones pendientes:', error);
-        return [];
+        throw error;
     }
+
 }
 
-export async function setPendingActions(actions: PendingAction[]): Promise<void> {
-    try {
-        await AsyncStorage.setItem(
-            STORAGE_KEYS.pendingActions,
-            JSON.stringify(actions)
-        );
-    } catch (error) {
-        console.error('Error guardando acciones pendientes:', error);
-    }
+export async function setPendingActions(
+    actions: PendingAction[]
+): Promise<void> {
+    await AsyncStorage.setItem(
+        STORAGE_KEYS.pendingActions,
+        JSON.stringify(actions)
+    );
 }
+
 
 export async function enqueuePendingAction(action: PendingAction): Promise<void> {
     const current = await getPendingActions();

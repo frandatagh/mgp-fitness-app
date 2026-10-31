@@ -16,7 +16,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { COLORS } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
-import { getRoutine, Routine, RoutineExercise, markRoutineDone, updateRoutineExercise, deleteRoutine } from '../../lib/routines';
+import { useFitnessInsights } from '../../context/FitnessInsightsContext';
+import {
+    getRoutine,
+    Routine,
+    RoutineExercise,
+    updateRoutineExercise,
+    deleteRoutine,
+} from '../../lib/routines';
 import { Ionicons } from '@expo/vector-icons';
 import {
     saveExerciseCheckinWithOfflineSupport,
@@ -232,6 +239,8 @@ export default function RoutineDetailScreen() {
     const { isAuthenticated } = useAuth();
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
+
+    const { refreshFitnessInsights } = useFitnessInsights();
 
     const [routine, setRoutine] = useState<Routine | null>(null);
     const [loading, setLoading] = useState(true);
@@ -779,15 +788,6 @@ export default function RoutineDetailScreen() {
         ]).start();
     };
 
-
-
-
-
-
-
-
-
-
     const handleSelectRoutineScore =
         async (score: number) => {
             if (!routine?.id) {
@@ -803,15 +803,6 @@ export default function RoutineDetailScreen() {
                     'savingAnswer'
                 );
 
-                /*
-                 * Ejecutamos inmediatamente
-                 * las operaciones reales.
-                 */
-                const updatedRoutine =
-                    await markRoutineDone(
-                        routine.id
-                    );
-
                 const result =
                     await saveRoutineCheckinWithOfflineSupport(
                         routine.id,
@@ -825,48 +816,44 @@ export default function RoutineDetailScreen() {
                     result
                 );
 
+
+                const ratedAt = new Date().toISOString();
+
                 setRoutine((current) => {
                     if (!current) {
-                        return {
-                            ...updatedRoutine,
-                            lastRating: score,
-                            lastRatedAt:
-                                new Date().toISOString(),
-                        };
+                        return current;
                     }
 
                     return {
                         ...current,
-                        ...updatedRoutine,
-
-                        /*
-                         * Conservamos los ejercicios
-                         * que ya tienen lastRating.
-                         */
-                        exercises:
-                            current.exercises,
-
-                        lastRating:
-                            score,
-
-                        lastRatedAt:
-                            new Date().toISOString(),
+                        lastDoneAt: ratedAt,
+                        lastRating: score,
+                        lastRatedAt: ratedAt,
                     };
                 });
+
 
                 setDoneMarked(
                     true
                 );
 
+
                 setRoutineUiPhase(
                     'saved'
                 );
+
+                // Sincronizamos los datos globales
+                // después de confirmar el guardado en el backend.
+                if (!result.offlineSaved) {
+                    void refreshFitnessInsights();
+                }
 
                 requestAnimationFrame(
                     () => {
                         animateRoutineSuccessIcon();
                     }
                 );
+
             } catch (error) {
                 console.error(
                     'Error guardando feedback de la rutina:',
@@ -1124,9 +1111,16 @@ export default function RoutineDetailScreen() {
                     0
                 );
 
+
                 setExerciseUiPhase(
                     'saved'
                 );
+
+                // Actualizamos estadísticas y consejos
+                // solamente si el backend confirmó el registro.
+                if (!result.offlineSaved) {
+                    void refreshFitnessInsights();
+                }
 
                 requestAnimationFrame(
                     () => {
@@ -1137,6 +1131,7 @@ export default function RoutineDetailScreen() {
                         animateSuccessIcon();
                     }
                 );
+
             } catch (error) {
                 console.error(
                     'Error guardando feedback del ejercicio:',

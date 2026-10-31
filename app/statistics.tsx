@@ -14,12 +14,7 @@ import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
 import { LineChart } from 'react-native-chart-kit';
 import { useAuth } from '../context/AuthContext';
-import {
-    getMyStatistics,
-    getMyAdvice,
-    type MyStatisticsResponse,
-    type AdviceItem,
-} from '../lib/statistics';
+import { useFitnessInsights } from '../context/FitnessInsightsContext';
 import {
     getMyRunSessions,
     type RunSession,
@@ -975,6 +970,16 @@ export default function StatisticsScreen() {
     const { isAuthenticated, isLoading } = useAuth();
     const router = useRouter();
 
+
+    const {
+        stats,
+        statsError: globalStatsError,
+        adviceItems,
+        adviceError,
+        loading: insightsLoading,
+    } = useFitnessInsights();
+
+
     React.useEffect(() => {
         if (!isLoading && !isAuthenticated) {
             router.replace('/');
@@ -998,9 +1003,6 @@ export default function StatisticsScreen() {
         'latest' | 'weekly' | 'monthly' | 'yearly'
     >('latest');
 
-    const [adviceItems, setAdviceItems] = React.useState<AdviceItem[]>([]);
-    const [adviceError, setAdviceError] = React.useState<string | null>(null);
-
     type RoutinePerformancePoint = {
         id: string;
         date: string;
@@ -1018,9 +1020,23 @@ export default function StatisticsScreen() {
 
 
 
-    const [stats, setStats] = React.useState<MyStatisticsResponse | null>(null);
-    const [loadingStats, setLoadingStats] = React.useState(true);
-    const [statsError, setStatsError] = React.useState<string | null>(null);
+
+    const [loadingExtraData, setLoadingExtraData] =
+        React.useState(true);
+
+    const [extraDataError, setExtraDataError] =
+        React.useState<string | null>(null);
+
+    // Esperamos las estadísticas globales y los datos
+    // adicionales necesarios para los gráficos.
+    const loadingStats =
+        loadingExtraData ||
+        (stats === null && globalStatsError === null);
+
+    const statsError =
+        extraDataError ??
+        (stats === null ? globalStatsError : null);
+
 
     const [infoModalVisible, setInfoModalVisible] = React.useState(false);
     const [infoModalTitle, setInfoModalTitle] = React.useState('');
@@ -1097,58 +1113,70 @@ export default function StatisticsScreen() {
     }, [isAuthenticated]);
 
 
+
+
     useEffect(() => {
-        const loadStats = async () => {
+        if (!isAuthenticated) return;
+
+        let active = true;
+
+        const loadStatisticsDetails = async () => {
+            setLoadingExtraData(true);
+            setExtraDataError(null);
+
             try {
-                if (!isAuthenticated) return;
-
-                setLoadingStats(true);
-                setStatsError(null);
-
-                const [statsResult, sessionsResult, historyResult, adviceResult] =
+                const [sessionsResult, historyResult] =
                     await Promise.allSettled([
-                        getMyStatistics(),
                         getMyRunSessions(),
                         getStatisticsHistory(),
-                        getMyAdvice(),
                     ]);
 
-                if (statsResult.status === 'rejected') {
-                    throw new Error('No se pudieron cargar tus estadísticas.');
-                }
+                if (!active) return;
 
                 if (sessionsResult.status === 'rejected') {
-                    throw new Error('No se pudieron cargar tus sesiones de running.');
+                    throw new Error(
+                        'No se pudieron cargar tus sesiones de running.'
+                    );
                 }
 
                 if (historyResult.status === 'rejected') {
-                    throw new Error('No se pudo cargar tu historial de registros.');
+                    throw new Error(
+                        'No se pudo cargar tu historial de registros.'
+                    );
                 }
 
-                setStats(statsResult.value);
                 setRunSessions(sessionsResult.value.items ?? []);
                 setHistoryDays(historyResult.value.items ?? []);
 
-                if (adviceResult.status === 'fulfilled') {
-                    setAdviceItems(adviceResult.value.items ?? []);
-                    setAdviceError(null);
-                } else {
-                    console.log('Error cargando consejos:', adviceResult.reason);
-                    setAdviceItems([]);
-                    setAdviceError(
-                        'No pudimos cargar los consejos en este momento. Tus estadísticas siguen disponibles.'
-                    );
-                }
             } catch (error) {
-                console.error('Error cargando estadísticas:', error);
-                setStatsError('No se pudieron cargar tus estadísticas.');
+                if (!active) return;
+
+                console.error(
+                    'Error cargando datos adicionales de Statistics:',
+                    error
+                );
+
+                setExtraDataError(
+                    error instanceof Error
+                        ? error.message
+                        : 'No se pudieron cargar las sesiones o el historial.'
+                );
+
             } finally {
-                setLoadingStats(false);
+                if (active) {
+                    setLoadingExtraData(false);
+                }
             }
         };
 
-        loadStats();
+        void loadStatisticsDetails();
+
+        return () => {
+            active = false;
+        };
     }, [isAuthenticated]);
+
+
 
     const handleQuickAccess = (
         key: StatisticsSectionKey
@@ -3854,7 +3882,33 @@ export default function StatisticsScreen() {
                                         />
                                     </View>
 
-                                    {adviceError ? (
+
+                                    {insightsLoading &&
+                                        adviceItems.length === 0 &&
+                                        !adviceError ? (
+                                        <View
+                                            style={{
+                                                padding: 18,
+                                                alignItems: 'center',
+                                            }}
+                                        >
+                                            <ActivityIndicator
+                                                size="small"
+                                                color={COLORS.primary}
+                                            />
+
+                                            <Text
+                                                style={{
+                                                    color: COLORS.textMuted,
+                                                    fontSize: 12,
+                                                    marginTop: 8,
+                                                }}
+                                            >
+                                                Cargando consejos...
+                                            </Text>
+                                        </View>
+                                    ) : adviceError && adviceItems.length === 0 ? (
+
                                         <View
                                             style={{
                                                 backgroundColor: 'rgba(250,204,21,0.08)',

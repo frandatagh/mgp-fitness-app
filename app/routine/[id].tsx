@@ -250,6 +250,9 @@ export default function RoutineDetailScreen() {
 
     const [routineSurveyVisible, setRoutineSurveyVisible] = useState(false);
     const [routineScore, setRoutineScore] = useState<number | null>(null);
+
+    const [routineOfflineSaved, setRoutineOfflineSaved] = useState(false);
+
     const [
         routineUiPhase,
         setRoutineUiPhase,
@@ -680,6 +683,8 @@ export default function RoutineDetailScreen() {
     const handleDonePress = () => {
         setRoutineScore(null);
 
+        setRoutineOfflineSaved(false);
+
         setRoutineUiPhase(
             'survey'
         );
@@ -810,6 +815,10 @@ export default function RoutineDetailScreen() {
                             score,
                         }
                     );
+
+
+                setRoutineOfflineSaved(result.offlineSaved);
+
 
                 console.log(
                     'Resultado checkin rutina:',
@@ -3898,7 +3907,11 @@ export default function RoutineDetailScreen() {
                                             marginTop: 9,
                                         }}
                                     >
-                                        ¡Rutina registrada!
+
+                                        {routineOfflineSaved
+                                            ? '¡Valoración guardada en el dispositivo!'
+                                            : '¡Rutina registrada!'}
+
                                     </Text>
 
                                     {routineScore !=
@@ -3967,7 +3980,11 @@ export default function RoutineDetailScreen() {
                                                 280,
                                         }}
                                     >
-                                        Tu rutina fue marcada como realizada y tu valoración ya forma parte de tus estadísticas.
+
+                                        {routineOfflineSaved
+                                            ? 'Tu valoración quedó guardada localmente y está pendiente de sincronización. Todavía no forma parte de las estadísticas del servidor.'
+                                            : 'Tu rutina fue marcada como realizada y tu valoración ya forma parte de tus estadísticas.'}
+
                                     </Text>
 
                                     <Pressable

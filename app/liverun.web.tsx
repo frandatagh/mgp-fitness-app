@@ -57,6 +57,12 @@ const MAX_ROUTE_ACCURACY_METERS =
     IS_LOCAL_DEV ? 90000 : 35;
 
 
+const MAX_REASONABLE_RUN_SPEED_MPS = 12;
+const STOP_CONFIRMATION_MS = 10000;
+const GPS_STALE_MS = 8000;
+
+
+
 
 function haversineDistanceMeters(a: RunPoint, b: RunPoint) {
     const toRad = (value: number) => (value * Math.PI) / 180;
@@ -130,8 +136,7 @@ function shouldAcceptWebPoint(
     const gpsSpeedMps =
         nextPoint.speed ?? null;
 
-    // Evitamos saltos imposibles.
-    if (impliedSpeedMps > 6.5) {
+    if (impliedSpeedMps > MAX_REASONABLE_RUN_SPEED_MPS) {
         return {
             accept: false,
             distance: 0,
@@ -141,7 +146,7 @@ function shouldAcceptWebPoint(
 
     if (
         gpsSpeedMps != null &&
-        gpsSpeedMps > 6.5
+        gpsSpeedMps > MAX_REASONABLE_RUN_SPEED_MPS
     ) {
         return {
             accept: false,
@@ -649,6 +654,19 @@ export default function LiveRunWeb() {
     const [maxSpeedMps, setMaxSpeedMps] =
         useState(0);
 
+    const smoothedSpeedRef =
+        useRef<number | null>(null);
+
+    const recentSpeedSamplesRef =
+        useRef<number[]>([]);
+
+    const lastMovementAtRef =
+        useRef<number | null>(null);
+
+    const lastGoodGpsAtRef =
+        useRef<number | null>(null);
+
+
     const startedAtMsRef =
         useRef<number | null>(null);
 
@@ -720,6 +738,16 @@ export default function LiveRunWeb() {
             session: RunSession;
             gpsBreakCount: number;
         } | null>(null);
+
+
+    const [previewRunSummary, setPreviewRunSummary] =
+        useState<{
+            durationSeconds: number;
+            distanceMeters: number;
+            avgPaceSecPerKm: number | null;
+            maxSpeedMps: number | null;
+        } | null>(null);
+
 
     const [runSessionRating, setRunSessionRating] =
         useState<number | null>(null);
@@ -878,6 +906,17 @@ export default function LiveRunWeb() {
 
     const pendingHomeAfterFinishRef =
         useRef(false);
+
+
+    const { height: viewportHeight } = useWindowDimensions();
+
+    const summaryMapHeight =
+        viewportHeight < 690
+            ? 110
+            : viewportHeight < 850
+                ? 140
+                : 170;
+
 
     const requestDeleteSummaryConfirmation = () => {
         if (
@@ -1204,6 +1243,15 @@ export default function LiveRunWeb() {
                 const lastPoint =
                     lastAcceptedPointRef.current;
 
+
+                if (
+                    (nextPoint.accuracy ?? 999) <=
+                    MAX_ROUTE_ACCURACY_METERS
+                ) {
+                    lastGoodGpsAtRef.current = Date.now();
+                }
+
+
                 /*
                  * Primero comprobamos si el nuevo punto
                  * tiene una precisión GPS aceptable.
@@ -1268,7 +1316,10 @@ export default function LiveRunWeb() {
                         segmentId:
                             currentSegmentIdRef.current,
                     };
-                    setCurrentSpeedMps(0);
+                    setCurrentSpeedMps(null);
+                    smoothedSpeedRef.current = null;
+                    recentSpeedSamplesRef.current = [];
+                    lastMovementAtRef.current = Date.now();
 
                     setRoutePoints(
                         (current) => [
@@ -1299,80 +1350,105 @@ export default function LiveRunWeb() {
                         nextPoint
                     );
 
-                if (!decision.accept) {
-                    /*
-                     * Si simplemente estamos prácticamente
-                     * quietos, mostramos velocidad cero.
-                     */
-                    if (
-                        decision.reason ===
-                        'tiny_noise'
-                    ) {
-                        setCurrentSpeedMps(0);
-                    }
 
+                if (!decision.accept) {
+                    // Un desplazamiento pequeño no demuestra
+                    // que el corredor se haya detenido.
+                    // El control temporal decidirá cuándo
+                    // corresponde mostrar velocidad cero.
                     return;
                 }
+
 
                 const acceptedPoint: RunPoint = {
                     ...nextPoint,
                     segmentId:
                         currentSegmentIdRef.current,
                 };
-                /*
- * Calculamos velocidad.
- *
- * Primero usamos la velocidad que nos da
- * directamente el GPS cuando es válida.
- *
- * Si el navegador no la proporciona,
- * la derivamos usando distancia / tiempo.
- */
-                let safeSpeedMps: number | null = null;
 
-                if (
-                    nextPoint.speed != null &&
-                    nextPoint.speed >= 0 &&
-                    nextPoint.speed <= 6.5
-                ) {
-                    safeSpeedMps =
-                        nextPoint.speed;
-                } else if (lastPoint) {
-                    const secondsBetweenPoints =
-                        Math.max(
-                            (
-                                nextPoint.timestamp -
-                                lastPoint.timestamp
-                            ) / 1000,
-                            0.1
+                /*
+                 * VELOCIDAD GPS ESTABILIZADA
+                 *
+                 * Combinamos, cuando son compatibles:
+                 * - velocidad informada por el GPS;
+                 * - distancia / tiempo entre puntos.
+                 */
+
+                const secondsBetweenPoints = lastPoint
+                    ? (nextPoint.timestamp - lastPoint.timestamp) / 1000
+                    : 0;
+
+                const calculatedSpeedMps =
+                    lastPoint && secondsBetweenPoints > 0.1
+                        ? decision.distance / secondsBetweenPoints
+                        : null;
+
+                const validCalculatedSpeed =
+                    calculatedSpeedMps != null &&
+                        calculatedSpeedMps >= 0 &&
+                        calculatedSpeedMps <= MAX_REASONABLE_RUN_SPEED_MPS
+                        ? calculatedSpeedMps
+                        : null;
+
+                // Ignoramos ceros aislados del sensor cuando
+                // el desplazamiento indica movimiento.
+                const validGpsSpeed =
+                    typeof nextPoint.speed === 'number' &&
+                        nextPoint.speed > 0.5 &&
+                        nextPoint.speed <= MAX_REASONABLE_RUN_SPEED_MPS
+                        ? nextPoint.speed
+                        : null;
+
+                // Si ambas mediciones son razonablemente
+                // parecidas, utilizamos su promedio.
+                const speedSample =
+                    validGpsSpeed != null &&
+                        validCalculatedSpeed != null &&
+                        Math.abs(validGpsSpeed - validCalculatedSpeed) <= 3
+                        ? (validGpsSpeed + validCalculatedSpeed) / 2
+                        : validGpsSpeed ?? validCalculatedSpeed;
+
+                if (speedSample != null) {
+                    // Suavizado exponencial: 65% de la
+                    // lectura anterior y 35% de la nueva.
+                    const previousSpeed = smoothedSpeedRef.current;
+
+                    const stableSpeed =
+                        previousSpeed == null
+                            ? speedSample
+                            : previousSpeed * 0.65 + speedSample * 0.35;
+
+                    smoothedSpeedRef.current = stableSpeed;
+
+                    setCurrentSpeedMps(stableSpeed);
+
+                    if (speedSample >= 0.8) {
+                        lastMovementAtRef.current = Date.now();
+                    }
+
+                    // Guardamos las tres muestras más recientes.
+                    const samples = [
+                        ...recentSpeedSamplesRef.current,
+                        speedSample,
+                    ].slice(-3);
+
+                    recentSpeedSamplesRef.current = samples;
+
+                    // Para la máxima utilizamos la mediana
+                    // de tres muestras, evitando picos aislados.
+                    if (samples.length === 3) {
+                        const ordered = [...samples].sort(
+                            (a, b) => a - b
                         );
 
-                    const calculatedSpeed =
-                        decision.distance /
-                        secondsBetweenPoints;
+                        const confirmedSpeed = ordered[1];
 
-                    if (
-                        calculatedSpeed >= 0 &&
-                        calculatedSpeed <= 6.5
-                    ) {
-                        safeSpeedMps =
-                            calculatedSpeed;
+                        setMaxSpeedMps((previous) =>
+                            Math.max(previous, confirmedSpeed)
+                        );
                     }
                 }
 
-                setCurrentSpeedMps(
-                    safeSpeedMps ?? 0
-                );
-
-                if (safeSpeedMps != null) {
-                    setMaxSpeedMps(
-                        (previous) =>
-                            Math.max(
-                                previous,
-                                safeSpeedMps
-                            )
-                    );
-                }
 
                 if (lastPoint) {
                     setDistanceMeters(
@@ -1479,6 +1555,45 @@ export default function LiveRunWeb() {
             }
         };
     }, []);
+
+
+    useEffect(() => {
+        if (!isRunning || isPaused) return;
+
+        const interval = setInterval(() => {
+            const now = Date.now();
+
+            const lastGps = lastGoodGpsAtRef.current;
+            const lastMovement = lastMovementAtRef.current;
+
+            // Si no recibimos GPS confiable,
+            // mostramos velocidad no disponible.
+            if (
+                lastGps == null ||
+                now - lastGps > GPS_STALE_MS
+            ) {
+                smoothedSpeedRef.current = null;
+                setCurrentSpeedMps(null);
+                return;
+            }
+
+            // Solo mostramos cero cuando transcurrieron
+            // diez segundos sin movimiento confirmado.
+            if (
+                lastMovement != null &&
+                now - lastMovement >= STOP_CONFIRMATION_MS
+            ) {
+                smoothedSpeedRef.current = 0;
+                recentSpeedSamplesRef.current = [];
+                setCurrentSpeedMps(0);
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [isRunning, isPaused]);
+
+
+
 
     const invalidateRouteRequests = () => {
         /*
@@ -1634,6 +1749,12 @@ export default function LiveRunWeb() {
         setCurrentSpeedMps(null);
         setMaxSpeedMps(0);
 
+        smoothedSpeedRef.current = null;
+        recentSpeedSamplesRef.current = [];
+        lastMovementAtRef.current = Date.now();
+        lastGoodGpsAtRef.current = Date.now();
+
+
         startedAtMsRef.current =
             Date.now();
 
@@ -1726,6 +1847,13 @@ export default function LiveRunWeb() {
          */
         forceSegmentBreakRef.current =
             true;
+
+
+        smoothedSpeedRef.current = null;
+        recentSpeedSamplesRef.current = [];
+        lastMovementAtRef.current = Date.now();
+        lastGoodGpsAtRef.current = Date.now();
+        setCurrentSpeedMps(null);
 
         isPausedRef.current = false;
         setIsPaused(false);
@@ -1851,22 +1979,40 @@ export default function LiveRunWeb() {
         screenLockModeRef.current =
             false;
 
-        setScreenLockMode(false);
 
-        await releaseScreenWakeLock();
+        setScreenLockMode(false);
 
         const avgPaceSecPerKm =
             distanceMeters > 0
                 ? finalElapsedSeconds /
-                (
-                    distanceMeters /
-                    1000
-                )
+                (distanceMeters / 1000)
                 : null;
 
-        try {
-            setSavingSession(true);
+        // Preparamos las métricas antes de esperar al servidor.
+        setPreviewRunSummary({
+            durationSeconds: finalElapsedSeconds,
+            distanceMeters,
+            avgPaceSecPerKm,
+            maxSpeedMps:
+                maxSpeedMps > 0 ? maxSpeedMps : null,
+        });
 
+        // Reiniciamos los controles del resumen.
+        setLastSessionSummary(null);
+        setRunSessionRating(null);
+        setRunSessionRatingLoading(false);
+        setRunSessionRatingSaved(false);
+        runSessionRatingSavedRef.current = false;
+        setConfirmDeleteSummary(false);
+
+        // Abrimos el único modal de resumen.
+        setSavingSession(true);
+        setSummaryVisible(true);
+
+        await releaseScreenWakeLock();
+
+
+        try {
             if (startedAtMs == null) {
                 throw new Error(
                     'No se encontró el inicio de la sesión.'
@@ -1943,7 +2089,7 @@ export default function LiveRunWeb() {
                 gpsBreakCount,
             });
 
-            setSummaryVisible(true);
+            setPreviewRunSummary(null);
         } catch (error) {
             console.error(
                 'Error guardando sesión web:',
@@ -1998,6 +2144,12 @@ export default function LiveRunWeb() {
         setDistanceMeters(0);
         setCurrentSpeedMps(null);
         setMaxSpeedMps(0);
+
+        smoothedSpeedRef.current = null;
+        recentSpeedSamplesRef.current = [];
+        lastMovementAtRef.current = Date.now();
+        lastGoodGpsAtRef.current = Date.now();
+
 
         setGpsBreakCount(0);
 
@@ -2855,6 +3007,9 @@ export default function LiveRunWeb() {
     const cancelDangerousRunAction = () => {
         setDangerActionToConfirm(null);
     };
+
+    const summaryMetrics =
+        lastSessionSummary?.session ?? previewRunSummary;
 
     return (
         <SafeAreaView
@@ -5077,12 +5232,16 @@ export default function LiveRunWeb() {
                     </View>
                 </View>
             </Modal>
+
+
             <Modal
                 visible={summaryVisible}
                 transparent
                 animationType="fade"
                 onRequestClose={() => {
-                    void closeSessionSummary();
+                    if (!savingSession) {
+                        void closeSessionSummary();
+                    }
                 }}
             >
                 <View
@@ -5156,15 +5315,45 @@ export default function LiveRunWeb() {
                                 </Text>
                             </View>
 
-                            {lastSessionSummary && (
-                                <>
-                                    {/* MAPA */}
 
-                                    <HistorySessionMapPreview
-                                        session={
-                                            lastSessionSummary.session
-                                        }
-                                    />
+                            {summaryMetrics && (
+                                <>
+                                    {/* MAPA COMPACTO CON CARGA LOCALIZADA */}
+
+                                    {lastSessionSummary ? (
+                                        <HistorySessionMapPreview
+                                            session={lastSessionSummary.session}
+                                            height={summaryMapHeight}
+                                        />
+                                    ) : (
+                                        <View
+                                            style={{
+                                                height: summaryMapHeight,
+                                                borderRadius: 16,
+                                                backgroundColor: '#181818',
+                                                borderWidth: 1,
+                                                borderColor: '#333333',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                            }}
+                                        >
+                                            <ActivityIndicator
+                                                size="large"
+                                                color={COLORS.primary}
+                                            />
+
+                                            <Text
+                                                style={{
+                                                    color: '#AAAAAA',
+                                                    fontSize: 11,
+                                                    marginTop: 8,
+                                                }}
+                                            >
+                                                Guardando recorrido...
+                                            </Text>
+                                        </View>
+                                    )}
+
 
                                     {/* MÉTRICAS */}
 
@@ -5178,39 +5367,28 @@ export default function LiveRunWeb() {
                                             marginTop: 14,
                                         }}
                                     >
+
                                         <HistoryMetric
                                             label="Tiempo"
                                             value={formatDuration(
-                                                lastSessionSummary
-                                                    .session
-                                                    .durationSeconds
+                                                summaryMetrics.durationSeconds
                                             )}
                                         />
 
                                         <HistoryMetric
                                             label="Distancia"
                                             value={formatDistance(
-                                                lastSessionSummary
-                                                    .session
-                                                    .distanceMeters
+                                                summaryMetrics.distanceMeters
                                             )}
                                         />
 
                                         <HistoryMetric
                                             label="Ritmo promedio"
                                             value={
-                                                lastSessionSummary
-                                                    .session
-                                                    .avgPaceSecPerKm !=
-                                                    null
+                                                summaryMetrics.avgPaceSecPerKm != null
                                                     ? formatPace(
-                                                        lastSessionSummary
-                                                            .session
-                                                            .distanceMeters,
-
-                                                        lastSessionSummary
-                                                            .session
-                                                            .durationSeconds
+                                                        summaryMetrics.distanceMeters,
+                                                        summaryMetrics.durationSeconds
                                                     )
                                                     : '--'
                                             }
@@ -5219,11 +5397,10 @@ export default function LiveRunWeb() {
                                         <HistoryMetric
                                             label="Vel. máxima"
                                             value={formatSpeed(
-                                                lastSessionSummary
-                                                    .session
-                                                    .maxSpeedMps
+                                                summaryMetrics.maxSpeedMps
                                             )}
                                         />
+
                                     </View>
 
 
@@ -5334,89 +5511,69 @@ export default function LiveRunWeb() {
                                             </View>
                                         ) : (
                                             <>
+
                                                 <View
                                                     style={{
-                                                        flexDirection:
-                                                            'row',
-                                                        justifyContent:
-                                                            'center',
-                                                        flexWrap:
-                                                            'wrap',
-                                                        gap: 5,
+                                                        flexDirection: 'row',
+                                                        flexWrap: 'nowrap',
+                                                        width: '100%',
+                                                        gap: 2,
                                                     }}
                                                 >
                                                     {Array.from(
-                                                        {
-                                                            length: 10,
-                                                        },
-                                                        (
-                                                            _,
-                                                            index
-                                                        ) => {
-                                                            const value =
-                                                                index +
-                                                                1;
+                                                        { length: 10 },
+                                                        (_, index) => {
+                                                            const value = index + 1;
 
                                                             const selected =
-                                                                runSessionRating ===
-                                                                value;
+                                                                runSessionRating === value;
 
                                                             return (
                                                                 <Pressable
-                                                                    key={
-                                                                        value
-                                                                    }
+                                                                    key={value}
                                                                     onPress={() =>
-                                                                        void handleRateLastRunSession(
-                                                                            value
-                                                                        )
+                                                                        void handleRateLastRunSession(value)
                                                                     }
                                                                     style={{
-                                                                        width: 27,
-                                                                        height: 27,
+                                                                        flex: 1,
+                                                                        minWidth: 0,
+                                                                        height: 29,
+                                                                        borderRadius: 6,
 
-                                                                        borderRadius: 7,
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
 
-                                                                        alignItems:
-                                                                            'center',
-                                                                        justifyContent:
-                                                                            'center',
-
-                                                                        backgroundColor:
-                                                                            selected
-                                                                                ? COLORS.primary
-                                                                                : value <=
-                                                                                    3
-                                                                                    ? '#7F1D1D'
-                                                                                    : value <=
-                                                                                        7
-                                                                                        ? '#3F3F46'
-                                                                                        : '#3F6212',
+                                                                        backgroundColor: selected
+                                                                            ? COLORS.primary
+                                                                            : value <= 3
+                                                                                ? '#7F1D1D'
+                                                                                : value <= 7
+                                                                                    ? '#3F3F46'
+                                                                                    : '#3F6212',
                                                                     }}
+                                                                    disabled={savingSession}
                                                                 >
                                                                     <Text
+                                                                        numberOfLines={1}
+                                                                        adjustsFontSizeToFit
                                                                         style={{
-                                                                            color:
-                                                                                selected
-                                                                                    ? '#111111'
-                                                                                    : '#FFFFFF',
+                                                                            color: selected
+                                                                                ? '#111111'
+                                                                                : '#FFFFFF',
 
-                                                                            fontSize:
-                                                                                11,
-
-                                                                            fontWeight:
-                                                                                '900',
+                                                                            fontSize: 10,
+                                                                            fontWeight: '900',
+                                                                            textAlign: 'center',
                                                                         }}
                                                                     >
-                                                                        {
-                                                                            value
-                                                                        }
+                                                                        {value}
                                                                     </Text>
                                                                 </Pressable>
                                                             );
                                                         }
                                                     )}
                                                 </View>
+
 
                                                 <Text
                                                     style={{
@@ -5484,6 +5641,7 @@ export default function LiveRunWeb() {
                                                             false
                                                         )
                                                     }
+                                                    disabled={deletePromptLoading || savingSession}
                                                     style={{
                                                         flex: 1,
                                                         backgroundColor:
@@ -5642,6 +5800,7 @@ export default function LiveRunWeb() {
                                                     onPress={() =>
                                                         void openStatisticsFromSummary()
                                                     }
+                                                    disabled={savingSession}
                                                     style={{
                                                         flex: 1,
 
@@ -5693,6 +5852,7 @@ export default function LiveRunWeb() {
                                                 onPress={() =>
                                                     void closeSessionSummary()
                                                 }
+                                                disabled={savingSession}
                                                 style={{
                                                     marginTop: 10,
 

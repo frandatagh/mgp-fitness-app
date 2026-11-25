@@ -16,6 +16,7 @@ import {
   FitnessInsightsProvider,
 } from '../context/FitnessInsightsContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import OfflineSyncManager from '../components/OfflineSyncManager';
 import { COLORS } from '../constants/colors';
 import {
   useAppHeader,
@@ -239,9 +240,12 @@ export default function RootLayout() {
         flex: 1,
       }}
     >
+
       <AuthProvider>
 
         <FitnessInsightsProvider>
+
+          <OfflineSyncManager />
 
           <AppHeaderProvider>
 
@@ -252,6 +256,7 @@ export default function RootLayout() {
         </FitnessInsightsProvider>
 
       </AuthProvider>
+
     </GestureHandlerRootView>
   );
 }

@@ -126,7 +126,7 @@ function NewRoutineNavButton({
 // ----------------------------------------------------------
 
 export default function NewRoutineScreen() {
-    const { isAuthenticated } = useAuth();
+    const { isAuthenticated, user } = useAuth();
 
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -268,9 +268,19 @@ export default function NewRoutineScreen() {
 
     // Guardar rutina ----------------------------------------
 
+
     const handleSave = async () => {
+        if (!user?.id) {
+            Alert.alert(
+                'Sesión no disponible',
+                'Debes iniciar sesión para guardar una rutina.'
+            );
+            return;
+        }
+
         const trimmedTitle =
             title.trim();
+
 
         setTitleError(null);
         setExerciseError(null);
@@ -325,10 +335,13 @@ export default function NewRoutineScreen() {
                 payload
             );
 
+
             const result =
                 await createRoutineWithOfflineSupport(
-                    payload
+                    payload,
+                    user.id
                 );
+
 
             console.log(
                 'Resultado guardado rutina:',

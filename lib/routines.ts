@@ -86,14 +86,22 @@ export async function getRoutine(id: string): Promise<Routine> {
     return data;
 }
 
+
 export async function createRoutine(
-    payload: CreateRoutinePayload
+    payload: CreateRoutinePayload,
+    clientRequestId?: string
 ): Promise<Routine> {
     const res = await apiFetch('/routines', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+            'Content-Type': 'application/json',
+            ...(clientRequestId
+                ? { 'Idempotency-Key': clientRequestId }
+                : {}),
+        },
         body: JSON.stringify(payload),
     });
+
 
     if (!res.ok) {
         const text = await res.text().catch(() => '');
@@ -230,6 +238,7 @@ export async function saveExerciseCheckin(
     payload: {
         routineId: string;
         score: number;
+        performedAt?: string;
     }
 ) {
     const res = await apiFetch(`/exercises/${exerciseId}/checkin`, {
@@ -249,10 +258,15 @@ export async function saveExerciseCheckin(
     return res.json();
 }
 
+
 export async function saveRoutineCheckin(
     routineId: string,
-    payload: { score: number }
+    payload: {
+        score: number;
+        performedAt?: string;
+    }
 ) {
+
     const res = await apiFetch(`/routines/${routineId}/checkin`, {
         method: 'POST',
         headers: {

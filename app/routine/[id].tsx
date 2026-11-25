@@ -236,7 +236,9 @@ function ScoreSelector({
 }
 
 export default function RoutineDetailScreen() {
-    const { isAuthenticated } = useAuth();
+
+    const { isAuthenticated, user } = useAuth();
+
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
 
@@ -793,9 +795,10 @@ export default function RoutineDetailScreen() {
         ]).start();
     };
 
+
     const handleSelectRoutineScore =
         async (score: number) => {
-            if (!routine?.id) {
+            if (!routine?.id || !user?.id) {
                 return;
             }
 
@@ -813,9 +816,9 @@ export default function RoutineDetailScreen() {
                         routine.id,
                         {
                             score,
-                        }
+                        },
+                        user.id
                     );
-
 
                 setRoutineOfflineSaved(result.offlineSaved);
 
@@ -1030,16 +1033,19 @@ export default function RoutineDetailScreen() {
         });
     };
 
+
     const handleSelectExerciseScore =
         async (
             score: number
         ) => {
             if (
                 !selectedExercise?.id ||
-                !routine?.id
+                !routine?.id ||
+                !user?.id
             ) {
                 return;
             }
+
 
             try {
                 setExerciseScore(
@@ -1050,19 +1056,17 @@ export default function RoutineDetailScreen() {
                     'savingAnswer'
                 );
 
-                /*
-                 * Guardamos inmediatamente.
-                 */
+
                 const result =
                     await saveExerciseCheckinWithOfflineSupport(
                         selectedExercise.id,
                         {
-                            routineId:
-                                routine.id,
-
+                            routineId: routine.id,
                             score,
-                        }
+                        },
+                        user.id
                     );
+
 
                 const ratedExerciseId =
                     selectedExercise.id;

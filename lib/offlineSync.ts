@@ -14,18 +14,37 @@ let syncInProgress = false;
 
 async function processPendingAction(action: PendingAction): Promise<void> {
     switch (action.type) {
+
         case 'CREATE_ROUTINE': {
-            await createRoutine(action.payload);
+            await createRoutine(
+                action.payload,
+                action.id
+            );
             return;
         }
+
+
 
         case 'EXERCISE_CHECKIN': {
-            await saveExerciseCheckin(action.exerciseId, action.payload);
+            await saveExerciseCheckin(
+                action.exerciseId,
+                {
+                    ...action.payload,
+                    performedAt: new Date(action.createdAt).toISOString(),
+                }
+            );
             return;
         }
 
+
         case 'ROUTINE_CHECKIN': {
-            await saveRoutineCheckin(action.routineId, action.payload);
+            await saveRoutineCheckin(
+                action.routineId,
+                {
+                    ...action.payload,
+                    performedAt: new Date(action.createdAt).toISOString(),
+                }
+            );
             return;
         }
 
@@ -36,12 +55,29 @@ async function processPendingAction(action: PendingAction): Promise<void> {
     }
 }
 
-export async function syncPendingActions(): Promise<{
+
+
+export async function syncPendingActions(
+    userId: string,
+    isSessionActive: () => boolean
+): Promise<{
     processed: number;
     remaining: number;
 }> {
+    // Sin usuario o sin sesión activa, no sincronizamos.
+    if (!userId.trim() || !isSessionActive()) {
+        return {
+            processed: 0,
+            remaining: (await getPendingActions()).length,
+        };
+    }
+
+    // Evitamos sincronizaciones simultáneas.
     if (syncInProgress) {
-        return { processed: 0, remaining: (await getPendingActions()).length };
+        return {
+            processed: 0,
+            remaining: (await getPendingActions()).length,
+        };
     }
 
     syncInProgress = true;
@@ -49,7 +85,11 @@ export async function syncPendingActions(): Promise<{
     try {
         const netState = await NetInfo.fetch();
 
-        if (!netState.isConnected) {
+
+        if (
+            netState.isConnected !== true ||
+            netState.isInternetReachable === false
+        ) {
             return {
                 processed: 0,
                 remaining: (await getPendingActions()).length,
@@ -60,17 +100,53 @@ export async function syncPendingActions(): Promise<{
 
         let processed = 0;
 
-        for (const action of actions) {
-            try {
-                await processPendingAction(action);
-                await removePendingActionById(action.id);
-                processed += 1;
-            } catch (error) {
-                console.error('Error sincronizando acción pendiente:', action, error);
 
-                // Cortamos en la primera que falla para mantener orden y evitar efectos raros.
+
+        for (const action of actions) {
+            // Si cambió la sesión, dejamos de enviar acciones.
+            if (!isSessionActive()) {
+                console.warn(
+                    'Sincronización detenida: la sesión ya no está activa.'
+                );
                 break;
             }
+
+            // Solo procesamos acciones del usuario autenticado.
+            if (action.userId !== userId) {
+                continue;
+            }
+
+
+            try {
+                await processPendingAction(action);
+
+                // Volvemos a comprobar la sesión después de
+                // recibir la respuesta del servidor.
+                if (!isSessionActive()) {
+                    console.warn(
+                        '[OfflineSync] La sesión cambió durante la solicitud. ' +
+                        'La acción permanecerá pendiente para su verificación.'
+                    );
+                    break;
+                }
+
+                // Eliminamos la acción solamente después de
+                // una respuesta exitosa y una sesión vigente.
+                await removePendingActionById(action.id);
+
+                processed += 1;
+
+            } catch (error) {
+                console.error(
+                    'Error sincronizando acción pendiente:',
+                    action.id,
+                    error
+                );
+
+                // Conservamos la acción y detenemos esta sincronización.
+                break;
+            }
+
         }
 
         const remaining = (await getPendingActions()).length;

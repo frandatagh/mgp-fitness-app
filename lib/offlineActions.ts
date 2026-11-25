@@ -10,14 +10,24 @@ import {
     type CreateRoutinePayload,
 } from './routines';
 
+
 export async function createRoutineWithOfflineSupport(
-    payload: CreateRoutinePayload
+    payload: CreateRoutinePayload,
+    userId: string
 ) {
+    // Verificamos que la rutina tenga un propietario.
+    if (!userId?.trim()) {
+        throw new Error(
+            'No se puede crear una rutina sin identificar al usuario.'
+        );
+    }
+
     const netState = await NetInfo.fetch();
 
     if (!netState.isConnected) {
         await enqueuePendingAction({
             id: createPendingActionId(),
+            userId,
             type: 'CREATE_ROUTINE',
             payload,
             createdAt: Date.now(),
@@ -25,7 +35,8 @@ export async function createRoutineWithOfflineSupport(
 
         return {
             offlineSaved: true,
-            message: 'Rutina guardada localmente. Se sincronizará cuando vuelva internet.',
+            message:
+                'Rutina guardada localmente. Se sincronizará cuando vuelva internet.',
         };
     }
 
@@ -38,15 +49,26 @@ export async function createRoutineWithOfflineSupport(
     };
 }
 
+
+
 export async function saveExerciseCheckinWithOfflineSupport(
     exerciseId: string,
-    payload: { routineId: string; score: number }
+    payload: { routineId: string; score: number },
+    userId: string
 ) {
+    // Verificamos que la valoración tenga propietario.
+    if (!userId.trim()) {
+        throw new Error(
+            'No se puede guardar el ejercicio sin identificar al usuario.'
+        );
+    }
+
     const netState = await NetInfo.fetch();
 
     if (!netState.isConnected) {
         await enqueuePendingAction({
             id: createPendingActionId(),
+            userId,
             type: 'EXERCISE_CHECKIN',
             exerciseId,
             payload,
@@ -55,28 +77,43 @@ export async function saveExerciseCheckinWithOfflineSupport(
 
         return {
             offlineSaved: true,
-            message: 'Checkin guardado localmente. Se sincronizará al reconectar.',
+            message:
+                'Valoración guardada localmente. Se sincronizará al reconectar.',
         };
     }
 
-    const result = await saveExerciseCheckin(exerciseId, payload);
+    const result = await saveExerciseCheckin(
+        exerciseId,
+        payload
+    );
 
     return {
         offlineSaved: false,
-        message: 'Checkin guardado correctamente.',
+        message: 'Valoración guardada correctamente.',
         data: result,
     };
 }
 
+
+
 export async function saveRoutineCheckinWithOfflineSupport(
     routineId: string,
-    payload: { score: number }
+    payload: { score: number },
+    userId: string
 ) {
+    // Ninguna valoración puede guardarse sin propietario.
+    if (!userId.trim()) {
+        throw new Error(
+            'No se puede guardar la valoración sin identificar al usuario.'
+        );
+    }
+
     const netState = await NetInfo.fetch();
 
     if (!netState.isConnected) {
         await enqueuePendingAction({
             id: createPendingActionId(),
+            userId,
             type: 'ROUTINE_CHECKIN',
             routineId,
             payload,
@@ -85,15 +122,19 @@ export async function saveRoutineCheckinWithOfflineSupport(
 
         return {
             offlineSaved: true,
-            message: 'Estado de rutina guardado localmente. Se sincronizará al reconectar.',
+            message:
+                'Valoración guardada localmente. Se sincronizará al reconectar.',
         };
     }
 
-    const result = await saveRoutineCheckin(routineId, payload);
+    const result = await saveRoutineCheckin(
+        routineId,
+        payload
+    );
 
     return {
         offlineSaved: false,
-        message: 'Estado de rutina guardado correctamente.',
+        message: 'Valoración guardada correctamente.',
         data: result,
     };
 }
